@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+*.db
+*.sqlite
+*.sqlite3
+groq key.txt
+*.log

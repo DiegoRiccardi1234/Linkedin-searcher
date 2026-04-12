@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Finder Universale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
+  <main class="layout">
+    <section class="hero card">
+      <div>
+        <h1>Job Finder Universale</h1>
+        <p>Upload CV, scansione LinkedIn/Indeed, rating AI, chat coaching, stato candidature persistente.</p>
+      </div>
+      <div class="meta">
+        <span id="providerBadge" class="badge">Provider: ...</span>
+        <span id="modelBadge" class="badge">Modello: ...</span>
+        <span class="badge">Profilo attivo: <select id="profileSelect"></select></span>
+      </div>
+    </section>
+
+    <section class="card split">
+      <div>
+        <h2>1) Carica CV</h2>
+        <form id="cvForm" class="row">
+          <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx" required />
+          <button type="submit">Upload</button>
+        </form>
+        <pre id="cvSummary" class="output"></pre>
+      </div>
+      <div>
+        <h2>2) Scansione</h2>
+        <form id="scanForm" class="column">
+          <textarea id="searchTerms" rows="4" placeholder="Una ricerca per riga (vuoto = default)"></textarea>
+          <div class="row">
+            <input id="locationInput" type="text" placeholder="Torino, Italy" />
+            <label class="toggle"><input id="remoteOnly" type="checkbox" /> Full remote</label>
+            <button type="submit">Avvia Scan</button>
+          </div>
+        </form>
+        <pre id="scanOutput" class="output"></pre>
+      </div>
+    </section>
+
+    <section class="card split">
+      <div>
+        <h2>3) Aggiungi annuncio manuale</h2>
+        <form id="manualForm" class="column">
+          <input id="manualTitolo" type="text" placeholder="Titolo" required />
+          <input id="manualAzienda" type="text" placeholder="Azienda" required />
+          <input id="manualSede" type="text" placeholder="Sede" />
+          <input id="manualLink" type="url" placeholder="Link" />
+          <textarea id="manualDescrizione" rows="4" placeholder="Descrizione"></textarea>
+          <button type="submit">Aggiungi + Analizza</button>
+        </form>
+      </div>
+      <div>
+        <h2>4) Chat coach</h2>
+        <div id="chatBox" class="chat-box"></div>
+        <form id="chatForm" class="row">
+          <input id="chatInput" type="text" placeholder="Es: consigliami i migliori 3 lavori da candidare ora" required />
+          <button type="submit">Invia</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="jobs-header">
+        <h2>5) Lavori</h2>
+        <div class="row">
+          <input id="searchText" type="text" placeholder="Cerca titolo/azienda" />
+          <input id="minScore" type="number" min="0" max="10" placeholder="Score min" />
+          <select id="statusFilter">
+            <option value="">Tutti stati</option>
+            <option value="open">Open</option>
+            <option value="applied">Applied</option>
+            <option value="rejected">Rejected</option>
+            <option value="archived">Archived</option>
+          </select>
+          <input id="maxAgeDays" type="number" min="1" max="365" placeholder="Max giorni" />
+          <label class="toggle"><input id="onlyNew" type="checkbox" /> Solo nuovi</label>
+          <label class="toggle"><input id="onlyFavorites" type="checkbox" /> Solo preferiti</label>
+          <button id="refreshJobsBtn" type="button">Aggiorna</button>
+          <button id="exportCsvBtn" type="button">Export CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nuovo</th>
+              <th>Score</th>
+              <th>Consiglio</th>
+              <th>Titolo</th>
+              <th>Azienda</th>
+              <th>Status</th>
+              <th>Dettaglio</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="jobsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>6) Dettaglio rating</h2>
+      <pre id="jobDetail" class="output detail-box">Seleziona un annuncio con il pulsante Dettaglio.</pre>
+    </section>
+  </main>
+
+  <script src="/web/app.js"></script>
+</body>
+</html>

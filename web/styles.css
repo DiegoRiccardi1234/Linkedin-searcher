@@ -1,0 +1,266 @@
+:root {
+  --bg: #f3efe6;
+  --card: rgba(255, 255, 255, 0.78);
+  --ink: #15202b;
+  --muted: #4a5968;
+  --accent: #0f8a5f;
+  --accent-2: #cb5f21;
+  --danger: #b61b3d;
+  --line: rgba(21, 32, 43, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at 10% 10%, #ffe2b3, transparent 40%),
+    radial-gradient(circle at 90% 80%, #b7ead6, transparent 38%),
+    var(--bg);
+  min-height: 100vh;
+}
+
+.bg-shape {
+  position: fixed;
+  z-index: -1;
+  border-radius: 999px;
+  filter: blur(30px);
+  opacity: 0.45;
+}
+
+.bg-shape-1 {
+  width: 240px;
+  height: 240px;
+  background: #ffd8a8;
+  top: 18%;
+  left: 8%;
+}
+
+.bg-shape-2 {
+  width: 280px;
+  height: 280px;
+  background: #9de1c5;
+  bottom: 10%;
+  right: 8%;
+}
+
+.layout {
+  width: min(1280px, 94vw);
+  margin: 1.2rem auto 2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  backdrop-filter: blur(6px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 12px 30px rgba(21, 32, 43, 0.08);
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.hero p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.meta {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-family: "IBM Plex Mono", monospace;
+  border: 1px dashed var(--line);
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+}
+
+.split {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  background: #fff;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  background: linear-gradient(120deg, var(--accent), #16a085);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+button.danger {
+  background: var(--danger);
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.column {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.output {
+  white-space: pre-wrap;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.detail-box {
+  max-height: 420px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.84rem;
+}
+
+.chat-box {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem;
+  height: 170px;
+  overflow: auto;
+}
+
+.chat-item {
+  margin-bottom: 0.6rem;
+  font-size: 0.92rem;
+}
+
+.chat-item .role {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--accent-2);
+  font-size: 0.8rem;
+}
+
+.jobs-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+#searchText {
+  min-width: 180px;
+}
+
+#minScore,
+#maxAgeDays,
+#statusFilter {
+  min-width: 96px;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.55rem;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.9rem;
+}
+
+td .mini {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.pill-new {
+  display: inline-block;
+  background: #0f8a5f;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 980px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jobs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
