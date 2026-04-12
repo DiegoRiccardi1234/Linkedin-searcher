@@ -1,3 +1,18 @@
+
+// Theme Toggle
+const themeToggle = document.getElementById('themeToggle');
+if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    });
+}
+// Apply saved theme
+const savedTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -163,7 +178,7 @@ async function saveKeys() {
     && !payload.google_api_key
     && !payload.primary_provider
   ) {
-    appendChat("system", "Inserisci almeno una key o scegli un provider primario.");
+    showToast("Inserisci almeno una key o scegli un provider primario.", "info");
     return;
   }
 
@@ -179,7 +194,7 @@ async function saveKeys() {
   await loadHealth();
   await loadKeysStatus();
   setKeysSectionMode(true);
-  appendChat("system", "Configurazione provider salvata. Motore AI ricaricato.");
+  showToast("Configurazione provider salvata. Motore AI ricaricato.", "info");
 }
 
 async function loadProfiles() {
@@ -204,7 +219,7 @@ async function loadProfiles() {
 async function activateProfile(profileId) {
   if (!profileId) return;
   await api(`/api/profiles/${profileId}/activate`, { method: "POST" });
-  appendChat("system", `Profilo attivo impostato su ID ${profileId}.`);
+  showToast(`Profilo attivo impostato su ID ${profileId}.`, "info");
 }
 
 function truncate(value, max = 120) {
@@ -288,7 +303,12 @@ async function showJobDetail(jobId) {
       </div>
     `;
   }
-  activateView("detail");
+  
+  const offcanvas = document.getElementById('jobOffcanvas');
+  if (offcanvas) {
+    offcanvas.classList.add('is-open');
+  }
+
 }
 
 async function performJobAction(jobId, action) {
@@ -363,7 +383,7 @@ async function loadRecommendations() {
           }
           await performJobAction(id, action);
         } catch (error) {
-          appendChat("system", `Errore azione rapida: ${error.message}`);
+          showToast(`Errore azione rapida: ${error.message}`, "info");
         }
       });
     });
@@ -375,7 +395,7 @@ async function loadRecommendations() {
         try {
           await toggleFavorite(id, fav);
         } catch (error) {
-          appendChat("system", `Errore preferito: ${error.message}`);
+          showToast(`Errore preferito: ${error.message}`, "info");
         }
       });
     });
@@ -403,7 +423,7 @@ async function loadChatPrompts() {
       wrap.appendChild(btn);
     }
   } catch (error) {
-    appendChat("system", `Prompt rapidi non disponibili: ${error.message}`);
+    showToast(`Prompt rapidi non disponibili: ${error.message}`, "info");
   }
 }
 
@@ -411,8 +431,13 @@ async function sendChatMessage(message) {
   const text = String(message || "").trim();
   if (!text) return;
 
-  appendChat("user", text);
-  activateView("detail");
+  showToast(text, "info");
+  
+  const offcanvas = document.getElementById('jobOffcanvas');
+  if (offcanvas) {
+    offcanvas.classList.add('is-open');
+  }
+
   try {
     const result = await api("/api/chat", {
       method: "POST",
@@ -478,7 +503,7 @@ async function loadJobs() {
       try {
         await performJobAction(id, action);
       } catch (error) {
-        appendChat("system", `Errore azione: ${error.message}`);
+        showToast(`Errore azione: ${error.message}`, "info");
       }
     });
   });
@@ -490,7 +515,7 @@ async function loadJobs() {
       try {
         await toggleFavorite(id, fav);
       } catch (error) {
-        appendChat("system", `Errore preferito: ${error.message}`);
+        showToast(`Errore preferito: ${error.message}`, "info");
       }
     });
   });
@@ -501,7 +526,7 @@ async function loadJobs() {
       try {
         await showJobDetail(id);
       } catch (error) {
-        appendChat("system", `Errore dettaglio: ${error.message}`);
+        showToast(`Errore dettaglio: ${error.message}`, "info");
       }
     });
   });
@@ -528,9 +553,9 @@ document.getElementById("linkedinForm").addEventListener("submit", async (event)
     status.textContent = "URL LinkedIn salvato con successo.";
     status.classList.remove("hidden");
     setTimeout(() => status.classList.add("hidden"), 3000);
-    appendChat("system", "URL di LinkedIn salvato. L'AI lo userà nelle prossime analisi.");
+    showToast("URL di LinkedIn salvato. L'AI lo userà nelle prossime analisi.", "info");
   } catch (error) {
-    appendChat("system", `Errore salvataggio LinkedIn: ${error.message}`);
+    showToast(`Errore salvataggio LinkedIn: ${error.message}`, "info");
   }
 });
 
@@ -614,10 +639,11 @@ document.getElementById("manualForm").addEventListener("submit", async (event) =
   });
 
   await Promise.all([loadJobs(), loadRecommendations()]);
-  appendChat("system", "Annuncio manuale aggiunto e analizzato.");
+  showToast("Annuncio manuale aggiunto e analizzato.", "info");
 });
 
-document.getElementById("chatForm").addEventListener("submit", async (event) => {
+const _chatForm = document.getElementById("chatForm");
+if (_chatForm) _chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = document.getElementById("chatInput");
   const message = input.value.trim();
@@ -626,14 +652,22 @@ document.getElementById("chatForm").addEventListener("submit", async (event) => 
   await sendChatMessage(message);
 });
 
-document.getElementById("quickRecommendBtn").addEventListener("click", async () => {
-  activateView("detail");
+const _quickRecommendBtn = document.getElementById("quickRecommendBtn");
+if (_quickRecommendBtn) _quickRecommendBtn.addEventListener("click", async () => {
+  
+  const offcanvas = document.getElementById('jobOffcanvas');
+  if (offcanvas) {
+    offcanvas.classList.add('is-open');
+  }
+
   await sendChatMessage("Consigliami i 5 lavori migliori da candidare oggi, in ordine di priorita.");
 });
 
-document.getElementById("refreshRecommendationsBtn").addEventListener("click", loadRecommendations);
+const _refreshRecommendationsBtn = document.getElementById("refreshRecommendationsBtn");
+if (_refreshRecommendationsBtn) _refreshRecommendationsBtn.addEventListener("click", loadRecommendations);
 
-document.getElementById("focusOpenBtn").addEventListener("click", async () => {
+const _focusOpenBtn = document.getElementById("focusOpenBtn");
+if (_focusOpenBtn) _focusOpenBtn.addEventListener("click", async () => {
   const status = document.getElementById("statusFilter");
   status.value = "open";
   activateView("dashboard");
@@ -647,20 +681,25 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
 });
 
 document.getElementById("railRecommendBtn").addEventListener("click", async () => {
-  activateView("detail");
+  
+  const offcanvas = document.getElementById('jobOffcanvas');
+  if (offcanvas) {
+    offcanvas.classList.add('is-open');
+  }
+
   await sendChatMessage("Consigliami i lavori piu forti su cui candidarmi adesso, con ordine di priorita.");
 });
 
 document.getElementById("detailApplyNowBtn").addEventListener("click", async () => {
   if (!selectedJobId) {
-    appendChat("system", "Apri prima un annuncio in dettaglio.");
+    showToast("Apri prima un annuncio in dettaglio.", "info");
     return;
   }
   try {
     await performJobAction(selectedJobId, "applied");
-    appendChat("system", "Candidatura marcata come inviata.");
+    showToast("Candidatura marcata come inviata.", "info");
   } catch (error) {
-    appendChat("system", `Errore candidatura: ${error.message}`);
+    showToast(`Errore candidatura: ${error.message}`, "info");
   }
 });
 
@@ -699,7 +738,7 @@ document.getElementById("profileSelect").addEventListener("change", async (event
 
 document.getElementById("exportCsvBtn").addEventListener("click", async () => {
   const result = await api("/api/export/csv", { method: "POST" });
-  appendChat("system", `CSV esportato: ${result.file}`);
+  showToast(`CSV esportato: ${result.file}`, "info");
 });
 
 async function bootstrap() {
@@ -714,5 +753,103 @@ async function bootstrap() {
 
 bootstrap().catch((error) => {
   console.error(error);
-  appendChat("system", `Errore inizializzazione: ${error.message}`);
+  showToast(`Errore inizializzazione: ${error.message}`, "info");
 });
+
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+    
+    container.appendChild(toast);
+}
+
+
+const closeOffcanvasBtn = document.getElementById('closeOffcanvasBtn');
+if (closeOffcanvasBtn) {
+    closeOffcanvasBtn.addEventListener('click', () => {
+        const offcanvas = document.getElementById('jobOffcanvas');
+        if (offcanvas) offcanvas.classList.remove('is-open');
+    });
+}
+
+
+let statusChart = null;
+let scoreChart = null;
+
+async function loadAnalytics() {
+    try {
+        const data = await api('/api/analytics');
+        
+        const statusCtx = document.getElementById('statusChart');
+        if (statusCtx && data.jobs_by_status) {
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data.jobs_by_status),
+                    datasets: [{
+                        data: Object.values(data.jobs_by_status),
+                        backgroundColor: ['#198754', '#dc3545', '#ffc107', '#0d6efd', '#6c757d']
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+        
+        const scoreCtx = document.getElementById('scoreChart');
+        if (scoreCtx && data.score_distribution) {
+            if(scoreChart) scoreChart.destroy();
+            scoreChart = new Chart(scoreCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.score_distribution),
+                    datasets: [{
+                        label: 'Match Score',
+                        data: Object.values(data.score_distribution),
+                        backgroundColor: '#0d6efd'
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to load analytics', e);
+    }
+}
+
+
+document.getElementById("viewTableBtn")?.addEventListener("click", e => {
+    document.getElementById("tableView").classList.add("is-active");
+    document.getElementById("kanbanView").classList.remove("is-active");
+    e.target.classList.add("is-active");
+    document.getElementById("viewKanbanBtn").classList.remove("is-active");
+});
+
+document.getElementById("viewKanbanBtn")?.addEventListener("click", e => {
+    document.getElementById("kanbanView").classList.add("is-active");
+    document.getElementById("tableView").classList.remove("is-active");
+    e.target.classList.add("is-active");
+    document.getElementById("viewTableBtn").classList.remove("is-active");
+    loadJobs(); // re-render kanban
+});
+
+// hook into activateView to trigger chart render for analytics view
+const origActivateView = activateView;
+activateView = function(viewName) {
+    origActivateView(viewName);
+    if(viewName === 'analytics') {
+        loadAnalytics();
+    }
+};

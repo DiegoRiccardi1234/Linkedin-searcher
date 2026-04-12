@@ -112,9 +112,10 @@ def run_scan(
     settings: AppSettings,
     provider_manager: ProviderManager,
     payload: ScanRequest,
-) -> dict[str, Any]:
+):
     if scrape_jobs is None:
-        raise RuntimeError("python-jobspy non installato")
+        yield {"error": "python-jobspy non installato"}
+        return
 
     profile = db.get_active_candidate_profile()
     profile_markdown = profile["markdown"] if profile else "Profilo non caricato."
@@ -134,6 +135,13 @@ def run_scan(
     db.set_preference("last_scan_terms", json.dumps(terms, ensure_ascii=False))
 
     run_id = db.begin_scan(location=location, is_remote=payload.is_remote, terms=terms)
+
+    yield {
+        "status": "started",
+        "terms": terms,
+        "location": location,
+        "is_remote": payload.is_remote,
+    }
 
     totale_trovati = 0
     totale_nuovi = 0
@@ -157,6 +165,7 @@ def run_scan(
         df = df.drop_duplicates(subset=["title", "company"])
         total_rows = len(df)
         totale_trovati += total_rows
+        yield {"status": "scraped", "term": term, "found": total_rows}
 
         for _, row in df.iterrows():
             titolo = str(row.get("title", "N/A"))
@@ -215,6 +224,7 @@ def run_scan(
 
             db.update_job_analysis(job_id=job_id, analysis=analysis)
             totale_analizzati += 1
+            yield {"status": "analyzed", "job": {"titolo": titolo, "azienda": azienda, "score": analysis.get("punteggio", 0)}}
             time.sleep(settings.delay_tra_chiamate)
 
         time.sleep(settings.delay_tra_ricerche)
@@ -228,14 +238,12 @@ def run_scan(
         totale_scartati=totale_scartati,
     )
 
-    return {
+    yield {
+        "status": "complete",
         "run_id": run_id,
         "totale_trovati": totale_trovati,
         "totale_nuovi": totale_nuovi,
         "totale_analizzati": totale_analizzati,
         "totale_scartati": totale_scartati,
         "archiviati": archiviati,
-        "location": location,
-        "is_remote": payload.is_remote,
-        "terms": terms,
     }

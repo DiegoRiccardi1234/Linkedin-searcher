@@ -9,16 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400" rel="stylesheet" />
   <link rel="stylesheet" href="/web/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">The Curated Career</div>
     <nav class="topnav">
       <button type="button" class="nav-link is-active" data-view="dashboard">Dashboard</button>
-      <button type="button" class="nav-link" data-view="detail">Discover</button>
       <button type="button" class="nav-link" data-view="settings">Settings</button>
     </nav>
     <div class="topbar-right">
+      <button type="button" id="themeToggle" class="icon-btn" title="Toggle Tema" style="background:none;border:none;cursor:pointer;color:inherit;"><span class="material-symbols-outlined">light_mode</span></button>
       <span class="material-symbols-outlined icon-btn">settings</span>
       <div class="avatar">D</div>
     </div>
@@ -63,16 +64,22 @@
           <strong>Consigliami i Top 5</strong>
           <small>Selezione basata su CV e obiettivi</small>
         </button>
-        <button id="refreshRecommendationsBtn" type="button" class="action-alt">
-          <span class="material-symbols-outlined">refresh</span>
-          <strong>Aggiorna Raccomandazioni</strong>
-          <small>Sincronizza le offerte recenti</small>
-        </button>
-        <button id="focusOpenBtn" type="button" class="action-alt">
-          <span class="material-symbols-outlined">visibility</span>
-          <strong>Mostra Solo Open</strong>
-          <small>Filtra posizioni ancora aperte</small>
-        </button>
+      </section>
+
+      <section class="analytics-section" style="margin-top: 32px;">
+        <div class="section-head">
+          <h2>Dashboard Analytics</h2>
+        </div>
+        <div style="display:flex; gap: 32px; flex-wrap: wrap;">
+          <div style="flex:1; min-width:300px; background:var(--surface); padding:16px; border-radius:8px; border:1px solid var(--border);">
+            <h4>Stato Candidature</h4>
+            <canvas id="statusChart"></canvas>
+          </div>
+          <div style="flex:1; min-width:300px; background:var(--surface); padding:16px; border-radius:8px; border:1px solid var(--border);">
+            <h4>Andamento AI Score</h4>
+            <canvas id="scoreChart"></canvas>
+          </div>
+        </div>
       </section>
 
       <section class="recommendations-section">
@@ -83,10 +90,15 @@
         <div id="recommendationsGrid" class="recommendations-grid"></div>
       </section>
 
-      <section class="jobs-section">
+      <section class="jobs-section" style="margin-top: 32px;">
         <div class="section-head jobs-head">
           <h2>Archivio Lavori</h2>
-          <div class="filters-row">
+          <div class="view-toggles" style="display:flex; gap:8px;">
+            <button id="viewTableBtn" type="button" class="tab-pill is-active">Tabella</button>
+            <button id="viewKanbanBtn" type="button" class="tab-pill">Kanban</button>
+          </div>
+        </div>
+        <div class="filters-row" style="margin-bottom:16px;">
             <input id="searchText" type="text" placeholder="Cerca titolo o azienda" />
             <input id="minScore" type="number" min="0" max="10" placeholder="Score min" />
             <select id="statusFilter">
@@ -101,14 +113,16 @@
             <label class="tiny-toggle"><input id="onlyFavorites" type="checkbox" /> Solo preferiti</label>
             <button id="refreshJobsBtn" type="button" class="secondary">Aggiorna</button>
             <button id="exportCsvBtn" type="button" class="secondary">Export CSV</button>
-          </div>
+            <button id="bulkActionBtn" type="button" class="secondary" title="Applica azione ai selezionati">Azione Massiva su Selezione (Applica Open/Scarta/etc dal filtro)</button>
         </div>
-        <div class="table-wrap">
+        
+        <div id="tableView" class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th><input type="checkbox" id="selectAllJobsCheckbox"/></th>
                 <th>Nuovo</th>
-                <th>Score</th>
+                <th class="sortable" data-sort="score">Score ▼</th>
                 <th>Consiglio</th>
                 <th>Titolo</th>
                 <th>Azienda</th>
@@ -120,59 +134,29 @@
             <tbody id="jobsTableBody"></tbody>
           </table>
         </div>
+        
+        <div id="kanbanView" class="kanban-board" style="display:none;">
+          <div class="kanban-col" data-status="open">
+            <h3>Open <span class="badge" id="k-count-open">0</span></h3>
+            <div class="cards-container"></div>
+          </div>
+          <div class="kanban-col" data-status="applied">
+            <h3>Applied <span class="badge" id="k-count-applied">0</span></h3>
+            <div class="cards-container"></div>
+          </div>
+          <div class="kanban-col" data-status="interview">
+            <h3>Archived <span class="badge" id="k-count-archived">0</span></h3>
+            <div class="cards-container"></div>
+          </div>
+          <div class="kanban-col" data-status="rejected">
+            <h3>Rejected <span class="badge" id="k-count-rejected">0</span></h3>
+            <div class="cards-container"></div>
+          </div>
+        </div>
       </section>
     </section>
 
-    <section id="view-detail" class="view">
-      <div class="detail-layout">
-        <article class="detail-main">
-          <p id="detailStatus" class="eyebrow">Stato: in revisione</p>
-          <h2 id="detailTitle">Seleziona un lavoro</h2>
-          <p id="detailCompany" class="detail-company">Apri un annuncio da Dashboard con il pulsante Dettaglio.</p>
-          <p id="detailMeta" class="detail-meta">Azienda, sede e score appariranno qui.</p>
-
-          <div class="next-action-banner">
-            <div>
-              <p class="banner-title">Prossimo Passo Consigliato</p>
-              <p id="detailAdvice">Quando selezioni un lavoro vedrai qui il consiglio AI per la candidatura.</p>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <button type="button" class="secondary" id="detailApplyNowBtn">Candida Ora</button>
-              <a id="detailLinkBtn" href="#" target="_blank" class="button secondary" style="display: none; align-items: center; justify-content: center; text-decoration: none;">Apri Link Offerta</a>
-            </div>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <button type="button" id="generateCoverLetterBtn" class="secondary" style="display: none;">Genera Cover Letter AI</button>
-            <div id="coverLetterBox" style="display: none; margin-top: 12px;">
-              <strong>Bozza Generata:</strong>
-              <textarea id="coverLetterOutput" rows="6" style="width: 100%; margin-top: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
-            </div>
-          </div>
-
-          <div class="detail-box-wrap" id="jobDetailContainer">
-            <div class="output detail-box">Seleziona un annuncio con il pulsante Dettaglio.</div>
-          </div>
-        </article>
-
-        <aside class="coach-panel">
-          <div class="coach-head">
-            <div class="coach-icon"><span class="material-symbols-outlined">psychology</span></div>
-            <div>
-              <h3>AI Career Coach</h3>
-              <p>Assistente attivo ora</p>
-            </div>
-          </div>
-          <div id="chatBox" class="chat-box"></div>
-          <div id="chatQuickPrompts" class="chat-quick-prompts"></div>
-          <form id="chatForm" class="chat-form">
-            <input id="chatInput" type="text" placeholder="Scrivi al tuo coach..." required />
-            <button type="submit" aria-label="Invia messaggio"><span class="material-symbols-outlined">send</span></button>
-          </form>
-        </aside>
-      </div>
-    </section>
-
+    
     <section id="view-settings" class="view">
       <header class="settings-hero">
         <h2>Configurazione <em>Profilo</em></h2>
@@ -277,6 +261,52 @@
     </aside>
   </main>
 
+  <aside id="jobOffcanvas" class="offcanvas">
+    <div class="offcanvas-header">
+      <h2 id="detailTitle">Dettagli</h2>
+      <button id="closeOffcanvasBtn" class="icon-btn" style="background:none;border:none;cursor:pointer"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="offcanvas-body" style="padding: 16px; overflow-y:auto;">
+      <p id="detailStatus" class="eyebrow" style="margin-bottom:8px">Stato: in revisione</p>
+      <p id="detailCompany" class="detail-company"></p>
+      <p id="detailMeta" class="detail-meta"></p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button id="detailApplyNowBtn" class="secondary">Candida Ora</button>
+        <a id="detailLinkBtn" target="_blank" class="button secondary" style="display:none;align-items:center;justify-content:center;text-decoration:none;">Vedi Offerta</a>
+      </div>
+      <div id="jobDetailContainer"></div>
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <button id="generateCoverLetterBtn" class="secondary" style="width:100%;margin-bottom:8px;">Genera / Aggiorna Cover Letter AI</button>
+        <div id="coverLetterBox" style="display:none;">
+          <textarea id="coverLetterOutput" rows="8" style="width:100%;padding:8px;border-radius:6px;font-family:inherit;"></textarea>
+          <div style="display:flex; align-items:center; margin-top:8px;">
+            <button id="saveCoverLetterBtn" class="secondary">Salva Bozze</button>
+            <span id="clSaveStatus" class="micro" style="margin-left:8px;color:var(--primary);"></span>
+          </div>
+        </div>
+      </div>
+      <div class="coach-panel" style="margin-top:24px;border:1px solid var(--border);border-radius:6px;">
+          <div class="coach-head" style="padding:12px;background:var(--surface);">
+            <h3>AI Career Coach</h3>
+          </div>
+          <div id="chatBox" class="chat-box" style="height:200px"></div>
+          <div id="chatQuickPrompts" class="chat-quick-prompts"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" type="text" placeholder="Scrivi al coach..." required />
+            <button type="submit"><span class="material-symbols-outlined">send</span></button>
+          </form>
+      </div>
+    </div>
+  </aside>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="scanOverlay" class="scan-overlay" style="display:none;">
+    <div class="scan-modal">
+      <h3>Scansione in corso...</h3>
+      <div class="progress-bar"><div class="progress-fill" id="scanProgressFill"></div></div>
+      <p id="scanProgressText" class="micro" style="margin-top:8px;">Inizializzazione...</p>
+      <button id="cancelScanBtn" class="secondary" style="margin-top:16px;">Chiudi/Sospendi</button>
+    </div>
+  </div>
   <script src="/web/app.js"></script>
 </body>
 </html>

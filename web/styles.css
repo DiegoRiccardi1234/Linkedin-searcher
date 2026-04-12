@@ -869,5 +869,139 @@ td .mini button {
  } 
  . p r o   {   b a c k g r o u n d :   r g b a ( 5 2 ,   2 1 1 ,   1 5 3 ,   0 . 1 ) ;   b o r d e r - l e f t :   3 p x   s o l i d   # 3 4 d 3 9 9 ;   } 
  . c o n   {   b a c k g r o u n d :   r g b a ( 2 4 8 ,   1 1 3 ,   1 1 3 ,   0 . 1 ) ;   b o r d e r - l e f t :   3 p x   s o l i d   # f 8 7 1 7 1 ;   } 
-  
  
+ 
+ 
+/* THEME DARK/LIGHT */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --bg-2: #1e293b;
+  --surface: #1e293b;
+  --surface-2: #334155;
+  --ink: #f8fafc;
+  --muted: #94a3b8;
+  --line: #334155;
+  --primary: #3b82f6;
+  --primary-soft: #2563eb;
+  --secondary: #a83900;
+  --danger: #ef4444;
+  --assistant: #1e293b;
+  --user: #3b82f6;
+}
+
+/* OFFCANVAS */
+.offcanvas {
+  position: fixed;
+  top: 0;
+  right: -550px;
+  width: 500px;
+  max-width: 100%;
+  height: 100vh;
+  background: var(--bg);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+  transition: right 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+.offcanvas.is-open { right: 0; }
+.offcanvas-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.offcanvas-body { flex: 1; overflow-y: auto; }
+
+/* TOASTS */
+.toast-container {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--surface);
+  color: var(--ink);
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid var(--primary);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  min-width: 250px;
+  animation: slideIn 0.3s ease forwards;
+}
+.toast.is-success { border-left-color: var(--success); }
+.toast.is-error { border-left-color: var(--danger); }
+.toast.fade-out { animation: fadeOut 0.3s ease forwards; }
+
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+/* TABE/KANBAN TOGGLES */
+.tab-pill { background: none; border: 1px solid var(--line); color: var(--muted); padding: 4px 12px; border-radius: 16px; cursor: pointer; }
+.tab-pill.is-active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* KANBAN BOARD */
+.kanban-board {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-top: 16px;
+}
+.kanban-col {
+  flex: 1;
+  min-width: 280px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+.kanban-col h3 {
+  padding: 12px;
+  margin: 0;
+  font-size: 1rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kanban-col h3 .badge {
+  background: var(--line);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+.cards-container {
+  padding: 8px;
+  min-height: 200px;
+  flex: 1;
+}
+.k-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: grab;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.k-card:active { cursor: grabbing; opacity: 0.8; }
+.k-card.drag-over { border: 2px dashed var(--primary); background: rgba(59, 130, 246, 0.05); }
+.k-card-title { font-weight: bold; margin-bottom: 4px; font-size: 0.95rem; }
+.k-card-company { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+.k-card-score { background: var(--bg); border: 1px solid var(--line); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: var(--primary); font-weight: bold; }
+
+/* SCAN OVERLAY & PROGRESS */
+.scan-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-modal { background: var(--surface); padding: 24px; border-radius: 8px; min-width: 350px; text-align: center; }
+.progress-bar { width: 100%; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 16px; }
+.progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }

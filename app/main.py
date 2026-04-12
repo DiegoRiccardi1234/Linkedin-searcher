@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import AppSettings, load_settings, save_local_provider_keys
@@ -160,14 +160,50 @@ def create_app(workspace_dir: Path) -> FastAPI:
         container.db.set_active_profile(profile_id)
         return {"ok": True, "active_profile_id": profile_id}
 
+    @fastapi_app.get("/api/scan/stream")
+    def scan_stream(
+        search_terms: str = Query(default=""),
+        location: str | None = Query(default=None),
+        is_remote: bool = Query(default=False),
+        sites: str = Query(default="linkedin,indeed")
+    ):
+        term_list = [t.strip() for t in search_terms.split(",") if t.strip()] if search_terms else []
+        site_list = [s.strip() for s in sites.split(",") if s.strip()]
+        
+        payload = ScanRequest(
+            search_terms=term_list if term_list else None,
+            location=location,
+            is_remote=is_remote,
+            sites=site_list
+        )
+        def event_generator():
+            import json
+            try:
+                for event in run_scan(
+                    db=container.db,
+                    settings=container.settings,
+                    provider_manager=container.providers,
+                    payload=payload,
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\\n\\n"
+        
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
     @fastapi_app.post("/api/scan")
     def scan(payload: ScanRequest) -> dict:
-        result = run_scan(
+        result = {}
+        for event in run_scan(
             db=container.db,
             settings=container.settings,
             provider_manager=container.providers,
             payload=payload,
-        )
+        ):
+            if "status" in event and event["status"] == "complete":
+                result = event
+            elif "error" in event:
+                raise HTTPException(status_code=500, detail=event["error"])
         return result
 
     @fastapi_app.get("/api/jobs")
@@ -239,10 +275,15 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
                 cover_letter = result["cover_letter"]
             else:
                 cover_letter = str(result)
+            container.db.save_cover_letter(job_id, cover_letter)
         except Exception as e:
             cover_letter = f"Errore durante la generazione: {e}"
             
         return {"cover_letter": cover_letter}
+
+    @fastapi_app.get("/api/analytics")
+    def get_analytics() -> dict:
+        return container.db.get_analytics()
 
     @fastapi_app.get("/api/recommendations")
     def recommendations(limit: int = Query(default=5, ge=1, le=20)) -> dict:

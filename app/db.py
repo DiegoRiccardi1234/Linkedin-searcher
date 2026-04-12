@@ -430,6 +430,25 @@ class Database:
         rows.reverse()
         return rows
 
+    def get_analytics(self) -> dict:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            total = cursor.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] or 0
+            applied = cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'applied'").fetchone()[0] or 0
+            rejected = cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'rejected'").fetchone()[0] or 0
+            return {"total": total, "applied": applied, "rejected": rejected}
+
+    def save_cover_letter(self, job_id: int, letter: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            row = cursor.execute("SELECT analysis_json FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if row and row[0]:
+                import json
+                data = json.loads(row[0])
+                data["cover_letter"] = letter
+                cursor.execute("UPDATE jobs SET analysis_json = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), job_id))
+            conn.commit()
+
     def set_preference(self, key: str, value: str) -> None:
         self.conn.execute(
             """
