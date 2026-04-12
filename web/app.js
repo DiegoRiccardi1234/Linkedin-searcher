@@ -28,6 +28,59 @@ async function loadHealth() {
   const health = await api("/api/health");
   setText("providerBadge", `Provider: ${health.provider.active_provider}`);
   setText("modelBadge", `Modello: ${health.provider.active_model}`);
+
+  const keys = health.keys || {};
+  const status = {
+    cerebras_configured: !!keys.cerebras_configured,
+    groq_configured: !!keys.groq_configured,
+    active_provider: health.provider.active_provider,
+    active_model: health.provider.active_model,
+  };
+  setText("keysStatus", JSON.stringify(status, null, 2));
+}
+
+async function loadKeysStatus() {
+  const payload = await api("/api/providers/keys/status");
+  const keys = payload.keys || {};
+  const provider = payload.provider || {};
+  setText(
+    "keysStatus",
+    JSON.stringify(
+      {
+        cerebras_configured: !!keys.cerebras_configured,
+        groq_configured: !!keys.groq_configured,
+        active_provider: provider.active_provider,
+        active_model: provider.active_model,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function saveKeys() {
+  const cerebras = document.getElementById("cerebrasKey").value.trim();
+  const groq = document.getElementById("groqKey").value.trim();
+
+  const payload = {};
+  if (cerebras) payload.cerebras_api_key = cerebras;
+  if (groq) payload.groq_api_key = groq;
+
+  if (!payload.cerebras_api_key && !payload.groq_api_key) {
+    appendChat("system", "Inserisci almeno una key prima di salvare.");
+    return;
+  }
+
+  await api("/api/providers/keys", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  document.getElementById("cerebrasKey").value = "";
+  document.getElementById("groqKey").value = "";
+  await loadHealth();
+  await loadKeysStatus();
+  appendChat("system", "Key salvate. Provider ricaricato.");
 }
 
 async function loadProfiles() {
@@ -184,6 +237,15 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
   await loadProfiles();
 });
 
+document.getElementById("keysForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await saveKeys();
+  } catch (error) {
+    setText("keysStatus", `Errore salvataggio key: ${error.message}`);
+  }
+});
+
 document.getElementById("scanForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const termsText = document.getElementById("searchTerms").value.trim();
@@ -263,8 +325,11 @@ document.getElementById("exportCsvBtn").addEventListener("click", async () => {
   appendChat("system", `CSV esportato: ${result.file}`);
 });
 
+document.getElementById("refreshKeysBtn").addEventListener("click", loadKeysStatus);
+
 async function bootstrap() {
   await loadHealth();
+  await loadKeysStatus();
   await loadProfiles();
   await loadJobs();
   await loadChatHistory();

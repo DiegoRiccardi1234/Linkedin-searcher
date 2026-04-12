@@ -26,6 +26,19 @@
       </div>
     </section>
 
+    <section class="card">
+      <h2>0) Configura API Key (senza terminale)</h2>
+      <form id="keysForm" class="column">
+        <input id="cerebrasKey" type="password" placeholder="CEREBRAS API Key (opzionale)" />
+        <input id="groqKey" type="password" placeholder="GROQ API Key (opzionale)" />
+        <div class="row">
+          <button type="submit">Salva Key</button>
+          <button id="refreshKeysBtn" type="button" class="secondary">Aggiorna stato key</button>
+        </div>
+      </form>
+      <pre id="keysStatus" class="output"></pre>
+    </section>
+
     <section class="card split">
       <div>
         <h2>1) Carica CV</h2>

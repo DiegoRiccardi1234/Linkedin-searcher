@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import AppSettings, load_settings
+from app.config import AppSettings, load_settings, save_local_provider_keys
 from app.cv_ingest import extract_markdown_from_upload, summarize_profile
 from app.db import Database
 from app.models import (
@@ -17,6 +17,7 @@ from app.models import (
     JobActionRequest,
     ManualJobCreateRequest,
     PreferenceUpdateRequest,
+    ProviderKeysRequest,
     ScanRequest,
 )
 from app.providers.factory import ProviderManager
@@ -47,6 +48,17 @@ class AppContainer:
     def shutdown(self) -> None:
         self.db.close()
 
+    def reload_providers(self) -> None:
+        self.settings = load_settings(self.workspace_dir)
+        self.providers = ProviderManager(self.settings)
+        self.providers.initialize()
+
+    def keys_status(self) -> dict:
+        return {
+            "cerebras_configured": bool(self.settings.cerebras_api_key),
+            "groq_configured": bool(self.settings.groq_api_key),
+        }
+
 
 def create_app(workspace_dir: Path) -> FastAPI:
     container = AppContainer(workspace_dir)
@@ -69,8 +81,31 @@ def create_app(workspace_dir: Path) -> FastAPI:
         return {
             "ok": True,
             "provider": container.providers.metadata(),
+            "keys": container.keys_status(),
             "preferences": container.db.list_preferences(),
             "db_path": str(container.settings.db_path),
+        }
+
+    @fastapi_app.get("/api/providers/keys/status")
+    def providers_keys_status() -> dict:
+        return {
+            "ok": True,
+            "keys": container.keys_status(),
+            "provider": container.providers.metadata(),
+        }
+
+    @fastapi_app.post("/api/providers/keys")
+    def save_provider_keys(payload: ProviderKeysRequest) -> dict:
+        local_status = save_local_provider_keys(
+            data_dir=container.settings.data_dir,
+            cerebras_api_key=payload.cerebras_api_key,
+            groq_api_key=payload.groq_api_key,
+        )
+        container.reload_providers()
+        return {
+            "ok": True,
+            "keys": {**local_status, **container.keys_status()},
+            "provider": container.providers.metadata(),
         }
 
     @fastapi_app.post("/api/upload-cv")

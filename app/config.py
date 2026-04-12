@@ -13,6 +13,8 @@ DEFAULT_SEARCH_TERMS = [
     "Junior AI Consultant",
 ]
 
+LOCAL_SECRETS_FILE = "local_secrets.json"
+
 
 @dataclass
 class AppSettings:
@@ -44,6 +46,38 @@ def _load_optional_json(path: Path) -> dict:
         return {}
 
 
+def save_local_provider_keys(
+    data_dir: Path,
+    cerebras_api_key: str | None = None,
+    groq_api_key: str | None = None,
+) -> dict:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    secrets_path = data_dir / LOCAL_SECRETS_FILE
+    current = _load_optional_json(secrets_path)
+    if not isinstance(current, dict):
+        current = {}
+
+    if cerebras_api_key is not None:
+        value = cerebras_api_key.strip()
+        if value:
+            current["cerebras_api_key"] = value
+        else:
+            current.pop("cerebras_api_key", None)
+
+    if groq_api_key is not None:
+        value = groq_api_key.strip()
+        if value:
+            current["groq_api_key"] = value
+        else:
+            current.pop("groq_api_key", None)
+
+    secrets_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "cerebras_configured": bool(current.get("cerebras_api_key")),
+        "groq_configured": bool(current.get("groq_api_key")),
+    }
+
+
 def load_settings(workspace_dir: Path) -> AppSettings:
     data_dir = workspace_dir / "data"
     config_path = data_dir / "settings.json"
@@ -52,12 +86,15 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     data_dir.mkdir(parents=True, exist_ok=True)
     db_path = data_dir / "searcher.db"
     groq_key_file = workspace_dir / "groq key.txt"
+    local_secrets = _load_optional_json(data_dir / LOCAL_SECRETS_FILE)
+    if not isinstance(local_secrets, dict):
+        local_secrets = {}
 
-    groq_api_key = os.getenv("GROQ_API_KEY")
+    groq_api_key = os.getenv("GROQ_API_KEY") or local_secrets.get("groq_api_key")
     if not groq_api_key and groq_key_file.exists():
         groq_api_key = groq_key_file.read_text(encoding="utf-8").strip()
 
-    cerebras_api_key = os.getenv("CEREBRAS_API_KEY")
+    cerebras_api_key = os.getenv("CEREBRAS_API_KEY") or local_secrets.get("cerebras_api_key")
 
     provider_order = cfg.get("llm_provider_order", ["cerebras", "groq"])
     if not isinstance(provider_order, list) or not provider_order:

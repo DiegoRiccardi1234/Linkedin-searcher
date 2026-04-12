@@ -65,3 +65,8 @@ class ChatResponse(BaseModel):
 class PreferenceUpdateRequest(BaseModel):
     key: str
     value: str
+
+
+class ProviderKeysRequest(BaseModel):
+    cerebras_api_key: str | None = None
+    groq_api_key: str | None = None

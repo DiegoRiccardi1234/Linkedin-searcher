@@ -19,9 +19,7 @@ Non ci sono piu file legacy, storico CSV, CV personale o test/dev script.
 
 - Python 3.11+
 - Connessione internet
-- Almeno una API key LLM:
-  - CEREBRAS_API_KEY (consigliata)
-  - oppure GROQ_API_KEY
+- Almeno una API key LLM (Cerebras o Groq), impostabile direttamente dalla pagina web
 
 ## Setup rapido (prima esecuzione)
 
@@ -33,14 +31,7 @@ Non ci sono piu file legacy, storico CSV, CV personale o test/dev script.
 python -m pip install -r requirements.txt
 ```
 
-4. Imposta chiavi API (sessione corrente):
-
-```powershell
-$env:CEREBRAS_API_KEY="LA_TUA_CHIAVE"
-$env:GROQ_API_KEY="LA_TUA_CHIAVE"
-```
-
-Nota: basta anche una sola chiave. Il sistema prova i provider in ordine configurato.
+4. Avvia l'app, poi inserisci le key direttamente dalla sezione web "0) Configura API Key".
 
 ## Avvio app
 
@@ -65,6 +56,8 @@ Deve risultare:
 - ok: true
 - active_provider valorizzato
 - active_model valorizzato
+
+Se active_provider e "none", inserisci la key dalla UI e premi "Salva Key".
 
 ## Test funzionale passo-passo
 
@@ -121,6 +114,10 @@ python -m pip install -r requirements.txt
 python run_webapp.py
 ```
 
+Checklist ultra rapida da mandare al tuo amico:
+
+- [CHECKLIST_INIZIALE_2_MIN.md](CHECKLIST_INIZIALE_2_MIN.md)
+
 ## Dati locali e backup
 
 Il database locale viene salvato in:
@@ -145,8 +142,8 @@ python -m pip install -r requirements.txt
 - Chiudi il processo che usa la porta
 
 3. Provider non attivo
-- Verifica variabili API key
-- Ricontrolla /api/health
+- Inserisci una key nella sezione "Configura API Key" della UI
+- Poi ricontrolla /api/health
 
 4. PDF o DOCX non letto
 - Verifica installazione pypdf e python-docx
