@@ -1,3 +1,6 @@
+import re
+
+
 def _weight(policy: dict | None, key: str, default: int) -> int:
     if not policy:
         return default
@@ -26,13 +29,20 @@ def score_model_name(model_name: str, policy: dict | None = None) -> int:
         score += _weight(policy, "family", 40) - 5
     elif "llama-3" in name or "llama3" in name:
         score += _weight(policy, "family", 40) - 15
+    elif "qwen" in name:
+        score += _weight(policy, "family", 40) - 2
 
-    if "70b" in name:
-        score += _weight(policy, "size", 20)
-    elif "34b" in name:
-        score += _weight(policy, "size", 20) - 8
-    elif "8b" in name:
-        score += _weight(policy, "size", 20) - 12
+    parsed_sizes = [int(x) for x in re.findall(r"(\d{1,4})b", name)]
+    size_b = max(parsed_sizes) if parsed_sizes else 0
+    base_size_weight = _weight(policy, "size", 20)
+    if size_b >= 200:
+        score += base_size_weight + 8
+    elif size_b >= 70:
+        score += base_size_weight
+    elif size_b >= 30:
+        score += base_size_weight - 6
+    elif size_b >= 8:
+        score += base_size_weight - 12
 
     if "reason" in name:
         score += _weight(policy, "reasoning", 6)
@@ -45,17 +55,19 @@ def score_model_name(model_name: str, policy: dict | None = None) -> int:
         score += _weight(policy, "vision_penalty", -8)
 
     max_cost_tier = str((policy or {}).get("max_cost_tier", "high")).lower()
-    if max_cost_tier in {"low", "medium"} and "70b" in name:
+    if max_cost_tier in {"low", "medium"} and size_b >= 70:
         score -= 15
-    if max_cost_tier == "low" and ("34b" in name or "32b" in name):
+    if max_cost_tier == "low" and size_b >= 30:
         score -= 8
 
     prefer_fast = bool((policy or {}).get("prefer_fast", True))
     prefer_quality = bool((policy or {}).get("prefer_quality", True))
     if prefer_fast and ("instant" in name or "turbo" in name):
         score += 6
-    if prefer_quality and ("70b" in name or "reason" in name):
+    if prefer_quality and (size_b >= 70 or "reason" in name):
         score += 6
+    if prefer_fast and size_b >= 200:
+        score -= 5
 
     return score
 

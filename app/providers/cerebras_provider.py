@@ -6,6 +6,11 @@ from app.providers.base import LLMProvider
 from app.providers.model_selector import choose_best_model
 
 try:
+    import requests
+except Exception:  # pragma: no cover
+    requests = None  # type: ignore[assignment]
+
+try:
     from openai import OpenAI
 except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore[assignment]
@@ -30,6 +35,68 @@ class CerebrasProvider(LLMProvider):
         )
         self._selected_model: str | None = None
 
+    def _extract_model_ids(self, models_obj: Any) -> list[str]:
+        ids: list[str] = []
+
+        data_attr = getattr(models_obj, "data", None)
+        if data_attr is not None:
+            for item in data_attr:
+                model_id = getattr(item, "id", None)
+                if not model_id and isinstance(item, dict):
+                    model_id = item.get("id")
+                if model_id:
+                    ids.append(str(model_id))
+
+        try:
+            for item in models_obj:
+                model_id = getattr(item, "id", None)
+                if not model_id and isinstance(item, dict):
+                    model_id = item.get("id")
+                if model_id:
+                    ids.append(str(model_id))
+        except Exception:
+            pass
+
+        # Dedup preservando ordine.
+        unique: list[str] = []
+        seen: set[str] = set()
+        for model_id in ids:
+            if model_id not in seen:
+                unique.append(model_id)
+                seen.add(model_id)
+        return unique
+
+    def _list_models_via_http(self) -> list[str]:
+        if not self.api_key or requests is None:
+            return []
+        try:
+            response = requests.get(
+                "https://api.cerebras.ai/v1/models",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            data = payload.get("data", []) if isinstance(payload, dict) else []
+            ids = [str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")]
+            return ids
+        except Exception:
+            return []
+
+    def _probe_model(self, model_name: str) -> bool:
+        if not self.client:
+            return False
+        try:
+            self.client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": "ok"}],
+                temperature=0.0,
+                max_tokens=1,
+            )
+            return True
+        except Exception:
+            return False
+
     def is_available(self) -> bool:
         return self.client is not None
 
@@ -38,14 +105,31 @@ class CerebrasProvider(LLMProvider):
             return []
         try:
             models = self.client.models.list()
-            return [m.id for m in models.data if getattr(m, "id", None)]
+            model_ids = self._extract_model_ids(models)
+            if model_ids:
+                return model_ids
+            return self._list_models_via_http()
         except Exception:
-            return []
+            return self._list_models_via_http()
 
     def select_model(self, preferred_model: str | None = None) -> str:
         models = self.list_models()
         if not models:
-            fallback = preferred_model or "llama-4-scout-17b-16e-instruct"
+            fallback_candidates = [
+                preferred_model or "",
+                "qwen-3-235b-a22b-instruct-2507",
+                "llama3.1-8b",
+                "llama-3.1-8b",
+                "llama-4-scout-17b-16e-instruct",
+            ]
+            for candidate in fallback_candidates:
+                if not candidate:
+                    continue
+                if self._probe_model(candidate):
+                    self._selected_model = candidate
+                    return candidate
+
+            fallback = preferred_model or "qwen-3-235b-a22b-instruct-2507"
             self._selected_model = fallback
             return fallback
         selected = choose_best_model(models, preferred_model=preferred_model)

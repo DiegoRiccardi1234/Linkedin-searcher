@@ -90,11 +90,11 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     if not isinstance(local_secrets, dict):
         local_secrets = {}
 
-    groq_api_key = os.getenv("GROQ_API_KEY") or local_secrets.get("groq_api_key")
+    groq_api_key = local_secrets.get("groq_api_key") or os.getenv("GROQ_API_KEY")
     if not groq_api_key and groq_key_file.exists():
         groq_api_key = groq_key_file.read_text(encoding="utf-8").strip()
 
-    cerebras_api_key = os.getenv("CEREBRAS_API_KEY") or local_secrets.get("cerebras_api_key")
+    cerebras_api_key = local_secrets.get("cerebras_api_key") or os.getenv("CEREBRAS_API_KEY")
 
     provider_order = cfg.get("llm_provider_order", ["cerebras", "groq"])
     if not isinstance(provider_order, list) or not provider_order:

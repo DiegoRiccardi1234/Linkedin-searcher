@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
@@ -168,6 +172,10 @@ button.danger {
   padding: 0.7rem;
   max-height: 180px;
   overflow: auto;
+}
+
+#keysStatus {
+  max-height: 130px;
 }
 
 .detail-box {
