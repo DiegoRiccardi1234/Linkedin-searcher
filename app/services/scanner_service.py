@@ -119,6 +119,10 @@ def run_scan(
     profile = db.get_active_candidate_profile()
     profile_markdown = profile["markdown"] if profile else "Profilo non caricato."
 
+    linkedin_url = db.get_preference("linkedin_url", "")
+    if linkedin_url:
+        profile_markdown += f"\n\nProfilo LinkedIn: {linkedin_url}"
+
     terms = payload.search_terms or settings.default_search_terms
     location = payload.location or (
         settings.location_remote_default if payload.is_remote else settings.location_default
@@ -139,7 +143,7 @@ def run_scan(
     for term in terms:
         try:
             df = scrape_jobs(
-                site_name=["linkedin", "indeed"],
+                site_name=payload.sites,
                 search_term=term,
                 location=location,
                 is_remote=payload.is_remote,

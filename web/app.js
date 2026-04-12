@@ -98,6 +98,12 @@ async function loadHealth() {
   setText("providerBadge", `Provider: ${health.provider.active_provider}`);
   setText("modelBadge", `Modello: ${health.provider.active_model}`);
 
+  const prefs = health.preferences || {};
+  const linkedinInput = document.getElementById("linkedinUrl");
+  if (linkedinInput && prefs.linkedin_url) {
+    linkedinInput.value = prefs.linkedin_url;
+  }
+
   const keys = health.keys || {};
   const configured = hasAnyProviderConfigured(keys);
   setKeysSectionMode(configured);
@@ -221,21 +227,67 @@ async function showJobDetail(jobId) {
   );
   setText("detailAdvice", job.consiglio || "Valuta il fit e prepara una candidatura mirata.");
 
-  const detail = {
-    id: job.id,
-    titolo: job.titolo,
-    azienda: job.azienda,
-    status: job.status,
-    score: job.punteggio_ai,
-    consiglio: job.consiglio,
-    ricerca_usata: job.ricerca_usata,
-    modalita: job.modalita,
-    first_seen_at: job.first_seen_at,
-    last_seen_at: job.last_seen_at,
-    link: job.link,
-    analysis,
-  };
-  setText("jobDetail", JSON.stringify(detail, null, 2));
+  const detailLinkBtn = document.getElementById("detailLinkBtn");
+  if (detailLinkBtn) {
+    if (job.link) {
+      detailLinkBtn.href = job.link;
+      detailLinkBtn.style.display = "flex";
+    } else {
+      detailLinkBtn.style.display = "none";
+    }
+  }
+
+  const genBtn = document.getElementById("generateCoverLetterBtn");
+  const covBox = document.getElementById("coverLetterBox");
+  if (genBtn && covBox) {
+    genBtn.style.display = "inline-block";
+    covBox.style.display = "none";
+    document.getElementById("coverLetterOutput").value = "";
+  }
+
+  const container = document.getElementById("jobDetailContainer");
+  if (container) {
+    const score = job.punteggio_ai || 0;
+    let ralSpan = "";
+    if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
+      ralSpan = `<div class="info-tag"><strong>RAL:</strong> ${escapeHtml(analysis.ral_stimata)}</div>`;
+    }
+    
+    container.innerHTML = `
+      <div class="modern-detail">
+        <div class="modern-detail-grid">
+          <div class="info-card highlight" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <h4>Match Score</h4>
+            <div class="score-xl">${score}/10</div>
+            <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
+          </div>
+          <div class="info-card">
+            <h4>Dettagli Posizione</h4>
+            ${ralSpan}
+            <div class="info-tag"><strong>Contratto:</strong> ${escapeHtml((analysis ? analysis.contratto : null) || "N/D")}</div>
+            <div class="info-tag"><strong>Remote:</strong> ${escapeHtml((analysis ? analysis.smart_working : null) || job.modalita || "N/D")}</div>
+            <div class="info-tag"><strong>Esperienza:</strong> ${escapeHtml((analysis ? analysis.anni_esperienza_richiesti : null) || "N/D")}</div>
+            <div class="info-tag"><strong>Skill Code:</strong> ${escapeHtml((analysis ? analysis.programmazione_richiesta : null) || "N/D")}</div>
+            <div class="info-tag"><strong>Neolaureati:</strong> ${escapeHtml((analysis ? analysis.adatta_neolaureati : null) || "N/D")}</div>
+          </div>
+        </div>
+        <div class="mt-16">
+          <h4>Vantaggi e Svantaggi</h4>
+          <ul class="pros-cons">
+            <li class="pro">✅ ${escapeHtml((analysis ? analysis.punti_forza_per_diego : null) || "N/D")}</li>
+            <li class="con">❌ ${escapeHtml((analysis ? analysis.punti_deboli_per_diego : null) || "N/D")}</li>
+          </ul>
+        </div>
+        <div class="info-card mt-8">
+            <p class="text-sm">💡 <strong>Giudizio AI:</strong> ${escapeHtml((analysis ? analysis.riassunto : null) || "")}</p>
+        </div>
+        <div class="mt-16">
+          <h4>Meta Annuncio</h4>
+          <p class="text-sm text-dim">Ricerca: ${escapeHtml(job.ricerca_usata)} | Fonte: ${escapeHtml(job.fonte || "App")} | Rilevato: ${escapeHtml(job.first_seen_at || "")} | Azienda Rep: ${escapeHtml((analysis ? analysis.reputazione_azienda : null) || "N/D")}</p>
+        </div>
+      </div>
+    `;
+  }
   activateView("detail");
 }
 
@@ -263,6 +315,7 @@ function recommendationCardHtml(job) {
   const newTag = job.is_new ? "<span class=\"pill-new\">Nuovo</span>" : "";
   const favoriteText = job.is_favorite ? "Togli Preferito" : "Preferito";
   const nextFavorite = job.is_favorite ? "0" : "1";
+  const linkHtml = job.link ? `<div style="margin-top: 4px"><a href="${job.link}" target="_blank" rel="noopener">🔗 Link all'offerta</a></div>` : "";
 
   return `
     <article class="rec-card" data-rec-id="${job.id}">
@@ -272,6 +325,7 @@ function recommendationCardHtml(job) {
       </div>
       <div class="rec-company">${company} ${newTag}</div>
       <div>${consiglio}</div>
+      ${linkHtml}
       <div class="rec-actions">
         <button class="secondary" data-rec-action="detail" data-id="${job.id}">Dettaglio</button>
         <button data-rec-action="applied" data-id="${job.id}">Candida ora</button>
@@ -401,7 +455,10 @@ async function loadJobs() {
       <td>${truncate(job.titolo || "")}</td>
       <td>${truncate(job.azienda || "")}</td>
       <td>${job.status}</td>
-      <td><button data-detail-id="${job.id}" class="secondary">Dettaglio</button></td>
+      <td>
+        <button data-detail-id="${job.id}" class="secondary">Dettaglio</button>
+        ${job.link ? `<a href="${job.link}" target="_blank" rel="noopener" style="margin-left: 8px;">🔗</a>` : ''}
+      </td>
       <td>
         <div class="mini">
           <button data-action="applied" data-id="${job.id}">Candidata</button>
@@ -459,6 +516,24 @@ async function loadChatHistory() {
   }
 }
 
+document.getElementById("linkedinForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const url = document.getElementById("linkedinUrl").value.trim();
+  try {
+    await api("/api/preferences", {
+      method: "POST",
+      body: JSON.stringify({ key: "linkedin_url", value: url }),
+    });
+    const status = document.getElementById("linkedinStatus");
+    status.textContent = "URL LinkedIn salvato con successo.";
+    status.classList.remove("hidden");
+    setTimeout(() => status.classList.add("hidden"), 3000);
+    appendChat("system", "URL di LinkedIn salvato. L'AI lo userà nelle prossime analisi.");
+  } catch (error) {
+    appendChat("system", `Errore salvataggio LinkedIn: ${error.message}`);
+  }
+});
+
 document.getElementById("cvForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const fileInput = document.getElementById("cvFile");
@@ -499,11 +574,15 @@ document.getElementById("scanForm").addEventListener("submit", async (event) => 
   event.preventDefault();
   const termsText = document.getElementById("searchTerms").value.trim();
   const terms = termsText ? termsText.split("\n").map((x) => x.trim()).filter(Boolean) : [];
+  
+  const siteCheckboxes = document.querySelectorAll('input[name="scanSites"]:checked');
+  const selectedSites = Array.from(siteCheckboxes).map(cb => cb.value);
 
   const payload = {
     search_terms: terms,
     location: document.getElementById("locationInput").value.trim() || null,
     is_remote: document.getElementById("remoteOnly").checked,
+    sites: selectedSites.length > 0 ? selectedSites : ["linkedin", "indeed"],
   };
 
   setText("scanOutput", "Scansione in corso...");
@@ -584,6 +663,28 @@ document.getElementById("detailApplyNowBtn").addEventListener("click", async () 
     appendChat("system", `Errore candidatura: ${error.message}`);
   }
 });
+
+const genCovBtn = document.getElementById("generateCoverLetterBtn");
+if (genCovBtn) {
+  genCovBtn.addEventListener("click", async () => {
+    if (!selectedJobId) return;
+    const outBox = document.getElementById("coverLetterBox");
+    const outTxt = document.getElementById("coverLetterOutput");
+    
+    outBox.style.display = "block";
+    outTxt.value = "Generazione in corso (potrebbe richiedere qualche secondo)...";
+    genCovBtn.disabled = true;
+
+    try {
+      const payload = await api(`/api/jobs/${selectedJobId}/cover-letter`, { method: "POST" });
+      outTxt.value = payload.cover_letter || "Nessun risultato ricevuto.";
+    } catch (error) {
+      outTxt.value = `Errore generazione: ${error.message}`;
+    } finally {
+      genCovBtn.disabled = false;
+    }
+  });
+}
 
 document.getElementById("refreshJobsBtn").addEventListener("click", loadJobs);
 document.getElementById("onlyNew").addEventListener("change", loadJobs);

@@ -41,6 +41,7 @@ class ScanRequest(BaseModel):
     search_terms: list[str] = Field(default_factory=list)
     location: str | None = None
     is_remote: bool = False
+    sites: list[str] = Field(default_factory=lambda: ["linkedin", "indeed"])
 
 
 class ScanResponse(BaseModel):

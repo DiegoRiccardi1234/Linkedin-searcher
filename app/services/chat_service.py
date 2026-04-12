@@ -73,6 +73,11 @@ def handle_chat_message(
 
     profile = db.get_active_candidate_profile()
     profile_text = profile["markdown"][:1500] if profile else "Profilo non caricato."
+    
+    linkedin_url = db.get_preference("linkedin_url", "")
+    if linkedin_url:
+        profile_text += f"\n\nProfilo LinkedIn: {linkedin_url}"
+
     context_jobs = _jobs_context(db)
 
     prompt_messages = [

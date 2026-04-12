@@ -198,6 +198,52 @@ def create_app(workspace_dir: Path) -> FastAPI:
             raise HTTPException(status_code=404, detail="Annuncio non trovato")
         return {"job": job}
 
+    @fastapi_app.post("/api/jobs/{job_id}/cover-letter")
+    def generate_cover_letter(job_id: int) -> dict:
+        job = container.db.get_job_with_analysis(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Annuncio non trovato")
+            
+        profile = container.db.get_active_candidate_profile()
+        profile_markdown = profile["markdown"] if profile else "CV non disponibile."
+        
+        linkedin_url = container.db.get_preference("linkedin_url", "")
+        if linkedin_url:
+            profile_markdown += f"\n\nProfilo LinkedIn: {linkedin_url}"
+        
+        titolo = job.get("titolo", "N/A")
+        azienda = job.get("azienda", "N/A")
+        descrizione = job.get("descrizione", "")
+        
+        prompt = f"""Sei un assistente che aiuta un IT professional a trovare lavoro. 
+Scrivi una Cover Letter / messaggio InMail (circa 100-150 parole, concisa ma efficace e performante, tono professionale ma non ingessato, focalizzato sui risultati) per questo annuncio. 
+Usa le informazioni del CV per evidenziare la corrispondenza con l'annuncio.
+
+CV candidato:
+{profile_markdown[:3500]}
+
+OFFERTA:
+Titolo: {titolo}
+Azienda: {azienda}
+{("Descrizione: " + descrizione[:1800]) if descrizione else ""}
+
+Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "cover_letter":
+{{
+  "cover_letter": "Il testo completo del messaggio..."
+}}
+"""
+        
+        try:
+            result = container.providers.complete_json(prompt=prompt, max_tokens=600)
+            if isinstance(result, dict) and "cover_letter" in result:
+                cover_letter = result["cover_letter"]
+            else:
+                cover_letter = str(result)
+        except Exception as e:
+            cover_letter = f"Errore durante la generazione: {e}"
+            
+        return {"cover_letter": cover_letter}
+
     @fastapi_app.get("/api/recommendations")
     def recommendations(limit: int = Query(default=5, ge=1, le=20)) -> dict:
         jobs = container.db.get_recommended_jobs(limit=limit)
@@ -222,6 +268,11 @@ def create_app(workspace_dir: Path) -> FastAPI:
 
         profile = container.db.get_active_candidate_profile()
         profile_markdown = profile["markdown"] if profile else "Profilo non caricato"
+        
+        linkedin_url = container.db.get_preference("linkedin_url", "")
+        if linkedin_url:
+            profile_markdown += f"\n\nProfilo LinkedIn: {linkedin_url}"
+
         analysis = analyze_offer(
             provider_manager=container.providers,
             profile_markdown=profile_markdown,

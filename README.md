@@ -15,11 +15,15 @@ Uso previsto: 1 persona per PC (tu e il tuo amico ognuno sul proprio computer, c
 
 Non ci sono piu file legacy, storico CSV, CV personale o test/dev script.
 
-## Screenshot Reali Desktop (CV IT + EN)
+## Screenshot Reali Desktop (CV IT + EN + LinkedIn)
 
-Queste immagini sono state generate con test browser automatici Playwright usando i tuoi PDF locali IT/EN.
+Queste immagini sono state generate con test browser automatici Playwright usando i tuoi PDF locali IT/EN. Ora includono:
+- Filtri per portali multipli (LinkedIn, Indeed, Glassdoor, ZipRecruiter)
+- Generatore AI di Cover Letter
+- Integrazione URL profilo LinkedIn (Settings)
+- Nuova UI moderna a card per i dettagli job (Match Score, Pro/Contro visivi, RAL, ecc.)
 
-CV Italiano caricato (Settings):
+CV Italiano caricato (Settings con scelta portali e URL LinkedIn):
 
 ![Settings CV IT](screenshots/readme/settings-cv-it.png)
 
@@ -117,9 +121,11 @@ Se active_provider e "none", inserisci una key dalla UI e premi "Salva Key".
 
 4. Apri dettaglio rating
 - Premi "Dettaglio" su una riga
-- Verifica JSON con campi analisi (consiglio, punti forza/deboli, ral, ecc.)
+- Visualizza la schermata Discover in modalita' Card Moderna con Match Score, Dettagli (RAL, Contratto, Modalita'), Pro e Contro.
+- **Genera Cover Letter AI**: Clicca il pulsante dedicato nel Dettaglio per preparare al volo un messaggio InMail mirato tenendo conto di Job, CV e tuo URL LinkedIn.
 
-5. Prova azioni stato
+5. Prova azioni stato e Link esterni
+- Apri la pagina esterna (LinkedIn, Indeed) usando i pulsanti Link ("🔗") o "Apri Link Offerta"
 - Candidata
 - Scarta
 - Riapri
@@ -139,6 +145,7 @@ Se active_provider e "none", inserisci una key dalla UI e premi "Salva Key".
 
 8. Esegui scansione reale
 - Inserisci 1-3 query nel box scansione
+- Seleziona/deseleziona i portali multipli (LinkedIn, Indeed, Glassdoor, ZipRecruiter) dal blocco "Portali"
 - Avvia scan
 - Verifica nuovi annunci e badge "Nuovo"
 

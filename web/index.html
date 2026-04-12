@@ -136,11 +136,22 @@
               <p class="banner-title">Prossimo Passo Consigliato</p>
               <p id="detailAdvice">Quando selezioni un lavoro vedrai qui il consiglio AI per la candidatura.</p>
             </div>
-            <button type="button" class="secondary" id="detailApplyNowBtn">Candida Ora</button>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="secondary" id="detailApplyNowBtn">Candida Ora</button>
+              <a id="detailLinkBtn" href="#" target="_blank" class="button secondary" style="display: none; align-items: center; justify-content: center; text-decoration: none;">Apri Link Offerta</a>
+            </div>
           </div>
 
-          <div class="detail-box-wrap">
-            <pre id="jobDetail" class="output detail-box">Seleziona un annuncio con il pulsante Dettaglio.</pre>
+          <div style="margin-bottom: 16px;">
+            <button type="button" id="generateCoverLetterBtn" class="secondary" style="display: none;">Genera Cover Letter AI</button>
+            <div id="coverLetterBox" style="display: none; margin-top: 12px;">
+              <strong>Bozza Generata:</strong>
+              <textarea id="coverLetterOutput" rows="6" style="width: 100%; margin-top: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
+            </div>
+          </div>
+
+          <div class="detail-box-wrap" id="jobDetailContainer">
+            <div class="output detail-box">Seleziona un annuncio con il pulsante Dettaglio.</div>
           </div>
         </article>
 
@@ -173,9 +184,19 @@
           <h3>Area Caricamento CV</h3>
           <form id="cvForm" class="column">
             <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx" required />
-            <button type="submit">Upload CV</button>
+            <button type="submit" class="secondary">Upload CV</button>
           </form>
-          <pre id="cvSummary" class="output"></pre>
+          <pre id="cvSummary" class="output hidden"></pre>
+        </article>
+
+        <article class="card-block">
+          <h3>Profilo LinkedIn</h3>
+          <p class="micro">Integrazione nel contesto dell'Intelligenza Artificiale</p>
+          <form id="linkedinForm" class="column">
+            <input id="linkedinUrl" type="url" placeholder="https://linkedin.com/in/..." required />
+            <button type="submit" class="secondary">Salva URL</button>
+          </form>
+          <pre id="linkedinStatus" class="output hidden"></pre>
         </article>
 
         <article class="card-block">
@@ -207,6 +228,13 @@
           <h3>Scansione Opportunita</h3>
           <form id="scanForm" class="column">
             <textarea id="searchTerms" rows="4" placeholder="Una ricerca per riga (vuoto = default)"></textarea>
+            <div class="row wrap" style="gap: 16px; margin: 8px 0;">
+              <div><strong>Portali:</strong></div>
+              <label class="tiny-toggle"><input type="checkbox" name="scanSites" value="linkedin" checked /> LinkedIn</label>
+              <label class="tiny-toggle"><input type="checkbox" name="scanSites" value="indeed" checked /> Indeed</label>
+              <label class="tiny-toggle"><input type="checkbox" name="scanSites" value="glassdoor" /> Glassdoor</label>
+              <label class="tiny-toggle"><input type="checkbox" name="scanSites" value="zip_recruiter" /> ZipRecruiter</label>
+            </div>
             <div class="row wrap">
               <input id="locationInput" type="text" placeholder="Torino, Italy" />
               <label class="tiny-toggle"><input id="remoteOnly" type="checkbox" /> Full remote</label>
