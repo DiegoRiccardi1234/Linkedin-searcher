@@ -40,15 +40,19 @@ The result is a portfolio-grade FastAPI app with a multi-provider LLM backbone, 
 
 ## Demo
 
-**Dashboard** — personalized hero, analytics, and an always-on AI Career Coach in the right rail.
+**Dashboard** — personalized hero, live analytics, and an always-on AI Career Coach in the right rail.
 
 ![Dashboard](screenshots/readme/dashboard-recommendations-en.png)
 
-**AI Career Coach in action** — the chatbot reads the CV, proposes matching roles, and can autofill the scan form.
+**AI-ranked recommendations** — top matches surfaced from your CV with explicit scores and reasoning.
 
-![AI Career Coach](screenshots/readme/chat-coach-en.png)
+![Recommendations](screenshots/readme/recommendations-grid-en.png)
 
-**Dark mode** — full glassmorphism theme.
+**Job archive** — searchable table with filters, favorites, and per-row actions (Apply / Skip / Details).
+
+![Archive](screenshots/readme/jobs-table-en.png)
+
+**Dark mode** — full glassmorphism theme, one-click toggle.
 
 ![Dark mode](screenshots/readme/dashboard-dark-en.png)
 
@@ -200,12 +204,12 @@ When offline, online features fail gracefully and fall back to rule-based answer
 
 | Provider | Notes |
 |----------|-------|
-| **OpenRouter** | Single key, hundreds of models (Claude, GPT, Llama, Mistral...) |
-| **Cerebras** | Llama 3.3 70B, very fast inference, generous free tier |
-| **Groq** | Llama / Mixtral, sub-second responses |
-| **OpenAI** | GPT-4o / GPT-4.1 / o-series |
-| **Anthropic** | Claude 3.7 Sonnet, Claude 3.5 Haiku |
-| **Google** | Gemini 1.5/2.0 Pro & Flash |
+| **OpenRouter** | Single key, hundreds of models (Claude 4.x, GPT-5, Llama 4, Qwen 3, DeepSeek...) |
+| **Cerebras** | Llama 4 Scout / Maverick, Qwen 3 235B — sub-second inference, free tier |
+| **Groq** | Llama 4, Qwen 3, Kimi K2, DeepSeek — ultra-low latency |
+| **OpenAI** | GPT-5, GPT-5 mini, o4-mini, o3 |
+| **Anthropic** | Claude Opus 4.7, Sonnet 4.6, Haiku 4.5 |
+| **Google** | Gemini 2.5 Pro & Flash, Gemini 2.0 Flash |
 
 The `ProviderManager` picks the first available provider from your configured order, logs the choice, and exposes a `metadata()` endpoint for the UI status badge.
 
@@ -255,7 +259,7 @@ Logging is configured once in `AppContainer.__init__`. Output goes to stderr **a
 
 ```
 2026-04-22 22:08:43 | INFO    | app.main              | AppContainer initializing
-2026-04-22 22:08:48 | INFO    | app.providers.factory | LLM provider active: openrouter (model=anthropic/claude-3.5-sonnet)
+2026-04-22 22:08:48 | INFO    | app.providers.factory | LLM provider active: openrouter (model=anthropic/claude-sonnet-4-6)
 2026-04-22 22:09:01 | WARNING | app.services.scanner_service | scrape_jobs failed (term='QA Tester'): TimeoutError
 ```
 

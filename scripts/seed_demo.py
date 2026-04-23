@@ -479,7 +479,7 @@ def insert_scan_runs(db: Database) -> None:
 
 def insert_chat(db: Database) -> None:
     now = datetime.now(timezone.utc)
-    session_id = "demo-session"
+    session_id = "default"
     for i, (role, content) in enumerate(CHAT_MESSAGES):
         ts = now - timedelta(minutes=(len(CHAT_MESSAGES) - i) * 2)
         db.conn.execute(
@@ -499,7 +499,7 @@ def insert_profile_and_prefs(db: Database) -> None:
     db.set_preference("language", "en")
     db.set_preference("theme", "light")
     db.set_preference("location_default", "Italy")
-    db.set_preference("chat_session_id", "demo-session")
+    db.set_preference("chat_session_id", "default")
 
 
 def main() -> int:
