@@ -134,7 +134,12 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     cfg = _load_optional_json(config_path)
 
     data_dir.mkdir(parents=True, exist_ok=True)
-    db_path = data_dir / "searcher.db"
+    db_override = os.getenv("SEARCHER_DB_PATH")
+    if db_override:
+        db_path = Path(db_override).expanduser().resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        db_path = data_dir / "searcher.db"
     groq_key_file = workspace_dir / "groq key.txt"
     local_secrets = _load_optional_json(data_dir / LOCAL_SECRETS_FILE)
     if not isinstance(local_secrets, dict):

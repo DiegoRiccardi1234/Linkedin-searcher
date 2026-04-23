@@ -53,5 +53,18 @@ def get_chat_state(db: Database) -> str:
     return "advising"
 
 
+SUPPORTED_UI_LANGS = ("en", "it", "es", "fr", "de")
+
+
+def get_ui_language(db: Database) -> str:
+    """Return the active UI language code (en/it/es/fr/de). Defaults to en."""
+    raw = (db.get_preference("ui_language", "en") or "en").lower()
+    for code in SUPPORTED_UI_LANGS:
+        if raw.startswith(code):
+            return code
+    return "en"
+
+
 def is_italian_ui(db: Database) -> bool:
-    return db.get_preference("ui_language", "en").lower().startswith("it")
+    """Backwards-compatible helper."""
+    return get_ui_language(db) == "it"

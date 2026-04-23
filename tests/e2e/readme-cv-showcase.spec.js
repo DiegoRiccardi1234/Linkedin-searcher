@@ -20,18 +20,13 @@ async function shot(page, file) {
   });
 }
 
-async function uploadCv(page, filePath, label) {
+async function uploadCv(page, filePath) {
   await page.locator(".topnav .nav-link[data-view='settings']").click();
   await expect(page.locator("#view-settings")).toHaveClass(/is-active/);
 
   await page.setInputFiles("#cvFile", filePath);
   await page.locator("#cvForm button[type='submit']").click();
   await expect(page.locator("#cvSummary")).toContainText("profile_id", { timeout: 120000 });
-
-  // Scroll top so Settings hero is in frame
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(400);
-  await shot(page, `settings-cv-${label}.png`);
 }
 
 async function addManualJobs(page) {
@@ -101,12 +96,6 @@ async function captureDashboard(page, label) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(400);
   await shot(page, `dashboard-recommendations-${label}.png`);
-
-  // Job detail panel (right column) populated by clicking a top recommendation
-  await page.locator("#recommendationsGrid button[data-rec-action='detail']").first().click();
-  await expect(page.locator("#detailTitle")).not.toContainText("Seleziona un lavoro");
-  await page.waitForTimeout(400);
-  await shot(page, `discover-top-job-${label}.png`);
 }
 
 async function captureChat(page, label, prompt) {
@@ -156,12 +145,8 @@ test("portfolio screenshots for README (IT + EN)", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Job Finder")).toBeVisible();
 
-  await uploadCv(page, cvIt, "it");
+  await uploadCv(page, cvEn);
   await addManualJobs(page);
-  await captureDashboard(page, "it");
-  await captureChat(page, "it", "Quali figure lavorative si adattano al mio CV?");
-
-  await uploadCv(page, cvEn, "en");
   await captureDashboard(page, "en");
   await captureChat(page, "en", "Which roles best fit my CV?");
   await captureDarkMode(page, "en");

@@ -112,7 +112,7 @@
     "aiCoach": "AI Coach",
     "aiCareerCoach": "AI Career Coach",
     "autoApi": "Auto API",
-    "chatPlaceholder": "Ask the coach...",
+    "chatPlaceholder": "e.g. Find Python jobs in Milan, or What roles fit my CV?",
     "settings": "Settings"
   },
   "offcanvas": {
@@ -172,5 +172,14 @@
     "genError": "Generation error",
     "quickActionError": "Quick action error",
     "quickPromptsUnavail": "Quick prompts unavailable"
+  },
+  "update": {
+    "title": "New version available",
+    "releaseNotes": "Release notes",
+    "runNow": "Update now",
+    "modalTitle": "Updating Job Finder..."
+  },
+  "common": {
+    "close": "Close"
   }
 }

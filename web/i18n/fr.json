@@ -112,7 +112,7 @@
     "aiCoach": "Coach IA",
     "aiCareerCoach": "AI Career Coach",
     "autoApi": "API Auto",
-    "chatPlaceholder": "Demandez au coach...",
+    "chatPlaceholder": "ex. Trouver des emplois Python à Milan, ou Quels rôles correspondent à mon CV?",
     "settings": "Paramètres"
   },
   "offcanvas": {
@@ -172,5 +172,14 @@
     "genError": "Erreur de génération",
     "quickActionError": "Erreur d'action rapide",
     "quickPromptsUnavail": "Suggestions rapides indisponibles"
+  },
+  "update": {
+    "title": "Nouvelle version disponible",
+    "releaseNotes": "Notes de version",
+    "runNow": "Mettre à jour",
+    "modalTitle": "Mise à jour en cours..."
+  },
+  "common": {
+    "close": "Fermer"
   }
 }

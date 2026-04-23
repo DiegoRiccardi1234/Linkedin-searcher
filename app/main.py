@@ -11,6 +11,7 @@ from app.config import AppSettings, load_settings, save_local_provider_keys
 from app.cv_ingest import extract_markdown_from_upload, summarize_profile, summarize_profile_with_llm
 from app.db import Database
 from app.log import configure_logging, get_logger
+from app.version import __version__, get_version_info
 from app.models import (
     ChatRequest,
     ChatResponse,
@@ -383,12 +384,25 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
     def chat_prompts() -> dict:
         return {
             "prompts": [
-                "Recommend the top 5 jobs I should apply for today",
-                "Explain why the first job has a high rating",
-                "Give me an application plan for this week",
-                "Which jobs should I skip and why?",
+                "Which roles best fit my CV?",
+                "Find Python jobs in Milan",
+                "Suggest search terms for a Junior QA role",
+                "Recommend the top 5 jobs I should apply for",
             ]
         }
+
+    @fastapi_app.get("/api/version")
+    def version_info(refresh: bool = False) -> dict:
+        return get_version_info(force_refresh=refresh)
+
+    @fastapi_app.post("/api/update")
+    def run_update() -> dict:
+        from scripts.update import update as run_update_script
+
+        result = run_update_script(repo_root=workspace_dir)
+        # Refresh version cache so banner reflects new state on next /api/version call.
+        get_version_info(force_refresh=True)
+        return result
 
     @fastapi_app.post("/api/preferences")
     def update_preference(payload: PreferenceUpdateRequest) -> dict:

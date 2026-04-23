@@ -7,7 +7,13 @@ def has_search_intent(message: str) -> bool:
     lower = message.lower()
     return any(
         token in lower
-        for token in ["search", "scan", "find", "cerca", "ricerca", "trova"]
+        for token in [
+            "search", "scan", "find",
+            "cerca", "ricerca", "trova",
+            "buscar", "encontrar",
+            "trouver", "chercher",
+            "suchen", "finden",
+        ]
     )
 
 

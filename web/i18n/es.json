@@ -112,7 +112,7 @@
     "aiCoach": "Coach IA",
     "aiCareerCoach": "AI Career Coach",
     "autoApi": "API Auto",
-    "chatPlaceholder": "Pregunta al coach...",
+    "chatPlaceholder": "p.ej. Buscar trabajos Python en Milán, o Qué roles se ajustan a mi CV?",
     "settings": "Ajustes"
   },
   "offcanvas": {
@@ -172,5 +172,14 @@
     "genError": "Error de generación",
     "quickActionError": "Error de acción rápida",
     "quickPromptsUnavail": "Sugerencias rápidas no disponibles"
+  },
+  "update": {
+    "title": "Nueva versión disponible",
+    "releaseNotes": "Notas de la versión",
+    "runNow": "Actualizar ahora",
+    "modalTitle": "Actualizando Job Finder..."
+  },
+  "common": {
+    "close": "Cerrar"
   }
 }

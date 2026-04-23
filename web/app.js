@@ -1129,3 +1129,129 @@ function setupTagInput(containerId, inputId) {
 
 const getKeywords = setupTagInput('keywordsContainer', 'keywordsInput');
 const getLocations = setupTagInput('locationsContainer', 'locationsInput');
+
+// ─── Update Banner ──────────────────────────────────────────────
+async function checkForUpdate() {
+  const banner = document.getElementById('updateBanner');
+  if (!banner) return;
+  try {
+    const info = await api('/api/version');
+    if (!info.update_available || !info.latest) return;
+    const dismissed = localStorage.getItem('updateDismissed');
+    if (dismissed === info.latest) return;
+
+    document.getElementById('updateBannerVersions').textContent =
+      `${info.current} → ${info.latest}`;
+    const link = document.getElementById('updateBannerLink');
+    if (info.release_url) {
+      link.href = info.release_url;
+      link.classList.remove('hidden');
+    } else {
+      link.classList.add('hidden');
+    }
+    banner.classList.remove('hidden');
+
+    document.getElementById('updateBannerClose').onclick = () => {
+      localStorage.setItem('updateDismissed', info.latest);
+      banner.classList.add('hidden');
+    };
+    document.getElementById('updateBannerRun').onclick = runUpdate;
+  } catch (err) {
+    console.warn('Update check failed:', err);
+  }
+}
+
+async function runUpdate() {
+  const modal = document.getElementById('updateModal');
+  const log = document.getElementById('updateModalLog');
+  const closeBtn = document.getElementById('updateModalClose');
+  log.textContent = 'Running update... please wait.\n';
+  modal.classList.remove('hidden');
+  closeBtn.onclick = () => modal.classList.add('hidden');
+
+  try {
+    const result = await api('/api/update', { method: 'POST' });
+    log.textContent = `${result.message}\n\n`;
+    for (const step of result.steps || []) {
+      log.textContent += `=== ${step.step} (exit ${step.code}) ===\n${step.output}\n\n`;
+    }
+    if (result.ok) {
+      log.textContent += '\n→ Restart the app to load the new version.';
+    }
+  } catch (err) {
+    log.textContent += `\nFAILED: ${err.message}`;
+  }
+}
+
+// ─── Chat empty state + first-time tutorial ─────────────────────
+const CHAT_SUGGESTIONS = [
+  'Which roles best fit my CV?',
+  'Find Python jobs in Milan',
+  'Suggest search terms for a Junior QA role',
+  'Recommend the top 5 jobs to apply for',
+];
+
+function renderChatEmptyState() {
+  const box = document.getElementById('chatBox');
+  if (!box) return;
+  if (box.querySelector('.chat-item') || box.querySelector('.chat-empty')) return;
+  const empty = document.createElement('div');
+  empty.className = 'chat-empty';
+  empty.innerHTML = `
+    <div class="lead">Try asking the coach to find roles for you:</div>
+  `;
+  for (const text of CHAT_SUGGESTIONS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = text;
+    btn.addEventListener('click', () => sendChatMessage(text));
+    empty.appendChild(btn);
+  }
+  box.appendChild(empty);
+}
+
+function clearChatEmptyState() {
+  const box = document.getElementById('chatBox');
+  const empty = box && box.querySelector('.chat-empty');
+  if (empty) empty.remove();
+}
+
+const _origAppendChat = typeof appendChat === 'function' ? appendChat : null;
+if (_origAppendChat) {
+  window.appendChat = function (role, content) {
+    clearChatEmptyState();
+    return _origAppendChat(role, content);
+  };
+}
+
+function showFirstTimeTutorial() {
+  if (localStorage.getItem('tutorialSeen')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'tutorial-overlay';
+  overlay.innerHTML = `
+    <div class="tutorial-card">
+      <h3>Meet your AI Career Coach</h3>
+      <p>Use the chat on the right to:</p>
+      <ul>
+        <li>Discover which roles match your CV</li>
+        <li>Get search keywords for a specific city</li>
+        <li>Pick the best jobs to apply for first</li>
+      </ul>
+      <div class="tutorial-actions">
+        <button type="button" class="ghost-btn" id="tutorialDismiss">Got it</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#tutorialDismiss').addEventListener('click', () => {
+    localStorage.setItem('tutorialSeen', '1');
+    overlay.remove();
+  });
+}
+
+window.addEventListener('load', () => {
+  checkForUpdate();
+  renderChatEmptyState();
+  // Defer tutorial to let dashboard render first.
+  setTimeout(showFirstTimeTutorial, 800);
+});

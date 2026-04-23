@@ -6,12 +6,31 @@
   <title>Job Finder — AI Job Search</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400" rel="stylesheet" />
   <link rel="stylesheet" href="/web/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+  <div id="updateBanner" class="update-banner hidden" role="status">
+    <span class="update-banner-icon material-symbols-outlined">campaign</span>
+    <span class="update-banner-text">
+      <strong data-i18n="update.title">New version available</strong>
+      <span id="updateBannerVersions" class="update-banner-versions"></span>
+    </span>
+    <a id="updateBannerLink" href="#" target="_blank" rel="noopener" class="update-banner-link" data-i18n="update.releaseNotes">Release notes</a>
+    <button type="button" id="updateBannerRun" class="update-banner-btn" data-i18n="update.runNow">Update now</button>
+    <button type="button" id="updateBannerClose" class="update-banner-close" aria-label="Dismiss">&times;</button>
+  </div>
+  <div id="updateModal" class="update-modal hidden" role="dialog" aria-modal="true">
+    <div class="update-modal-card">
+      <h3 data-i18n="update.modalTitle">Updating...</h3>
+      <pre id="updateModalLog" class="update-modal-log"></pre>
+      <div class="update-modal-actions">
+        <button type="button" id="updateModalClose" class="ghost-btn" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
   <header class="topbar">
     <div class="brand"><span class="brand-icon material-symbols-outlined">work</span> Job Finder</div>
     <nav class="topnav">
