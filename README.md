@@ -297,6 +297,14 @@ Back up the `data/` folder before major updates.
 
 ---
 
+## Documentation
+
+- [DB schema reference](DOCS/schema.md) — table-by-table breakdown of `data/searcher.db`.
+- [Security notes](DOCS/security.md) — localhost threat model, secret storage, network surface.
+- [Contributing guide](CONTRIBUTING.md) — local dev workflow, Makefile targets, quality gates.
+- [Security policy](SECURITY.md) — how to report vulnerabilities, scope, threat model.
+- [Changelog](CHANGELOG.md) — release history.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
