@@ -130,24 +130,24 @@ async function captureDarkMode(page, label) {
   await setTheme(page, "light");
 }
 
-test("portfolio screenshots for README (IT + EN)", async ({ page }) => {
+test("manual CV flow smoke (real CV upload + dashboard + chat + dark mode)", async ({ page }) => {
   test.setTimeout(240000);
   ensureOutputDir();
 
   const cvIt = path.join(CV_DIR, "CV_Diego_Riccardi_IT.pdf");
-  const cvEn = path.join(CV_DIR, "CV_Diego_Riccardi_EN.pdf");
 
-  if (!fs.existsSync(cvIt) || !fs.existsSync(cvEn)) {
-    throw new Error("Missing CVs in Test-Mio-CV folder.");
+  if (!fs.existsSync(cvIt)) {
+    test.skip(true, "Missing CV_Diego_Riccardi_IT.pdf in Test-Mio-CV folder; skipping manual smoke.");
+    return;
   }
 
   await page.setViewportSize(VIEWPORT);
   await page.goto("/");
   await expect(page.getByText("Job Finder")).toBeVisible();
 
-  await uploadCv(page, cvEn);
+  await uploadCv(page, cvIt);
   await addManualJobs(page);
-  await captureDashboard(page, "en");
-  await captureChat(page, "en", "Which roles best fit my CV?");
-  await captureDarkMode(page, "en");
+  await captureDashboard(page, "it");
+  await captureChat(page, "it", "Quali ruoli si adattano meglio al mio CV?");
+  await captureDarkMode(page, "it");
 });
