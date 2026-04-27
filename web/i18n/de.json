@@ -239,6 +239,10 @@
   },
   "banner": {
     "noKey": "Kein KI-Anbieter konfiguriert — Chat nutzt regelbasierte Antworten.",
-    "configureKey": "Schlüssel konfigurieren"
+    "configureKey": "Schlüssel konfigurieren",
+    "signupHint": "Schlüssel benötigt? Beide Optionen sind kostenlos, ohne Kreditkarte.",
+    "signupCerebras": "Hol dir einen kostenlosen Cerebras-Schlüssel",
+    "signupGroq": "Hol dir einen Groq-Schlüssel",
+    "openSettings": "Einstellungen öffnen"
   }
 }

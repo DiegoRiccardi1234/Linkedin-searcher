@@ -239,6 +239,10 @@
   },
   "banner": {
     "noKey": "Aucun fournisseur IA configuré — le chat utilise des réponses rule-based.",
-    "configureKey": "Configurer une clé"
+    "configureKey": "Configurer une clé",
+    "signupHint": "Besoin d'une clé ? Les deux options sont gratuites, sans carte.",
+    "signupCerebras": "Obtenir une clé Cerebras gratuite",
+    "signupGroq": "Obtenir une clé Groq",
+    "openSettings": "Ouvrir les paramètres"
   }
 }

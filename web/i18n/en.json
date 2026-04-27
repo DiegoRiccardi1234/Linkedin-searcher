@@ -239,6 +239,10 @@
   },
   "banner": {
     "noKey": "No AI provider configured — chat uses rule-based replies.",
-    "configureKey": "Configure a key"
+    "configureKey": "Configure a key",
+    "signupHint": "Need a key? Both options are free, no credit card.",
+    "signupCerebras": "Get a free Cerebras key",
+    "signupGroq": "Get a Groq key",
+    "openSettings": "Open Settings"
   }
 }

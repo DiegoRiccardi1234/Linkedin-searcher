@@ -378,12 +378,27 @@
   z-index: 50;
 }
 .no-key-banner .material-symbols-outlined { font-size: 18px; }
+.no-key-banner-text { font-weight: 600; }
+.no-key-banner-hint {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.85;
+  font-size: 0.95em;
+}
 .no-key-banner-link {
   color: var(--accent);
   text-decoration: underline;
   font-weight: 500;
-  margin-left: auto;
+  white-space: nowrap;
 }
+.no-key-banner-link--primary {
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.no-key-banner-link--primary:hover { filter: brightness(1.1); }
 .no-key-banner-close {
   background: transparent;
   border: none;

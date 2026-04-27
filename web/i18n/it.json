@@ -239,6 +239,10 @@
   },
   "banner": {
     "noKey": "Nessun provider AI configurato — la chat usa risposte rule-based.",
-    "configureKey": "Configura una chiave"
+    "configureKey": "Configura una chiave",
+    "signupHint": "Serve una chiave? Entrambe le opzioni sono gratis, senza carta.",
+    "signupCerebras": "Ottieni una chiave Cerebras gratis",
+    "signupGroq": "Ottieni una chiave Groq",
+    "openSettings": "Apri Impostazioni"
   }
 }

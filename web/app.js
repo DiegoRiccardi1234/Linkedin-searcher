@@ -202,8 +202,11 @@ function ensureNoKeyBanner(show, message) {
   }
   banner.innerHTML = `
     <span class="material-symbols-outlined">warning</span>
-    <span>${escapeHtml(message)}</span>
-    <a href="#" id="noApiKeyBannerLink" class="no-key-banner-link">${t("banner.configureKey")}</a>
+    <span class="no-key-banner-text">${escapeHtml(message)}</span>
+    <span class="no-key-banner-hint">${t("banner.signupHint")}</span>
+    <a href="https://cloud.cerebras.ai/?utm_source=jobfinder" target="_blank" rel="noopener noreferrer" class="no-key-banner-link no-key-banner-link--primary">${t("banner.signupCerebras")}</a>
+    <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" class="no-key-banner-link">${t("banner.signupGroq")}</a>
+    <a href="#" id="noApiKeyBannerLink" class="no-key-banner-link">${t("banner.openSettings")}</a>
     <button type="button" id="noApiKeyBannerClose" class="no-key-banner-close" aria-label="close">×</button>
   `;
   banner.querySelector("#noApiKeyBannerClose").addEventListener("click", () => banner.remove());
