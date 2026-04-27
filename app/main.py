@@ -99,7 +99,10 @@ def create_app(workspace_dir: Path) -> FastAPI:
         container.shutdown()
 
     fastapi_app = FastAPI(title="Job Finder", version="0.3.0", lifespan=lifespan)
-    web_dir = workspace_dir / "web"
+    if getattr(sys, "frozen", False):
+        web_dir = Path(sys._MEIPASS) / "web"  # type: ignore[attr-defined]
+    else:
+        web_dir = workspace_dir / "web"
     fastapi_app.mount("/web", StaticFiles(directory=web_dir), name="web")
 
     @fastapi_app.get("/")

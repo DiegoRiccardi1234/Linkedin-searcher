@@ -24,9 +24,14 @@ hiddenimports += [
 datas: list[tuple[str, str]] = [
     ("web", "web"),
     ("app/prompts", "app/prompts"),
+    ("app/migrations", "app/migrations"),
 ]
 try:
     datas += collect_data_files("jobspy", include_py_files=False)
+except Exception:
+    pass
+try:
+    datas += collect_data_files("tls_client", include_py_files=False)
 except Exception:
     pass
 
