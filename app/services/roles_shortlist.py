@@ -8,10 +8,9 @@ while preserving the casing of the first occurrence.
 from __future__ import annotations
 
 import json
-from typing import Iterable
+from collections.abc import Iterable
 
 from app.db import Database
-
 
 PREF_KEY = "role_shortlist"
 

@@ -40,9 +40,7 @@ def get_chat_state(db: Database) -> str:
     """Return one of: no_cv, onboarding, ready_to_search, advising."""
     profile = db.get_active_candidate_profile()
     jobs = db.get_top_jobs(limit=1)
-    prefs_set = bool(
-        db.get_preference("remote_mode", "") or db.get_preference("min_ral", "")
-    )
+    prefs_set = bool(db.get_preference("remote_mode", "") or db.get_preference("min_ral", ""))
 
     if not profile:
         return "no_cv"

@@ -86,7 +86,9 @@ def score_model_name(model_name: str, policy: dict | None = None) -> int:
     return score
 
 
-def choose_best_model(models: list[str], preferred_model: str | None = None, policy: dict | None = None) -> str:
+def choose_best_model(
+    models: list[str], preferred_model: str | None = None, policy: dict | None = None
+) -> str:
     if preferred_model:
         for model in models:
             if model.lower() == preferred_model.lower():

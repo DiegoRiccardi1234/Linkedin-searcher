@@ -41,7 +41,10 @@ class OpenAIProvider(LLMProvider):
                     continue
                 lowered = model_id.lower()
                 # Skip non-chat models (embeddings, audio, moderation, etc.).
-                if any(token in lowered for token in ["embedding", "audio", "tts", "moderation", "whisper"]):
+                if any(
+                    token in lowered
+                    for token in ["embedding", "audio", "tts", "moderation", "whisper"]
+                ):
                     continue
                 output.append(str(model_id))
             return output
@@ -70,7 +73,9 @@ class OpenAIProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         if not self.client:
             raise RuntimeError("OpenAI not configured")
         resolved_model = model or self._selected_model or self.select_model()
@@ -82,7 +87,9 @@ class OpenAIProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
         if not self.client:
             raise RuntimeError("OpenAI not configured")
 

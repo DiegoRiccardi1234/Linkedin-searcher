@@ -8,13 +8,22 @@ from typing import Any
 # it's suspicious — likely a DOM/selector regression on the scraper side
 # rather than an actual lack of listings.
 _COMMON_CANARY_TERMS = {
-    "python", "java", "javascript", "sql", "react", "data analyst",
-    "data engineer", "devops", "qa tester", "cloud engineer",
+    "python",
+    "java",
+    "javascript",
+    "sql",
+    "react",
+    "data analyst",
+    "data engineer",
+    "devops",
+    "qa tester",
+    "cloud engineer",
 }
 
 
 def _is_common_term(term: str) -> bool:
     return term.strip().lower() in _COMMON_CANARY_TERMS
+
 
 from app.config import AppSettings
 from app.db import Database
@@ -48,16 +57,71 @@ BLACKLIST = [
 ]
 
 STOPWORDS = {
-    "the", "and", "for", "with", "from", "that", "this", "have", "has", "will", "your",
-    "you", "our", "all", "per", "con", "dei", "delle", "della", "dell", "una", "uno",
-    "sono", "come", "sulla", "sulle", "degli", "nella", "nelle", "into", "about", "role",
-    "lavoro", "lavori", "offerta", "annuncio", "candidate", "team", "company",
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "have",
+    "has",
+    "will",
+    "your",
+    "you",
+    "our",
+    "all",
+    "per",
+    "con",
+    "dei",
+    "delle",
+    "della",
+    "dell",
+    "una",
+    "uno",
+    "sono",
+    "come",
+    "sulla",
+    "sulle",
+    "degli",
+    "nella",
+    "nelle",
+    "into",
+    "about",
+    "role",
+    "lavoro",
+    "lavori",
+    "offerta",
+    "annuncio",
+    "candidate",
+    "team",
+    "company",
 }
 
 TECH_KEYWORDS = {
-    "python", "java", "javascript", "typescript", "react", "node", "sql", "docker",
-    "kubernetes", "aws", "azure", "gcp", "api", "fastapi", "django", "selenium",
-    "playwright", "testing", "qa", "data", "analytics", "machine", "learning",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "react",
+    "node",
+    "sql",
+    "docker",
+    "kubernetes",
+    "aws",
+    "azure",
+    "gcp",
+    "api",
+    "fastapi",
+    "django",
+    "selenium",
+    "playwright",
+    "testing",
+    "qa",
+    "data",
+    "analytics",
+    "machine",
+    "learning",
 }
 
 
@@ -133,7 +197,9 @@ def _estimate_experience_band(offer_text: str) -> str:
             return "2"
         return "3+"
 
-    if any(token in offer_text for token in ["junior", "entry level", "neolaureat", "stage", "intern"]):
+    if any(
+        token in offer_text for token in ["junior", "entry level", "neolaureat", "stage", "intern"]
+    ):
         return "0"
     return "Non specificato"
 
@@ -145,13 +211,19 @@ def _estimate_contract_type(offer_text: str) -> str:
         return "Stage"
     if any(token in offer_text for token in ["partita iva", "p.iva", "freelance", "contractor"]):
         return "Partita IVA"
-    if any(token in offer_text for token in ["tempo indeterminato", "full-time", "dipendente", "permanent"]):
+    if any(
+        token in offer_text
+        for token in ["tempo indeterminato", "full-time", "dipendente", "permanent"]
+    ):
         return "Dipendente"
     return "Non specificato"
 
 
 def _estimate_smart_working(offer_text: str) -> str:
-    if any(token in offer_text for token in ["remote", "full remote", "smart working", "hybrid", "ibrid"]):
+    if any(
+        token in offer_text
+        for token in ["remote", "full remote", "smart working", "hybrid", "ibrid"]
+    ):
         return "Sì"
     if any(token in offer_text for token in ["on-site", "onsite", "in office"]):
         return "No"
@@ -188,14 +260,20 @@ def _fallback_analysis(
         advice = "Salta"
 
     overlap_preview = ", ".join(overlap[:5]) if overlap else "competenze base IT"
-    weakness_text = "Richieste non completamente allineate al profilo" if score < 7 else "Competenze verificabili in colloquio"
+    weakness_text = (
+        "Richieste non completamente allineate al profilo"
+        if score < 7
+        else "Competenze verificabili in colloquio"
+    )
 
     return {
         "punteggio": score,
         "programmazione_richiesta": _estimate_programming_demand(offer_text),
         "smart_working": _estimate_smart_working(offer_text),
         "contratto": _estimate_contract_type(offer_text),
-        "junior_friendly": "Sì" if any(token in offer_text for token in ["junior", "entry", "stage", "intern"]) else "Non specificato",
+        "junior_friendly": "Sì"
+        if any(token in offer_text for token in ["junior", "entry", "stage", "intern"])
+        else "Non specificato",
         "anni_esperienza_richiesti": _estimate_experience_band(offer_text),
         "punti_forza_per_diego": f"Match su: {overlap_preview}.",
         "punti_deboli_per_diego": weakness_text,
@@ -203,12 +281,18 @@ def _fallback_analysis(
         "consiglio": advice,
         "ral_stimata": "Non stimabile",
         "reputazione_azienda": "Sconosciuta",
-        "adatta_neolaureati": "Sì" if any(token in offer_text for token in ["junior", "stage", "intern", "entry"]) else "Non specificato",
+        "adatta_neolaureati": "Sì"
+        if any(token in offer_text for token in ["junior", "stage", "intern", "entry"])
+        else "Non specificato",
         "note_azienda": f"Valutazione automatica fallback per {azienda}.",
         "match_axes": {
             "skills_match": max(0, min(10, score + min(2, len(overlap) // 2))),
-            "seniority_match": 8 if any(t in offer_text for t in ["junior", "entry", "stage", "intern"]) else (3 if any(t in offer_text for t in ["senior", "lead"]) else 6),
-            "remote_match": 9 if any(t in offer_text for t in ["remote", "smart working"]) else (6 if "hybrid" in offer_text or "ibrid" in offer_text else 4),
+            "seniority_match": 8
+            if any(t in offer_text for t in ["junior", "entry", "stage", "intern"])
+            else (3 if any(t in offer_text for t in ["senior", "lead"]) else 6),
+            "remote_match": 9
+            if any(t in offer_text for t in ["remote", "smart working"])
+            else (6 if "hybrid" in offer_text or "ibrid" in offer_text else 4),
             "salary_match": 5,
             "contract_match": 3 if any(t in offer_text for t in ["partita iva", "p.iva"]) else 7,
         },
@@ -340,7 +424,7 @@ def run_scan(
             azienda = str(row.get("company", "N/A"))
             descrizione = str(row.get("description", ""))
 
-            skip, reason = pre_filtro(titolo=titolo, descrizione=descrizione)
+            skip, _reason = pre_filtro(titolo=titolo, descrizione=descrizione)
             if skip:
                 totale_scartati += 1
                 continue
@@ -392,7 +476,14 @@ def run_scan(
 
             db.update_job_analysis(job_id=job_id, analysis=analysis)
             totale_analizzati += 1
-            yield {"status": "analyzed", "job": {"titolo": titolo, "azienda": azienda, "score": analysis.get("punteggio", 0)}}
+            yield {
+                "status": "analyzed",
+                "job": {
+                    "titolo": titolo,
+                    "azienda": azienda,
+                    "score": analysis.get("punteggio", 0),
+                },
+            }
             time.sleep(settings.delay_tra_chiamate)
 
         time.sleep(settings.delay_tra_ricerche)

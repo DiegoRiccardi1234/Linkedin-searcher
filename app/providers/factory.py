@@ -1,3 +1,6 @@
+import os as _os
+import random as _random
+import time as _time
 from typing import Any
 
 from app.config import AppSettings
@@ -73,9 +76,7 @@ class ProviderManager:
             self.active_provider = provider
             self.active_provider_name = provider.name
             self.active_model = selected_model
-            log.info(
-                "LLM provider active: %s (model=%s)", provider.name, selected_model
-            )
+            log.info("LLM provider active: %s (model=%s)", provider.name, selected_model)
             return
 
         self.active_provider = None
@@ -124,7 +125,9 @@ class ProviderManager:
         if not provider:
             raise RuntimeError("No LLM provider available")
         return _with_retry(
-            lambda: provider.complete_json(prompt=prompt, model=active_model, max_tokens=max_tokens),
+            lambda: provider.complete_json(
+                prompt=prompt, model=active_model, max_tokens=max_tokens
+            ),
             provider_label=provider_name or self.active_provider_name or "unknown",
         )
 
@@ -146,10 +149,6 @@ class ProviderManager:
 
 
 # ─── Retry helper ──────────────────────────────────────────────
-import os as _os
-import random as _random
-import time as _time
-
 
 _RETRYABLE_MARKERS = (
     "429",
@@ -182,7 +181,7 @@ def _with_retry(fn, provider_label: str):
     for attempt in range(1, max_attempts + 1):
         try:
             return fn()
-        except Exception as exc:  # noqa: BLE001 — rethrow unchanged after last retry
+        except Exception as exc:
             last_exc = exc
             if attempt >= max_attempts or not _is_retryable(exc):
                 raise

@@ -25,7 +25,9 @@ class GoogleProvider(LLMProvider):
     def __init__(self, api_key: str | None):
         self.api_key = api_key
         self.client = (
-            OpenAI(api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+            OpenAI(
+                api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+            )
             if (api_key and OpenAI is not None)
             else None
         )
@@ -81,7 +83,9 @@ class GoogleProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         if not self.client:
             raise RuntimeError("Google not configured")
         resolved_model = model or self._selected_model or self.select_model()
@@ -93,7 +97,9 @@ class GoogleProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
         if not self.client:
             raise RuntimeError("Google not configured")
 

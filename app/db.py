@@ -2,13 +2,13 @@ import hashlib
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def make_job_hash(titolo: str, azienda: str, link: str) -> str:
@@ -228,7 +228,9 @@ class Database:
         if only_new:
             query += " AND is_new = 1"
         if search_text:
-            query += " AND (LOWER(titolo) LIKE ? OR LOWER(azienda) LIKE ? OR LOWER(descrizione) LIKE ?)"
+            query += (
+                " AND (LOWER(titolo) LIKE ? OR LOWER(azienda) LIKE ? OR LOWER(descrizione) LIKE ?)"
+            )
             like = f"%{search_text.strip().lower()}%"
             params.extend([like, like, like])
         if min_score is not None:
@@ -324,8 +326,7 @@ class Database:
     def find_candidate_profile_by_hash(self, content_hash: str) -> int | None:
         cur = self.conn.cursor()
         cur.execute(
-            "SELECT id FROM candidate_profiles WHERE content_hash = ? "
-            "ORDER BY id DESC LIMIT 1",
+            "SELECT id FROM candidate_profiles WHERE content_hash = ? ORDER BY id DESC LIMIT 1",
             (content_hash,),
         )
         row = cur.fetchone()
@@ -405,8 +406,7 @@ class Database:
             )
         else:
             cur.execute(
-                "SELECT * FROM chat_messages WHERE session_id = ? "
-                "ORDER BY id DESC LIMIT ?",
+                "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id DESC LIMIT ?",
                 (session_id, limit),
             )
         rows = [dict(r) for r in cur.fetchall()]
@@ -431,8 +431,12 @@ class Database:
     def get_analytics(self) -> dict:
         cursor = self.conn.cursor()
         total = cursor.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] or 0
-        applied = cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'applied'").fetchone()[0] or 0
-        rejected = cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'rejected'").fetchone()[0] or 0
+        applied = (
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'applied'").fetchone()[0] or 0
+        )
+        rejected = (
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'rejected'").fetchone()[0] or 0
+        )
 
         jobs_by_status: dict[str, int] = {
             "open": 0,
@@ -449,7 +453,7 @@ class Database:
             if status in jobs_by_status:
                 jobs_by_status[status] = count
 
-        score_distribution: dict[str, int] = {str(i): 0 for i in range(0, 11)}
+        score_distribution: dict[str, int] = {str(i): 0 for i in range(11)}
         for row in cursor.execute(
             "SELECT punteggio_ai, COUNT(*) AS count FROM jobs GROUP BY punteggio_ai"
         ).fetchall():

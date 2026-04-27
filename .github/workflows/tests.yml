@@ -26,6 +26,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Lint (ruff check)
+        run: ruff check app/
+
+      - name: Format check (ruff format)
+        run: ruff format --check app/
+
       - name: Run unit tests
         run: pytest -q
 

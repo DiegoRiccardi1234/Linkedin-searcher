@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sqlite3
 
-
 VERSION = 2
 DESCRIPTION = "chat_messages.content_type column"
 

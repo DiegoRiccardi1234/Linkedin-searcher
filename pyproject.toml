@@ -1,0 +1,59 @@
+[project]
+name = "job-finder"
+version = "0.3.0"
+description = "Localhost-first AI-powered job search assistant"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["data", ".venv", "node_modules", "scripts/seed_demo.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "C4", "PIE"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default arg (FastAPI Depends/File pattern)
+    "N806",   # local constants in FastAPI handlers (MAX_CV_BYTES etc.)
+    "N818",   # exception classes without "Error" suffix (project convention)
+    "UP042",  # str+Enum vs StrEnum (StrEnum requires py3.11+ everywhere)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B", "N"]
+"app/services/scanner_service.py" = ["E402"]  # conditional jobspy import
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = ["tests", "data", ".venv", "scripts/seed_demo.py"]
+
+[[tool.mypy.overrides]]
+module = ["jobspy.*", "pypdf.*", "docx.*", "cerebras.*", "groq.*", "anthropic.*", "google.*", "pandas.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/_stubs/*", "app/migrations/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = false

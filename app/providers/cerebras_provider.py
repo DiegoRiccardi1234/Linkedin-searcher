@@ -78,7 +78,9 @@ class CerebrasProvider(LLMProvider):
             response.raise_for_status()
             payload = response.json()
             data = payload.get("data", []) if isinstance(payload, dict) else []
-            ids = [str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")]
+            ids = [
+                str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")
+            ]
             return ids
         except Exception:
             return []
@@ -148,7 +150,9 @@ class CerebrasProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         if not self.client:
             raise RuntimeError("Cerebras not configured")
         resolved_model = model or self._selected_model or self.select_model()
@@ -160,6 +164,8 @@ class CerebrasProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
         text = self.complete_text(prompt=prompt, model=model, max_tokens=max_tokens)
         return _extract_json(text)

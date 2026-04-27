@@ -46,7 +46,9 @@ class AnthropicProvider(LLMProvider):
             with request.urlopen(req, timeout=12) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             data = payload.get("data", []) if isinstance(payload, dict) else []
-            return [str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")]
+            return [
+                str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")
+            ]
         except Exception:
             return []
 
@@ -84,7 +86,8 @@ class AnthropicProvider(LLMProvider):
         body: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
-            "messages": transformed_messages or [{"role": "user", "content": [{"type": "text", "text": "ok"}]}],
+            "messages": transformed_messages
+            or [{"role": "user", "content": [{"type": "text", "text": "ok"}]}],
         }
         if system_parts:
             body["system"] = "\n".join(system_parts)
@@ -112,16 +115,21 @@ class AnthropicProvider(LLMProvider):
 
     def complete_text(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> str:
         resolved_model = model or self._selected_model or self.select_model()
-        return self._chat_request(messages=[{"role": "user", "content": prompt}], model=resolved_model, max_tokens=max_tokens)
+        return self._chat_request(
+            messages=[{"role": "user", "content": prompt}],
+            model=resolved_model,
+            max_tokens=max_tokens,
+        )
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         resolved_model = model or self._selected_model or self.select_model()
         return self._chat_request(messages=messages, model=resolved_model, max_tokens=max_tokens)
 
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
-        instruction = (
-            "Rispondi esclusivamente con JSON valido, senza testo extra.\n"
-            f"\n{prompt}"
-        )
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
+        instruction = f"Rispondi esclusivamente con JSON valido, senza testo extra.\n\n{prompt}"
         text = self.complete_text(prompt=instruction, model=model, max_tokens=max_tokens)
         return _extract_json(text)

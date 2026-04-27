@@ -8,7 +8,7 @@ JSON action protocol.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts" / "chat"
@@ -24,7 +24,7 @@ LANG_MAP = {
 }
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load(name: str) -> str:
     path = _PROMPTS_DIR / f"{name}.txt"
     return path.read_text(encoding="utf-8").strip()
@@ -36,8 +36,4 @@ def system_prompt(state: str, ui_language: str) -> str:
     base = _load(state_key)
     envelope = _load("json_envelope")
     lang_name = LANG_MAP.get(ui_language, "English")
-    return (
-        f"{base}\n\n"
-        f"IMPORTANT: Always respond in {lang_name}.\n\n"
-        f"{envelope}"
-    )
+    return f"{base}\n\nIMPORTANT: Always respond in {lang_name}.\n\n{envelope}"

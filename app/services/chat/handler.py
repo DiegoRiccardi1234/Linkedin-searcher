@@ -24,7 +24,7 @@ log = get_logger(__name__)
 def _strip_markdown_fence(text: str) -> str:
     cleaned = text.strip()
     if cleaned.startswith("```json"):
-        cleaned = cleaned[len("```json"):].lstrip()
+        cleaned = cleaned[len("```json") :].lstrip()
     elif cleaned.startswith("```"):
         cleaned = cleaned[3:].lstrip()
     if cleaned.endswith("```"):
@@ -121,9 +121,7 @@ def handle_chat_message(
 
     suggested_roles: list[dict[str, Any]] = []
     try:
-        raw_answer = provider_manager.chat(
-            prompt_messages, max_tokens=900, provider_name=provider
-        )
+        raw_answer = provider_manager.chat(prompt_messages, max_tokens=900, provider_name=provider)
         answer, action_payload, suggested_roles = _parse_llm_response(raw_answer)
     except Exception as exc:
         log.error("Provider chat call failed, using fallback: %s", exc, exc_info=True)

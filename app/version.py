@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
-from typing import Any
-
-import urllib.request
 import urllib.error
-import json
+import urllib.request
+from typing import Any
 
 from app.log import get_logger
 

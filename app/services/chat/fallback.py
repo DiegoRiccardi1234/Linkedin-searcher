@@ -89,8 +89,20 @@ def fallback_answer(db: Database, message: str) -> tuple[str, dict[str, Any] | N
 
     recommend_intent = any(
         token in lower
-        for token in ["recommend", "best", "top", "consiglia", "miglior", "priorit", "candid",
-                      "mejor", "recomienda", "recommand", "empfeh", "beste"]
+        for token in [
+            "recommend",
+            "best",
+            "top",
+            "consiglia",
+            "miglior",
+            "priorit",
+            "candid",
+            "mejor",
+            "recomienda",
+            "recommand",
+            "empfeh",
+            "beste",
+        ]
     )
 
     recommended_jobs = db.get_recommended_jobs(limit=3)
@@ -112,8 +124,6 @@ def fallback_answer(db: Database, message: str) -> tuple[str, dict[str, Any] | N
         keywords = suggest_keywords_from_profile(db)
         locations = suggest_locations(db)
         action = {"type": "FILL_SCAN_FORM", "keywords": keywords, "locations": locations}
-        return _t(lang, "search_prepared",
-                  kw=", ".join(keywords),
-                  loc=", ".join(locations)), action
+        return _t(lang, "search_prepared", kw=", ".join(keywords), loc=", ".join(locations)), action
 
     return _t(lang, "default_saved"), None

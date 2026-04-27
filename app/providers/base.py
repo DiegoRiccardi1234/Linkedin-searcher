@@ -22,9 +22,13 @@ class LLMProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
         raise NotImplementedError

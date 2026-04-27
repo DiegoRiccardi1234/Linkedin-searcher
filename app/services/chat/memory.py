@@ -98,9 +98,7 @@ def maybe_summarize(
 
 
 def load_session_summary(db: Database, session_id: str) -> str:
-    rows = db.list_chat_messages(
-        session_id=session_id, limit=1, include_types=("summary",)
-    )
+    rows = db.list_chat_messages(session_id=session_id, limit=1, include_types=("summary",))
     if not rows:
         return ""
     return str(rows[-1].get("content") or "").strip()

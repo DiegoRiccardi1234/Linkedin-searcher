@@ -1,15 +1,14 @@
 import csv
 import hashlib
-from datetime import datetime
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
-
-from app import rate_limit
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import rate_limit
 from app.config import AppSettings, load_settings, save_local_provider_keys
 from app.cv_ingest import (
     InvalidCVContent,
@@ -20,7 +19,6 @@ from app.cv_ingest import (
 )
 from app.db import Database
 from app.log import configure_logging, get_logger
-from app.version import __version__, get_version_info
 from app.models import (
     ChatRequest,
     ChatResponse,
@@ -36,6 +34,7 @@ from app.providers.factory import ProviderManager
 from app.services import roles_shortlist as roles_shortlist_svc
 from app.services.chat_service import handle_chat_message
 from app.services.scanner_service import analyze_offer, run_scan
+from app.version import get_version_info
 
 
 class AppContainer:
@@ -53,7 +52,9 @@ class AppContainer:
         if cv_path.exists() and not self.db.get_latest_candidate_profile():
             markdown = cv_path.read_text(encoding="utf-8", errors="replace")
             summary = summarize_profile(markdown)
-            created_id = self.db.save_candidate_profile(source_name="cv.md", markdown=markdown, summary=summary)
+            created_id = self.db.save_candidate_profile(
+                source_name="cv.md", markdown=markdown, summary=summary
+            )
             self.db.set_active_profile(created_id)
 
         if not self.db.get_preference("active_profile_id", ""):
@@ -160,7 +161,7 @@ def create_app(workspace_dir: Path) -> FastAPI:
         try:
             validate_cv_content(markdown)
         except InvalidCVContent as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         content_hash = hashlib.sha256(data).hexdigest()
         existing_id = container.db.find_candidate_profile_by_hash(content_hash)
@@ -225,19 +226,23 @@ def create_app(workspace_dir: Path) -> FastAPI:
         search_terms: str = Query(default=""),
         location: str | None = Query(default=None),
         is_remote: bool = Query(default=False),
-        sites: str = Query(default="linkedin,indeed")
+        sites: str = Query(default="linkedin,indeed"),
     ):
-        term_list = [t.strip() for t in search_terms.split(",") if t.strip()] if search_terms else []
+        term_list = (
+            [t.strip() for t in search_terms.split(",") if t.strip()] if search_terms else []
+        )
         site_list = [s.strip() for s in sites.split(",") if s.strip()]
-        
+
         payload = ScanRequest(
             search_terms=term_list if term_list else None,
             location=location,
             is_remote=is_remote,
-            sites=site_list
+            sites=site_list,
         )
+
         def event_generator():
             import json
+
             try:
                 for event in run_scan(
                     db=container.db,
@@ -248,7 +253,7 @@ def create_app(workspace_dir: Path) -> FastAPI:
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\\n\\n"
-        
+
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     @fastapi_app.post("/api/scan")
@@ -300,20 +305,20 @@ def create_app(workspace_dir: Path) -> FastAPI:
         job = container.db.get_job_with_analysis(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-            
+
         profile = container.db.get_active_candidate_profile()
         profile_markdown = profile["markdown"] if profile else "CV non disponibile."
-        
+
         linkedin_url = container.db.get_preference("linkedin_url", "")
         if linkedin_url:
             profile_markdown += f"\n\nProfilo LinkedIn: {linkedin_url}"
-        
+
         titolo = job.get("titolo", "N/A")
         azienda = job.get("azienda", "N/A")
         descrizione = job.get("descrizione", "")
-        
-        prompt = f"""Sei un assistente che aiuta un IT professional a trovare lavoro. 
-Scrivi una Cover Letter / messaggio InMail (circa 100-150 parole, concisa ma efficace e performante, tono professionale ma non ingessato, focalizzato sui risultati) per questo annuncio. 
+
+        prompt = f"""Sei un assistente che aiuta un IT professional a trovare lavoro.
+Scrivi una Cover Letter / messaggio InMail (circa 100-150 parole, concisa ma efficace e performante, tono professionale ma non ingessato, focalizzato sui risultati) per questo annuncio.
 Usa le informazioni del CV per evidenziare la corrispondenza con l'annuncio.
 
 CV candidato:
@@ -329,7 +334,7 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
   "cover_letter": "Il testo completo del messaggio..."
 }}
 """
-        
+
         try:
             result = container.providers.complete_json(prompt=prompt, max_tokens=600)
             if isinstance(result, dict) and "cover_letter" in result:
@@ -339,7 +344,7 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
             container.db.save_cover_letter(job_id, cover_letter)
         except Exception as e:
             cover_letter = f"Error generating cover letter: {e}"
-            
+
         return {"cover_letter": cover_letter}
 
     @fastapi_app.get("/api/analytics")
@@ -370,7 +375,7 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
 
         profile = container.db.get_active_candidate_profile()
         profile_markdown = profile["markdown"] if profile else "Profile not loaded"
-        
+
         linkedin_url = container.db.get_preference("linkedin_url", "")
         if linkedin_url:
             profile_markdown += f"\n\nProfilo LinkedIn: {linkedin_url}"
@@ -461,9 +466,6 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
 
     @fastapi_app.get("/api/applications/export")
     def export_applications(format: str = "csv") -> StreamingResponse:
-        rows_all = container.db.export_jobs_for_csv()
-        tracking_statuses = {"applied", "interviewing", "rejected"}
-        # export_jobs_for_csv doesn't include status — use get_top_jobs instead to get raw status
         cur = container.db.conn.cursor()
         raw_rows = cur.execute(
             "SELECT titolo, azienda, sede, status, punteggio_ai, consiglio, link, "

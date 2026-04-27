@@ -11,7 +11,6 @@ import os
 import threading
 import time
 from collections import deque
-from typing import Deque
 
 from fastapi import HTTPException, Request
 
@@ -23,7 +22,7 @@ log = get_logger(__name__)
 _ENABLED = os.environ.get("ENABLE_RATE_LIMIT", "1").lower() not in ("0", "false", "no")
 
 _lock = threading.Lock()
-_buckets: dict[tuple[str, str], Deque[float]] = {}
+_buckets: dict[tuple[str, str], deque[float]] = {}
 
 
 def _client_ip(request: Request) -> str:

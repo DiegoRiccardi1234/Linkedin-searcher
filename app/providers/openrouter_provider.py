@@ -26,7 +26,11 @@ class OpenRouterProvider(LLMProvider):
 
     def __init__(self, api_key: str | None):
         self.api_key = api_key
-        self.client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1") if (api_key and OpenAI is not None) else None
+        self.client = (
+            OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+            if (api_key and OpenAI is not None)
+            else None
+        )
         self._selected_model: str | None = None
 
     def is_available(self) -> bool:
@@ -70,7 +74,9 @@ class OpenRouterProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700) -> str:
+    def chat(
+        self, messages: list[dict[str, str]], model: str | None = None, max_tokens: int = 700
+    ) -> str:
         if not self.client:
             raise RuntimeError("OpenRouter not configured")
         resolved_model = model or self._selected_model or self.select_model()
@@ -82,7 +88,9 @@ class OpenRouterProvider(LLMProvider):
         )
         return (response.choices[0].message.content or "").strip()
 
-    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700) -> dict[str, Any]:
+    def complete_json(
+        self, prompt: str, model: str | None = None, max_tokens: int = 700
+    ) -> dict[str, Any]:
         if not self.client:
             raise RuntimeError("OpenRouter not configured")
 

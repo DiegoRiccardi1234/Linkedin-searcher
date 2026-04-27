@@ -152,7 +152,10 @@ _CV_SIGNALS: list[tuple[tuple[str, ...], str]] = [
     (("java", "spring"), "java_backend"),
     (("javascript", "react", "vue", "angular", "frontend", "front-end"), "frontend"),
     (("sql", "database", "data warehouse", "etl", "power bi", "tableau"), "data"),
-    (("machine learning", "deep learning", " ai ", "ml engineer", "pytorch", "tensorflow"), "ai_ml"),
+    (
+        ("machine learning", "deep learning", " ai ", "ml engineer", "pytorch", "tensorflow"),
+        "ai_ml",
+    ),
     (("cyber", "security", "pentest", "soc", "siem", "firewall"), "cyber"),
     (("cloud", "aws", "azure", "gcp", "kubernetes", "docker", "devops"), "cloud_devops"),
     (("qa", "testing", "selenium", "cypress", "automation"), "qa"),

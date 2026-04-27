@@ -25,10 +25,9 @@ import importlib
 import pkgutil
 import re
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable
-
+from datetime import UTC, datetime
 
 _FILENAME_RE = re.compile(r"^(\d{3})_[a-z0-9_]+$")
 
@@ -41,7 +40,7 @@ class Migration:
 
 
 def _iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _discover() -> list[Migration]:
@@ -81,9 +80,7 @@ def _current_version(conn: sqlite3.Connection) -> int:
 
 
 def _has_table(conn: sqlite3.Connection, name: str) -> bool:
-    cur = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    )
+    cur = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,))
     return cur.fetchone() is not None
 
 

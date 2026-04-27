@@ -3,7 +3,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-
 DEFAULT_SEARCH_TERMS = [
     "Analista Funzionale Junior",
     "Junior QA Tester",
@@ -184,9 +183,11 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         if provider not in seen:
             sanitized_order.append(provider)
 
-    primary_provider = str(
-        local_secrets.get("primary_provider") or os.getenv("LLM_PROVIDER") or ""
-    ).strip().lower()
+    primary_provider = (
+        str(local_secrets.get("primary_provider") or os.getenv("LLM_PROVIDER") or "")
+        .strip()
+        .lower()
+    )
     if primary_provider in SUPPORTED_PROVIDERS:
         sanitized_order = [primary_provider] + [p for p in sanitized_order if p != primary_provider]
 

@@ -1,5 +1,5 @@
-from io import BytesIO
 import re
+from io import BytesIO
 from typing import Any
 
 from app.log import get_logger
@@ -33,7 +33,7 @@ def _extract_text_docx(data: bytes) -> str:
 
 def extract_markdown_from_upload(filename: str, data: bytes) -> str:
     lower = filename.lower()
-    if lower.endswith(".md") or lower.endswith(".txt"):
+    if lower.endswith((".md", ".txt")):
         return data.decode("utf-8", errors="replace").strip()
     if lower.endswith(".pdf"):
         return _extract_text_pdf(data)
@@ -43,9 +43,17 @@ def extract_markdown_from_upload(filename: str, data: bytes) -> str:
 
 
 CV_KEYWORDS = (
-    "experience", "skill", "education", "work",
-    "esperienza", "competenze", "formazione", "lavoro",
-    "cv", "resume", "curriculum",
+    "experience",
+    "skill",
+    "education",
+    "work",
+    "esperienza",
+    "competenze",
+    "formazione",
+    "lavoro",
+    "cv",
+    "resume",
+    "curriculum",
 )
 MIN_CV_CHARS = 200
 
@@ -57,14 +65,11 @@ class InvalidCVContent(ValueError):
 def validate_cv_content(markdown: str) -> None:
     text = markdown.strip()
     if len(text) < MIN_CV_CHARS:
-        raise InvalidCVContent(
-            f"CV content too short ({len(text)} chars, min {MIN_CV_CHARS})."
-        )
+        raise InvalidCVContent(f"CV content too short ({len(text)} chars, min {MIN_CV_CHARS}).")
     lower = text.lower()
     if not any(kw in lower for kw in CV_KEYWORDS):
         raise InvalidCVContent(
-            "File does not appear to be a CV/resume "
-            "(missing common section keywords)."
+            "File does not appear to be a CV/resume (missing common section keywords)."
         )
 
 
@@ -73,12 +78,39 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
     lower = markdown_text.lower()
 
     skill_keywords = [
-        "qa", "testing", "analista", "analyst", "cybersecurity", "soc",
-        "python", "typescript", "javascript", "react", "java", "sql",
-        "automation", "devops", "docker", "kubernetes", "git",
-        "machine learning", "data analysis", "agile", "scrum",
-        "api", "rest", "graphql", "node", "fastapi", "django",
-        "c#", ".net", "azure", "aws", "gcp", "linux",
+        "qa",
+        "testing",
+        "analista",
+        "analyst",
+        "cybersecurity",
+        "soc",
+        "python",
+        "typescript",
+        "javascript",
+        "react",
+        "java",
+        "sql",
+        "automation",
+        "devops",
+        "docker",
+        "kubernetes",
+        "git",
+        "machine learning",
+        "data analysis",
+        "agile",
+        "scrum",
+        "api",
+        "rest",
+        "graphql",
+        "node",
+        "fastapi",
+        "django",
+        "c#",
+        ".net",
+        "azure",
+        "aws",
+        "gcp",
+        "linux",
     ]
     found_skills = [kw for kw in skill_keywords if kw in lower]
 
@@ -114,9 +146,7 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
     }
 
 
-def summarize_profile_with_llm(
-    markdown_text: str, provider_manager: "Any"
-) -> dict[str, Any]:
+def summarize_profile_with_llm(markdown_text: str, provider_manager: "Any") -> dict[str, Any]:
     """Rich profile summary using LLM. Falls back to keyword-based if LLM fails."""
     prompt = (
         "You are an expert career advisor. Analyze this CV/resume and extract a structured profile.\n"
