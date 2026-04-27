@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Playwright E2E tests for Job Finder",
   "scripts": {
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "record-demo": "playwright test tests/e2e/readme-demo-gif.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1"
