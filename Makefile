@@ -1,4 +1,4 @@
-.PHONY: install test coverage e2e lint fmt run docker docker-down clean
+.PHONY: install test coverage e2e lint fmt run docker docker-down build-exe clean
 
 install:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -33,6 +33,9 @@ docker:
 
 docker-down:
 	docker compose down
+
+build-exe:
+	python scripts/build_exe.py
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov coverage.xml .coverage

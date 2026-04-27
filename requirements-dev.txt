@@ -6,3 +6,5 @@ ruff>=0.5
 mypy>=1.10
 pre-commit>=3.7
 pydantic
+pyinstaller>=6.0
+Pillow>=10.0
