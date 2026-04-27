@@ -1,98 +1,20 @@
 import { api, escapeHtml, setText, truncate, showToast } from "./modules/helpers.js";
 import { initTheme } from "./modules/theme.js";
 import { loadShortlist as _loadShortlistApi, addToShortlist as _addToShortlistApi } from "./modules/shortlist.js";
+import { initI18n, t, loadLanguage, getCurrentLang, onLanguageChange } from "./modules/i18n.js";
 
 initTheme();
 
-// ─── i18n System ──────────────────────────────────────────────
-let _i18nStrings = {};
-let _i18nFallback = {};
-let _currentLang = localStorage.getItem('language') || 'en';
-const _i18nMissingReported = new Set();
-
-function _reportMissingKey(key) {
-  if (_i18nMissingReported.has(key)) return;
-  _i18nMissingReported.add(key);
-  console.warn(`[i18n] missing translation for "${key}" (lang=${_currentLang})`);
-}
-
-function t(key, params = {}) {
-  const keys = key.split('.');
-  let val = keys.reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), _i18nStrings);
-  let usedFallback = false;
-  if (val === undefined) {
-    val = keys.reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), _i18nFallback);
-    usedFallback = val !== undefined;
-  }
-  if (val === undefined) {
-    _reportMissingKey(key);
-    return key;
-  }
-  if (usedFallback && _currentLang !== 'en') {
-    _reportMissingKey(key);
-  }
-  return String(val).replace(/\{(\w+)\}/g, (_, p) => (params[p] !== undefined ? params[p] : `{${p}}`));
-}
-
-async function loadLanguage(lang) {
-  try {
-    const res = await fetch(`/web/i18n/${lang}.json`);
-    if (!res.ok) throw new Error(res.status);
-    _i18nStrings = await res.json();
-  } catch {
-    _i18nStrings = _i18nFallback;
-  }
-  _currentLang = lang;
-  localStorage.setItem('language', lang);
-  document.documentElement.setAttribute('lang', lang);
-  applyTranslations();
+onLanguageChange(() => {
   if (typeof loadChatPrompts === "function") {
     loadChatPrompts().catch(() => {});
   }
-
-  // Notify backend of language change
-  fetch('/api/preferences', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: 'ui_language', value: lang }),
-  }).catch(() => {});
-}
-
-function applyTranslations() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    const val = t(key);
-    if (val !== key) el.textContent = val;
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    const val = t(key);
-    if (val !== key) el.placeholder = val;
-  });
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    const key = el.getAttribute('data-i18n-title');
-    const val = t(key);
-    if (val !== key) el.title = val;
-  });
-  document.querySelectorAll('[data-i18n-html]').forEach(el => {
-    const key = el.getAttribute('data-i18n-html');
-    const val = t(key);
-    if (val !== key) el.innerHTML = val;
-  });
-}
-
-async function initI18n() {
-  try {
-    const res = await fetch('/web/i18n/en.json');
-    _i18nFallback = await res.json();
-  } catch { _i18nFallback = {}; }
-  await loadLanguage(_currentLang);
-}
+});
 
 // Language selector
 const langSelect = document.getElementById('langSelect');
 if (langSelect) {
-  langSelect.value = _currentLang;
+  langSelect.value = getCurrentLang();
   langSelect.addEventListener('change', () => {
     loadLanguage(langSelect.value);
   });
@@ -665,7 +587,7 @@ async function loadChatPrompts() {
 
   wrap.innerHTML = "";
   try {
-    const payload = await api(`/api/chat/prompts?lang=${encodeURIComponent(_currentLang || "en")}`);
+    const payload = await api(`/api/chat/prompts?lang=${encodeURIComponent(getCurrentLang() || "en")}`);
     const prompts = payload.prompts || [];
     for (const prompt of prompts) {
       const btn = document.createElement("button");
