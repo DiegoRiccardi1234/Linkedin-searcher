@@ -1252,25 +1252,6 @@ document.getElementById("scanForm").addEventListener("submit", async (event) => 
   }
 });
 
-document.getElementById("manualForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const payload = {
-    titolo: document.getElementById("manualTitolo").value.trim(),
-    azienda: document.getElementById("manualAzienda").value.trim(),
-    sede: document.getElementById("manualSede").value.trim(),
-    link: document.getElementById("manualLink").value.trim(),
-    descrizione: document.getElementById("manualDescrizione").value.trim(),
-  };
-
-  await api("/api/jobs/manual", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  await Promise.all([loadJobs(), loadRecommendations()]);
-  showToast(t("toast.manualAdded"), "info");
-});
-
 const _chatForm = document.getElementById("chatForm");
 if (_chatForm) _chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();

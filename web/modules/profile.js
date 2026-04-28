@@ -1,4 +1,4 @@
-import { api, escapeHtml, showToast, renderCoachMarkdown } from "./helpers.js";
+import { api, escapeHtml, showToast } from "./helpers.js";
 import { t } from "./i18n.js";
 
 const FIELDS = ["preferred_roles", "skills", "languages"];
@@ -69,7 +69,72 @@ function _renderMarkdown(markdown) {
     el.innerHTML = "";
     return;
   }
-  el.innerHTML = renderCoachMarkdown(markdown);
+  el.innerHTML = _formatCvText(markdown);
+}
+
+const _DATE_PREFIX_RE = /^\s*(?:\d{1,2}\/\d{4}|\d{4})\s*[-–]\s*(?:\d{1,2}\/\d{4}|\d{4}|presente|present|current|in corso)/i;
+const _SECTION_KEYWORDS_RE = /^(profilo|profile|esperienza|experience|esperienza\s+lavorativa|work\s+experience|istruzione|education|formazione|skill|skills|competenze|competenze\s+tecniche|hard\s+skills|soft\s+skills|lingue|languages|certificazioni|certifications|progetti|projects|interessi|interests|hobby|contatti|contacts)\b/i;
+
+function _formatCvText(raw) {
+  const text = String(raw || "");
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let nameAssigned = false;
+  let contactAssigned = false;
+  let inList = false;
+
+  const flushList = () => {
+    if (inList) { out.push("</ul>"); inList = false; }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      out.push('<div class="cv-spacer"></div>');
+      continue;
+    }
+    const safe = escapeHtml(trimmed);
+
+    if (!nameAssigned) {
+      flushList();
+      out.push(`<h2 class="cv-name">${safe}</h2>`);
+      nameAssigned = true;
+      continue;
+    }
+    if (!contactAssigned && (trimmed.includes("@") || trimmed.includes("|"))) {
+      flushList();
+      out.push(`<p class="cv-contact">${safe.replace(/\s*\|\s*/g, ' <span class="cv-sep">·</span> ')}</p>`);
+      contactAssigned = true;
+      continue;
+    }
+
+    const isAllCaps = trimmed.length > 2 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed);
+    if (isAllCaps || _SECTION_KEYWORDS_RE.test(trimmed)) {
+      flushList();
+      out.push(`<h3 class="cv-section">${safe}</h3>`);
+      continue;
+    }
+
+    const bulletMatch = trimmed.match(/^[-•·]\s+(.*)$/);
+    if (bulletMatch) {
+      if (!inList) { out.push('<ul class="cv-list">'); inList = true; }
+      out.push(`<li>${escapeHtml(bulletMatch[1])}</li>`);
+      continue;
+    }
+
+    if (_DATE_PREFIX_RE.test(trimmed)) {
+      flushList();
+      out.push(`<p class="cv-role">${safe}</p>`);
+      continue;
+    }
+
+    flushList();
+    out.push(`<p class="cv-line">${safe}</p>`);
+  }
+  flushList();
+  return out.join("\n");
 }
 
 function _renderMeta(profile) {
@@ -169,12 +234,6 @@ async function _activateProfile(id) {
   }
 }
 
-function _toggleEdit(field) {
-  const row = document.querySelector(`.profile-edit-row[data-field="${field}"]`);
-  if (!row) return;
-  row.classList.toggle("hidden");
-}
-
 /**
  * Public helper: append `roles` to the active profile's preferred_roles list,
  * de-duplicating case-insensitively. Used by the chat coach to push AI-suggested
@@ -221,10 +280,6 @@ export function bindProfileEvents() {
     const target = event.target.closest("button");
     if (!target) return;
 
-    if (target.classList.contains("profile-edit-toggle")) {
-      _toggleEdit(target.dataset.target);
-      return;
-    }
     if (target.classList.contains("chip-remove")) {
       const field = target.dataset.field;
       const idx = parseInt(target.dataset.idx || "-1", 10);

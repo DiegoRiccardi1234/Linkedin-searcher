@@ -325,10 +325,9 @@
         <article class="profile-block">
           <header class="profile-block-head">
             <h3 data-i18n="profile.preferredRoles">Preferred roles</h3>
-            <button type="button" class="ghost-btn profile-edit-toggle" data-target="roles" data-i18n="profile.edit">Edit</button>
           </header>
           <div id="profileRoles" class="chip-list" data-field="preferred_roles"></div>
-          <div class="profile-edit-row hidden" data-field="preferred_roles">
+          <div class="profile-edit-row" data-field="preferred_roles">
             <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addRole" placeholder="Add role" />
             <button type="button" class="secondary profile-add-btn" data-field="preferred_roles" data-i18n="profile.add">Add</button>
           </div>
@@ -337,10 +336,9 @@
         <article class="profile-block">
           <header class="profile-block-head">
             <h3 data-i18n="profile.skills">Top skills</h3>
-            <button type="button" class="ghost-btn profile-edit-toggle" data-target="skills" data-i18n="profile.edit">Edit</button>
           </header>
           <div id="profileSkills" class="chip-list" data-field="skills"></div>
-          <div class="profile-edit-row hidden" data-field="skills">
+          <div class="profile-edit-row" data-field="skills">
             <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addSkill" placeholder="Add skill" />
             <button type="button" class="secondary profile-add-btn" data-field="skills" data-i18n="profile.add">Add</button>
           </div>
@@ -349,10 +347,9 @@
         <article class="profile-block">
           <header class="profile-block-head">
             <h3 data-i18n="profile.languages">Languages</h3>
-            <button type="button" class="ghost-btn profile-edit-toggle" data-target="languages" data-i18n="profile.edit">Edit</button>
           </header>
           <div id="profileLanguages" class="chip-list" data-field="languages"></div>
-          <div class="profile-edit-row hidden" data-field="languages">
+          <div class="profile-edit-row" data-field="languages">
             <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addLanguage" placeholder="Add language" />
             <button type="button" class="secondary profile-add-btn" data-field="languages" data-i18n="profile.add">Add</button>
           </div>
@@ -409,17 +406,6 @@
           <pre id="keysStatus" class="output hidden"></pre>
         </article>
 
-        <article class="card-block">
-          <h3><span class="material-symbols-outlined">edit_note</span> <span data-i18n="settings.addManual">Add Job Manually</span></h3>
-          <form id="manualForm" class="column">
-            <input id="manualTitolo" type="text" data-i18n-placeholder="settings.jobTitle" placeholder="Job Title" required />
-            <input id="manualAzienda" type="text" data-i18n-placeholder="settings.companyName" placeholder="Company" />
-            <input id="manualSede" type="text" data-i18n-placeholder="settings.locationName" placeholder="Location" />
-            <input id="manualLink" type="url" placeholder="URL" />
-            <textarea id="manualDescrizione" rows="4" data-i18n-placeholder="settings.description" placeholder="Description"></textarea>
-            <button type="submit" class="secondary" data-i18n="settings.addAnalyze">Add + Analyze</button>
-          </form>
-        </article>
       </div>
     </section>
 

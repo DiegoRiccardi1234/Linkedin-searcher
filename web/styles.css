@@ -1432,16 +1432,61 @@ pre {
   color: var(--text-soft);
 }
 .markdown-render {
-  white-space: pre-wrap;
-  font-family: var(--font-mono, "Consolas", monospace);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  max-height: 320px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  max-height: 480px;
   overflow-y: auto;
   background: var(--surface-soft, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: var(--space-2);
+  border-radius: 12px;
+  padding: var(--space-4);
+  color: var(--text);
+}
+.markdown-render .cv-name {
+  margin: 0 0 4px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+}
+.markdown-render .cv-contact {
+  margin: 0 0 var(--space-3) 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-family: inherit;
+}
+.markdown-render .cv-contact .cv-sep {
+  margin: 0 4px;
+  opacity: 0.5;
+}
+.markdown-render .cv-section {
+  margin: var(--space-3) 0 6px 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.markdown-render .cv-role {
+  margin: 8px 0 2px 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.markdown-render .cv-line {
+  margin: 0 0 4px 0;
+}
+.markdown-render .cv-list {
+  margin: 4px 0 8px 1.2rem;
+  padding: 0;
+}
+.markdown-render .cv-list li {
+  margin-bottom: 2px;
+}
+.markdown-render .cv-spacer {
+  height: 8px;
 }
 .chip-list {
   display: flex;
