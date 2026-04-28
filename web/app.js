@@ -448,8 +448,20 @@ function appendChat(role, content, extras) {
       pill.textContent = r.label;
       const kws = Array.isArray(r.keywords) && r.keywords.length ? r.keywords : [r.label];
       pill.addEventListener("click", async () => {
-        const ok = await addRolesToProfile([r.label]);
-        if (ok) showToast(t("coach.savedToShortlist") || "Role added to your profile", "info");
+        const profileAdded = await addRolesToProfile([r.label]);
+        const kwAdded =
+          window.getKeywords && typeof window.getKeywords.addMultiple === "function"
+            ? window.getKeywords.addMultiple(kws)
+            : false;
+        try {
+          await _addToShortlistApi(kws);
+        } catch (err) {
+          /* shortlist API best-effort; chip still added locally */
+        }
+        pill.classList.add("is-added");
+        if (profileAdded || kwAdded) {
+          showToast(t("coach.savedToShortlist") || "Added to your search", "info");
+        }
       });
       pillRow.appendChild(pill);
     }
