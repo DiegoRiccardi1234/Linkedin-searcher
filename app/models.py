@@ -54,6 +54,12 @@ class ScanResponse(BaseModel):
     run_id: int
 
 
+class ProfileUpdate(BaseModel):
+    preferred_roles: list[str] | None = None
+    skills: list[str] | None = None
+    languages: list[str] | None = None
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"

@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -32,6 +33,7 @@ from app.models import (
     JobActionRequest,
     ManualJobCreateRequest,
     PreferenceUpdateRequest,
+    ProfileUpdate,
     ProviderKeysRequest,
     RoleShortlistRequest,
     ScanRequest,
@@ -226,6 +228,28 @@ def create_app(workspace_dir: Path) -> FastAPI:
         profile = container.db.get_active_candidate_profile()
         active = container.db.get_preference("active_profile_id", "")
         return {"profile": profile, "active_profile_id": active}
+
+    @fastapi_app.patch("/api/profile")
+    def update_profile(payload: ProfileUpdate) -> dict[str, Any]:
+        profile = container.db.get_active_candidate_profile()
+        if not profile:
+            raise HTTPException(status_code=404, detail="no_profile")
+        summary = dict(profile.get("summary_json") or {})
+        if payload.preferred_roles is not None:
+            cleaned = [r.strip() for r in payload.preferred_roles if r and r.strip()]
+            summary["preferred_roles"] = cleaned
+            container.db.set_preference(
+                "preferred_roles", json.dumps(cleaned, ensure_ascii=False)
+            )
+        if payload.skills is not None:
+            summary["skills"] = [s.strip() for s in payload.skills if s and s.strip()]
+        if payload.languages is not None:
+            summary["languages"] = [
+                lang.strip() for lang in payload.languages if lang and lang.strip()
+            ]
+        container.db.update_candidate_profile_summary(int(profile["id"]), summary)
+        updated = container.db.get_active_candidate_profile()
+        return {"ok": True, "profile": updated}
 
     @fastapi_app.get("/api/profiles")
     def get_profiles() -> dict[str, Any]:

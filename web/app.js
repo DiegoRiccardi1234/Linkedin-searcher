@@ -2,6 +2,7 @@ import { api, escapeHtml, setText, truncate, showToast } from "./modules/helpers
 import { initTheme } from "./modules/theme.js";
 import { loadShortlist as _loadShortlistApi, addToShortlist as _addToShortlistApi } from "./modules/shortlist.js";
 import { initI18n, t, loadLanguage, getCurrentLang, onLanguageChange } from "./modules/i18n.js";
+import { loadProfile as loadProfileView, bindProfileEvents } from "./modules/profile.js";
 
 initTheme();
 
@@ -1326,9 +1327,15 @@ if (_focusOpenBtn) _focusOpenBtn.addEventListener("click", async () => {
 
 document.querySelectorAll("[data-view]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    activateView(btn.dataset.view || "dashboard");
+    const view = btn.dataset.view || "dashboard";
+    activateView(view);
+    if (view === "profile") {
+      loadProfileView().catch(() => {});
+    }
   });
 });
+
+bindProfileEvents();
 
 const _primaryProviderEl = document.getElementById("primaryProvider");
 if (_primaryProviderEl) {

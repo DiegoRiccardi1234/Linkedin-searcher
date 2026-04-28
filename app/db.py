@@ -366,6 +366,15 @@ class Database:
     def set_active_profile(self, profile_id: int) -> None:
         self.set_preference("active_profile_id", str(profile_id))
 
+    def update_candidate_profile_summary(
+        self, profile_id: int, summary: dict[str, Any]
+    ) -> None:
+        self.conn.execute(
+            "UPDATE candidate_profiles SET summary_json = ? WHERE id = ?",
+            (json.dumps(summary, ensure_ascii=False), profile_id),
+        )
+        self.conn.commit()
+
     def get_active_candidate_profile(self) -> dict[str, Any] | None:
         active_raw = self.get_preference("active_profile_id", "")
         if active_raw.isdigit():

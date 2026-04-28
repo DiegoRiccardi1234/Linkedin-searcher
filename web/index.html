@@ -36,6 +36,7 @@
     <nav class="topnav">
       <button type="button" class="nav-link is-active" data-view="dashboard"><span class="material-symbols-outlined">dashboard</span> <span data-i18n="topbar.dashboard">Dashboard</span></button>
       <button type="button" class="nav-link" data-view="job-search"><span class="material-symbols-outlined">travel_explore</span> <span data-i18n="topbar.jobSearch">Job Search</span></button>
+      <button type="button" class="nav-link" data-view="profile"><span class="material-symbols-outlined">person</span> <span data-i18n="topbar.profile">Profile</span></button>
       <button type="button" class="nav-link" data-view="settings"><span class="material-symbols-outlined">settings</span> <span data-i18n="topbar.settings">Settings</span></button>
     </nav>
     <div class="topbar-right">
@@ -286,6 +287,81 @@
           <em data-i18n="jobSearch.reviewEmpty">Your scan parameters will appear here as you fill Step 2.</em>
         </div>
       </article>
+    </section>
+
+    <!-- Profile View -->
+    <section id="view-profile" class="view">
+      <header class="profile-hero">
+        <h2><span data-i18n="profile.title">Your Profile</span></h2>
+        <p class="micro" data-i18n="profile.subtitle">What the AI understood from your CV. Edit any field, switch between uploaded CVs.</p>
+      </header>
+
+      <div id="profileEmpty" class="profile-empty hidden">
+        <p data-i18n="profile.empty">No CV uploaded yet. Go to Settings → CV Upload.</p>
+      </div>
+
+      <div id="profileContent" class="profile-grid hidden">
+        <article class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.preferredRoles">Preferred roles</h3>
+            <button type="button" class="ghost-btn profile-edit-toggle" data-target="roles" data-i18n="profile.edit">Edit</button>
+          </header>
+          <div id="profileRoles" class="chip-list" data-field="preferred_roles"></div>
+          <div class="profile-edit-row hidden" data-field="preferred_roles">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addRole" placeholder="Add role" />
+            <button type="button" class="secondary profile-add-btn" data-field="preferred_roles" data-i18n="profile.add">Add</button>
+            <button type="button" class="profile-save-btn" data-field="preferred_roles" data-i18n="profile.saveChanges">Save</button>
+          </div>
+        </article>
+
+        <article class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.skills">Top skills</h3>
+            <button type="button" class="ghost-btn profile-edit-toggle" data-target="skills" data-i18n="profile.edit">Edit</button>
+          </header>
+          <div id="profileSkills" class="chip-list" data-field="skills"></div>
+          <div class="profile-edit-row hidden" data-field="skills">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addSkill" placeholder="Add skill" />
+            <button type="button" class="secondary profile-add-btn" data-field="skills" data-i18n="profile.add">Add</button>
+            <button type="button" class="profile-save-btn" data-field="skills" data-i18n="profile.saveChanges">Save</button>
+          </div>
+        </article>
+
+        <article class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.languages">Languages</h3>
+            <button type="button" class="ghost-btn profile-edit-toggle" data-target="languages" data-i18n="profile.edit">Edit</button>
+          </header>
+          <div id="profileLanguages" class="chip-list" data-field="languages"></div>
+          <div class="profile-edit-row hidden" data-field="languages">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addLanguage" placeholder="Add language" />
+            <button type="button" class="secondary profile-add-btn" data-field="languages" data-i18n="profile.add">Add</button>
+            <button type="button" class="profile-save-btn" data-field="languages" data-i18n="profile.saveChanges">Save</button>
+          </div>
+        </article>
+
+        <article class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.experience">Experience</h3>
+          </header>
+          <div id="profileExperience" class="profile-experience"></div>
+        </article>
+
+        <article class="profile-block profile-cv">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.originalCv">CV (markdown)</h3>
+            <span id="profileMeta" class="micro"></span>
+          </header>
+          <div id="profileMarkdown" class="markdown-render"></div>
+        </article>
+
+        <article class="profile-block profile-history">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.history">CV history</h3>
+          </header>
+          <div id="profileHistory" class="profile-history-list"></div>
+        </article>
+      </div>
     </section>
 
     <!-- Settings View -->
