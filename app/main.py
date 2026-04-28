@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import rate_limit
-from app.config import AppSettings, load_settings, save_local_provider_keys
+from app.config import SUPPORTED_PROVIDERS, AppSettings, load_settings, save_local_provider_keys
 from app.cv_ingest import (
     InvalidCVContent,
     extract_markdown_from_upload,
@@ -147,6 +147,16 @@ def create_app(workspace_dir: Path) -> FastAPI:
             "keys": {**local_status, **container.keys_status()},
             "provider": container.providers.metadata(),
         }
+
+    @fastapi_app.get("/api/providers/{name}/models")
+    def provider_models(name: str, force_refresh: int = 0) -> dict[str, Any]:
+        if name not in SUPPORTED_PROVIDERS:
+            raise HTTPException(status_code=404, detail="unknown_provider")
+        provider = container.providers.providers.get(name)
+        if not provider or not provider.is_available():
+            raise HTTPException(status_code=400, detail="key_missing")
+        result = container.providers.get_models(name, force_refresh=bool(force_refresh))
+        return {"ok": True, "provider": name, **result}
 
     @fastapi_app.post("/api/upload-cv")
     async def upload_cv(request: Request, file: UploadFile = File(...)) -> dict[str, Any]:

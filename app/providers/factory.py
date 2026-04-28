@@ -19,6 +19,8 @@ _RetryT = TypeVar("_RetryT")
 
 log = get_logger(__name__)
 
+_MODELS_CACHE_TTL_SECONDS = 300.0
+
 
 class ProviderManager:
     def __init__(self, settings: AppSettings) -> None:
@@ -34,6 +36,7 @@ class ProviderManager:
         self.active_provider: LLMProvider | None = None
         self.active_provider_name: str = "none"
         self.active_model: str = "none"
+        self._models_cache: dict[str, tuple[float, list[str]]] = {}
 
     def initialize(self) -> None:
         """Pick first available provider from configured order and select a model."""
@@ -114,6 +117,50 @@ class ProviderManager:
             "active_model": self.active_model,
             "available": self.active_provider is not None,
             "providers": providers_metadata,
+        }
+
+    def get_models(self, provider_name: str, force_refresh: bool = False) -> dict[str, Any]:
+        """Return models + recommended for a single provider, cached for 5 min."""
+        provider = self.providers.get(provider_name)
+        if not provider:
+            return {"models": [], "recommended": None, "cached": False, "fetched_at": 0.0}
+        if not provider.is_available():
+            return {"models": [], "recommended": None, "cached": False, "fetched_at": 0.0}
+
+        now = _time.time()
+        cached_entry = self._models_cache.get(provider_name)
+        if (
+            not force_refresh
+            and cached_entry is not None
+            and now - cached_entry[0] < _MODELS_CACHE_TTL_SECONDS
+        ):
+            models = cached_entry[1]
+            cached = True
+            fetched_at = cached_entry[0]
+        else:
+            try:
+                models = provider.list_models()
+            except Exception as exc:
+                log.warning("Provider %s list_models() raised: %s", provider_name, exc)
+                models = []
+            self._models_cache[provider_name] = (now, models)
+            cached = False
+            fetched_at = now
+
+        recommended = (
+            choose_best_model(
+                models=models,
+                preferred_model=self.settings.preferred_model,
+                policy=self.settings.model_selection_policy,
+            )
+            if models
+            else None
+        )
+        return {
+            "models": models,
+            "recommended": recommended,
+            "cached": cached,
+            "fetched_at": fetched_at,
         }
 
     def complete_json(

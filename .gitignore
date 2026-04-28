@@ -30,6 +30,7 @@ snapshot-*.md
 .mypy_cache/
 .ruff_cache/
 coverage.xml
+coverage.json
 *.egg-info/
 dist/
 build/

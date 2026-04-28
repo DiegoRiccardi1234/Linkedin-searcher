@@ -2,8 +2,11 @@ import json
 import re
 from typing import Any, cast
 
+from app.log import get_logger
 from app.providers.base import LLMProvider
 from app.providers.model_selector import choose_best_model
+
+log = get_logger(__name__)
 
 try:
     import requests
@@ -82,7 +85,8 @@ class CerebrasProvider(LLMProvider):
                 str(item.get("id")) for item in data if isinstance(item, dict) and item.get("id")
             ]
             return ids
-        except Exception:
+        except Exception as exc:
+            log.warning("Cerebras HTTP list_models failed: %s", exc)
             return []
 
     def _probe_model(self, model_name: str) -> bool:
@@ -111,7 +115,8 @@ class CerebrasProvider(LLMProvider):
             if model_ids:
                 return model_ids
             return self._list_models_via_http()
-        except Exception:
+        except Exception as exc:
+            log.warning("Cerebras SDK list_models failed, falling back to HTTP: %s", exc)
             return self._list_models_via_http()
 
     def select_model(self, preferred_model: str | None = None) -> str:

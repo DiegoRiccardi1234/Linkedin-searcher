@@ -2,8 +2,11 @@ import json
 import re
 from typing import Any, cast
 
+from app.log import get_logger
 from app.providers.base import LLMProvider
 from app.providers.model_selector import choose_best_model
+
+log = get_logger(__name__)
 
 try:
     from groq import Groq
@@ -35,7 +38,8 @@ class GroqProvider(LLMProvider):
         try:
             models = self.client.models.list()
             return [m.id for m in models.data if getattr(m, "id", None)]
-        except Exception:
+        except Exception as exc:
+            log.warning("Groq list_models failed: %s", exc)
             return []
 
     def select_model(self, preferred_model: str | None = None) -> str:

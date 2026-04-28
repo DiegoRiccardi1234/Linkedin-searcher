@@ -17,8 +17,9 @@ const { spawnSync } = require("child_process");
 
 const FRAMES_DIR = path.join(process.cwd(), "tests", "e2e", "_demo_frames");
 const OUT_GIF = path.join(process.cwd(), "screenshots", "readme", "demo.gif");
-const VIEWPORT = { width: 1440, height: 900 };
+const VIEWPORT = { width: 1920, height: 1080 };
 const FPS = 12;
+const GIF_WIDTH = 960;
 const FRAME_INTERVAL_MS = Math.round(1000 / FPS);
 
 function ensureDirs() {
@@ -75,7 +76,7 @@ function buildGifFfmpeg() {
       "-y",
       "-framerate", String(FPS),
       "-i", inputGlob,
-      "-vf", "scale=720:-1:flags=lanczos,palettegen",
+      "-vf", `scale=${GIF_WIDTH}:-1:flags=lanczos,palettegen`,
       palette,
     ],
     { stdio: "inherit" },
@@ -91,7 +92,7 @@ function buildGifFfmpeg() {
       "-framerate", String(FPS),
       "-i", inputGlob,
       "-i", palette,
-      "-lavfi", "scale=720:-1:flags=lanczos [x]; [x][1:v] paletteuse",
+      "-lavfi", `scale=${GIF_WIDTH}:-1:flags=lanczos [x]; [x][1:v] paletteuse`,
       "-loop", "0",
       OUT_GIF,
     ],
@@ -115,7 +116,7 @@ out.parent.mkdir(parents=True, exist_ok=True)
 frames = sorted(src.glob("frame_*.png"))
 if not frames:
     raise SystemExit("no frames")
-target_w = 720
+target_w = ${GIF_WIDTH}
 imgs = []
 for f in frames:
     im = Image.open(f).convert("RGB")
