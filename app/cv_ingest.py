@@ -141,6 +141,7 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
 
     years_experience = _estimate_years_experience(markdown_text)
     experience_level = _estimate_experience_level(years_experience)
+    languages = _extract_languages(markdown_text)
 
     return {
         "skills": found_skills,
@@ -148,6 +149,7 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
         "graduation_year": graduation_year,
         "years_experience": years_experience,
         "experience_level": experience_level,
+        "languages": languages,
     }
 
 
@@ -182,6 +184,76 @@ _OTHER_SECTION_HEADER_RE = re.compile(
     r")\s*[:\n]",
     re.IGNORECASE,
 )
+
+
+_LANG_SECTION_HEADER_RE = re.compile(
+    r"(?:^|\n)\s*(lingue|languages|idiomas|langues|sprachen)\s*[:\n]",
+    re.IGNORECASE,
+)
+
+# Common language names across the five supported locales (IT/EN/ES/FR/DE).
+_LANG_NAME_PATTERN = (
+    r"italiano|italian|italien|italienisch|"
+    r"inglese|english|inglés|anglais|englisch|"
+    r"spagnolo|spanish|español|espagnol|spanisch|"
+    r"francese|french|francés|français|französisch|"
+    r"tedesco|german|alemán|allemand|deutsch|"
+    r"portoghese|portuguese|portugués|portugais|portugiesisch|"
+    r"cinese|chinese|chino|chinois|chinesisch|"
+    r"giapponese|japanese|japonés|japonais|japanisch|"
+    r"russo|russian|ruso|russe|russisch|"
+    r"arabo|arabic|árabe|arabe|arabisch"
+)
+_LANG_NAME_RE = re.compile(rf"\b(?P<name>{_LANG_NAME_PATTERN})\b", re.IGNORECASE)
+
+
+def _extract_languages(text: str) -> list[str]:
+    """Parse the Languages section of a CV into a list like ``"Italiano (Madrelingua)"``.
+
+    Returns an empty list if no explicit Languages section header is found, to
+    avoid pulling random language mentions from prose elsewhere in the CV.
+    Deduplicates by normalized language name (case-insensitive).
+    """
+    header = _LANG_SECTION_HEADER_RE.search(text)
+    if not header:
+        return []
+    rest = text[header.end() :]
+    next_section = _OTHER_SECTION_HEADER_RE.search(rest)
+    scope = rest[: next_section.start()] if next_section else rest
+
+    found: list[str] = []
+    seen: set[str] = set()
+    lines = [raw.strip(" \t*-•·•") for raw in scope.splitlines()]  # noqa: B005
+    for idx, line in enumerate(lines):
+        if not line:
+            continue
+        match = _LANG_NAME_RE.search(line)
+        if not match:
+            continue
+        name = match.group("name").strip().title()
+        key = name.lower()
+        if key in seen:
+            continue
+        # Level = everything after the matched name, stripped of separators and any parens.
+        level = line[match.end() :].strip(" \t:-–—.,()")  # noqa: RUF001
+        # PDF extraction often splits "Lang:\n  Level" across two lines — pull the
+        # next non-empty line if it doesn't start with another language name.
+        if not level:
+            for next_line in lines[idx + 1 : idx + 3]:
+                if next_line and not _LANG_NAME_RE.match(next_line):
+                    level = next_line.strip(" \t:-–—.,()")  # noqa: RUF001
+                    break
+                if next_line:
+                    break
+        level = level.replace("(", "").replace(")", "").strip()
+        if len(level) > 60:
+            level = level[:60].rstrip()
+        if level:
+            found.append(f"{name} ({level})")
+        else:
+            found.append(name)
+        seen.add(key)
+    return found
 
 
 def _scope_work_section(text: str) -> str:
@@ -270,6 +342,7 @@ def summarize_profile_with_llm(
         "- strengths: list of 3 key strengths\n"
         "- industries: list of industries the candidate has experience in\n"
         "- education: highest education level and field\n"
+        "- languages: list of spoken languages with level if stated, e.g. 'Italian (Native)', 'English (B2)'\n"
         "- summary: 2-3 sentence professional summary\n\n"
         f"CV Content:\n{markdown_text[:3000]}"
     )

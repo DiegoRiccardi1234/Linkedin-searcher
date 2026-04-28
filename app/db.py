@@ -384,9 +384,7 @@ class Database:
         self.conn.commit()
 
     def delete_candidate_profile(self, profile_id: int) -> bool:
-        cur = self.conn.execute(
-            "DELETE FROM candidate_profiles WHERE id = ?", (profile_id,)
-        )
+        cur = self.conn.execute("DELETE FROM candidate_profiles WHERE id = ?", (profile_id,))
         self.conn.commit()
         deleted = cur.rowcount > 0
         if deleted:
