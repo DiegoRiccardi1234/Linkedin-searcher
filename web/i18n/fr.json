@@ -185,6 +185,8 @@
       "modelAuto": "Auto (par défaut du fournisseur)",
       "searchPlaceholder": "Rechercher des modèles...",
       "freeOnly": "Gratuits uniquement",
+      "freeGroup": "── Gratuits ──",
+      "paidGroup": "── Payants ──",
       "saveAndFetch": "Enregistrer et charger les modèles",
       "saving": "Enregistrement...",
       "saveFailed": "Échec de l'enregistrement",

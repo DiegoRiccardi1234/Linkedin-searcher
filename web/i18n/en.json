@@ -185,6 +185,8 @@
       "modelAuto": "Auto (provider default)",
       "searchPlaceholder": "Search models...",
       "freeOnly": "Free only",
+      "freeGroup": "── Free ──",
+      "paidGroup": "── Paid ──",
       "saveAndFetch": "Save & fetch models",
       "saving": "Saving...",
       "saveFailed": "Save failed",

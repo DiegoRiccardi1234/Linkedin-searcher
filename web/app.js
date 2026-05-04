@@ -214,6 +214,20 @@ function _setProviderCardState(name, state) {
   if (card) card.dataset.state = state;
 }
 
+function _sortModelsAlpha(models) {
+  return [...models].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
+function _splitFreePaid(models) {
+  const free = [];
+  const paid = [];
+  for (const m of models) {
+    if (m.endsWith(":free")) free.push(m);
+    else paid.push(m);
+  }
+  return { free: _sortModelsAlpha(free), paid: _sortModelsAlpha(paid) };
+}
+
 function _ensureOpenRouterFilter(card, models, recommended, renderOptions) {
   const row = card.querySelector(".provider-model-row");
   if (!row) {
@@ -226,29 +240,26 @@ function _ensureOpenRouterFilter(card, models, recommended, renderOptions) {
     filterBox.className = "or-filter";
     filterBox.innerHTML = `
       <input type="search" class="or-filter-search" placeholder="${t("settings.providers.searchPlaceholder")}" />
-      <label class="or-filter-toggle">
-        <input type="checkbox" class="or-filter-free" checked />
-        <span>${t("settings.providers.freeOnly")}</span>
-      </label>
     `;
     const select = row.querySelector(".provider-model-select");
     row.insertBefore(filterBox, select);
   }
   const searchInput = filterBox.querySelector(".or-filter-search");
-  const freeToggle = filterBox.querySelector(".or-filter-free");
   const apply = () => {
     const q = (searchInput.value || "").toLowerCase().trim();
-    const freeOnly = freeToggle.checked;
-    const filtered = models
-      .filter((m) => !freeOnly || m.endsWith(":free"))
-      .filter((m) => !q || m.toLowerCase().includes(q));
-    if (recommended && filtered.includes(recommended)) {
-      filtered.sort((a, b) => (a === recommended ? -1 : b === recommended ? 1 : 0));
-    }
-    renderOptions(filtered);
+    const matches = (m) => !q || m.toLowerCase().includes(q);
+    const { free, paid } = _splitFreePaid(models.filter(matches));
+    // Render: Free header (disabled separator) + free alpha,
+    // Paid header (disabled separator) + paid alpha. Recommended ⭐ stays
+    // inline within its own group so users see why it was picked.
+    const freeLabel = t("settings.providers.freeGroup") || "── Free ──";
+    const paidLabel = t("settings.providers.paidGroup") || "── Paid ──";
+    const ordered = [];
+    if (free.length) ordered.push({ separator: true, label: freeLabel }, ...free);
+    if (paid.length) ordered.push({ separator: true, label: paidLabel }, ...paid);
+    renderOptions(ordered);
   };
   searchInput.oninput = apply;
-  freeToggle.onchange = apply;
   apply();
 }
 
@@ -283,18 +294,33 @@ async function fetchAndRenderProviderModels(name, force) {
       const autoLabel = t("settings.providers.modelAuto");
       const renderOptions = (filtered) => {
         const opts = [`<option value="">${autoLabel}</option>`];
-        for (const m of filtered) {
+        for (const entry of filtered) {
+          if (typeof entry === "object" && entry && entry.separator) {
+            const label = String(entry.label || "──────");
+            opts.push(`<option value="" disabled>${label}</option>`);
+            continue;
+          }
+          const m = String(entry);
           const isRec = m === recommended;
           const star = isRec ? "⭐ " : "";
           opts.push(`<option value="${m}">${star}${m}</option>`);
         }
         select.innerHTML = opts.join("");
       };
-      // OpenRouter has 300+ models; add search + free-only filter for usability.
       if (name === "openrouter" && models.length > 30) {
+        // OpenRouter: search + alphabetical free-then-paid grouping.
         _ensureOpenRouterFilter(card, models, recommended, renderOptions);
       } else {
-        renderOptions(models);
+        // All other providers: alphabetical sort, recommended stays at top.
+        const sorted = _sortModelsAlpha(models);
+        if (recommended) {
+          const recIdx = sorted.indexOf(recommended);
+          if (recIdx > 0) {
+            sorted.splice(recIdx, 1);
+            sorted.unshift(recommended);
+          }
+        }
+        renderOptions(sorted);
       }
       select.disabled = false;
       // Pre-select if this provider is the primary and a preferred_model is known

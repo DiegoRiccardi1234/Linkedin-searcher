@@ -185,6 +185,8 @@
       "modelAuto": "Auto (Anbieter-Standard)",
       "searchPlaceholder": "Modelle suchen...",
       "freeOnly": "Nur kostenlose",
+      "freeGroup": "── Kostenlos ──",
+      "paidGroup": "── Kostenpflichtig ──",
       "saveAndFetch": "Speichern & Modelle laden",
       "saving": "Speichern...",
       "saveFailed": "Speichern fehlgeschlagen",

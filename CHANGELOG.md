@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.2.2] — 2026-05-04
+
+Settings model picker readability.
+
+### Changed
+- **OpenRouter shows all 371 models, sorted by tier then alphabetical** — replaced the v1.2.0 "Free only" toggle with a visible grouping. Models render as `── Free ──` then alphabetical free entries, then `── Paid ──` then alphabetical paid entries. Disabled `<option>` elements act as section headers. The search input still narrows by substring across both groups.
+- **Other providers now sort alphabetically** — Cerebras, Groq, OpenAI, Anthropic, Google all render their model dropdowns in alpha order. The recommended ⭐ model still floats to the top regardless of name. Previously the order was whatever the provider API returned (insertion order, often arbitrary).
+
+### Added
+- Locale keys `settings.providers.freeGroup` / `paidGroup` for the OpenRouter section headers.
+
 ## [1.2.1] — 2026-05-04
 
 Update flow reliability and UX polish. Driven by a real-world failure where v1.1.1 → v1.2.0 produced two parallel `Updater.exe` processes both racing on `JobFinder.exe` file locks (`PermissionError(13)`) and a 180 s timeout that wasn't enough for slow GitHub downloads of the 175 MB bundle.
