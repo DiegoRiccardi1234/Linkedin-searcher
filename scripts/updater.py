@@ -177,7 +177,20 @@ def main() -> int:
             exe = install_dir / "JobFinder.exe"
             log(f"restarting {exe}")
             event("restart_spawned", exe=str(exe))
-            subprocess.Popen([str(exe)], cwd=str(install_dir))
+            # Detach the new JobFinder.exe so it survives Updater.exe exit.
+            # Without DETACHED_PROCESS the child inherits Updater's console;
+            # when Updater returns the console closes and the just-spawned
+            # JobFinder dies with it, leaving the user with no app and a
+            # frontend modal stuck at "Restart 95%" forever.
+            restart_flags = 0
+            if sys.platform == "win32":
+                restart_flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen(
+                [str(exe)],
+                cwd=str(install_dir),
+                close_fds=True,
+                creationflags=restart_flags,
+            )
             # Best-effort lockfile cleanup so the next update isn't blocked
             # by a stale lock. The backend TTL covers crash cases.
             with contextlib.suppress(OSError):

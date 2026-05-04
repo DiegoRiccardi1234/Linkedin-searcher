@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [1.2.4] — 2026-05-05
+
+Critical updater fix: restart now actually persists after Updater exits.
+
+### Fixed
+- **JobFinder.exe died seconds after restart, leaving the modal stuck at "Riavvio 95%"** — `scripts/updater.py` spawned the new JobFinder.exe with `subprocess.Popen([str(exe)])` and no `creationflags`. On Windows, `JobFinder.exe` is built with `console=True`, so the new process inherited Updater's console. When Updater returned and its cmd window closed, the JobFinder console closed with it and the just-spawned process died — port 8000 never came back up, the frontend health-poll loop spun until the 600 s timeout, and the user had no app. Fix: detach the restart with `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` (mirrors the flags `app.main.start_bundle_update` already uses to spawn `Updater.exe` from `JobFinder.exe`).
+
 ## [1.2.3] — 2026-05-05
 
 Update banner readability + recover from stuck retry state.
