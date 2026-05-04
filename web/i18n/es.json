@@ -175,6 +175,15 @@
     "url": "URL",
     "description": "Descripción",
     "addAnalyze": "Añadir + Analizar",
+    "system": {
+      "title": "Sistema",
+      "currentVersion": "Versión actual",
+      "lastCheck": "Última verificación",
+      "checkNow": "Buscar actualizaciones",
+      "checking": "Verificando…",
+      "upToDate": "Estás en la versión más reciente.",
+      "openLogs": "Abrir carpeta de registros"
+    },
     "providers": {
       "title": "Proveedores IA",
       "subtitle": "Añade una clave de API para cada proveedor que quieras usar y elige uno como principal.",
@@ -300,6 +309,9 @@
       "verify": "Verificando paquete",
       "replace": "Instalando archivos",
       "restart": "Reiniciando Job Finder"
+    },
+    "modal": {
+      "viewLogs": "Abrir carpeta de registros para detalles"
     }
   },
   "chat": {

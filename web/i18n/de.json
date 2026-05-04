@@ -175,6 +175,15 @@
     "url": "URL",
     "description": "Beschreibung",
     "addAnalyze": "Hinzufügen + Analysieren",
+    "system": {
+      "title": "System",
+      "currentVersion": "Aktuelle Version",
+      "lastCheck": "Letzte Prüfung",
+      "checkNow": "Auf Updates prüfen",
+      "checking": "Prüfen…",
+      "upToDate": "Du nutzt die aktuelle Version.",
+      "openLogs": "Log-Ordner öffnen"
+    },
     "providers": {
       "title": "KI-Anbieter",
       "subtitle": "Füge einen API-Schlüssel für jeden Anbieter hinzu, den du nutzen willst, und wähle einen als primär.",
@@ -300,6 +309,9 @@
       "verify": "Paket wird verifiziert",
       "replace": "Dateien werden installiert",
       "restart": "Job Finder wird neu gestartet"
+    },
+    "modal": {
+      "viewLogs": "Log-Ordner für Details öffnen"
     }
   },
   "chat": {

@@ -44,7 +44,7 @@
     </div>
   </div>
   <header class="topbar">
-    <div class="brand"><span class="brand-icon material-symbols-outlined">work</span> Job Finder</div>
+    <div class="brand"><span class="brand-icon material-symbols-outlined">work</span> Job Finder<span id="topbarVersion" class="version-chip"></span></div>
     <nav class="topnav">
       <button type="button" class="nav-link is-active" data-view="dashboard"><span class="material-symbols-outlined">dashboard</span> <span data-i18n="topbar.dashboard">Dashboard</span></button>
       <button type="button" class="nav-link" data-view="job-search"><span class="material-symbols-outlined">travel_explore</span> <span data-i18n="topbar.jobSearch">Job Search</span></button>
@@ -392,6 +392,21 @@
       </header>
 
       <div class="settings-grid">
+        <article class="card-block card-block--wide system-card">
+          <h3><span class="material-symbols-outlined">tune</span> <span data-i18n="settings.system.title">System</span></h3>
+          <div class="system-row">
+            <span class="micro" data-i18n="settings.system.currentVersion">Current version</span>
+            <code id="systemCurrentVersion">—</code>
+          </div>
+          <div class="system-row">
+            <span class="micro" data-i18n="settings.system.lastCheck">Last check</span>
+            <span id="systemLastCheck" class="system-status">—</span>
+          </div>
+          <div class="system-actions">
+            <button type="button" id="systemCheckUpdate" class="secondary" data-i18n="settings.system.checkNow">Check for updates</button>
+            <button type="button" id="systemOpenLogs" class="ghost-btn" data-i18n="settings.system.openLogs">Open logs folder</button>
+          </div>
+        </article>
         <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">key</span> <span data-i18n="settings.providers.title">AI Providers</span></h3>
           <p class="micro" data-i18n="settings.providers.subtitle">Add an API key for each provider you want to use, then pick one as primary.</p>

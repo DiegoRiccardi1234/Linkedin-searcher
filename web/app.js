@@ -1810,12 +1810,17 @@ async function loadRoleShortlist() {
 loadRoleShortlist();
 
 // ─── Update Banner ──────────────────────────────────────────────
-async function checkForUpdate() {
+async function checkForUpdate(opts) {
+  const forceRefresh = !!(opts && opts.forceRefresh);
   const banner = document.getElementById('updateBanner');
-  if (!banner) return;
+  const url = forceRefresh ? '/api/version?refresh=true' : '/api/version';
+  const info = await api(url);
+  if (!banner) return info;
   try {
-    const info = await api('/api/version');
-    if (!info.update_available || !info.latest) return;
+    if (!info.update_available || !info.latest) {
+      banner.classList.add('hidden');
+      return info;
+    }
     const dismissed = localStorage.getItem('updateDismissed');
     if (dismissed === info.latest) return;
 
@@ -1860,8 +1865,10 @@ async function checkForUpdate() {
         localStorage.removeItem('updateInProgress');
       });
     };
+    return info;
   } catch (err) {
     console.warn('Update check failed:', err);
+    return info;
   }
 }
 
@@ -1870,6 +1877,14 @@ async function runUpdate(info) {
   const log = document.getElementById('updateModalLog');
   const closeBtn = document.getElementById('updateModalClose');
   modal.classList.remove('hidden');
+  // Reset error-state hooks from any previous run so the open-logs link
+  // is re-appendable on a fresh failure.
+  if (log) {
+    log.dataset.openLogsLink = '';
+    log.onclick = null;
+    log.style.cursor = '';
+    log.title = '';
+  }
   closeBtn.onclick = () => {
     modal.classList.add('hidden');
     // Clear stuck flag so user can retry if they close the modal manually
@@ -1904,8 +1919,23 @@ async function runDevUpdate(log) {
   }
 }
 
+function _appendOpenLogsLink(log) {
+  if (!log || log.dataset.openLogsLink === '1') return;
+  log.dataset.openLogsLink = '1';
+  const linkText = t('update.modal.viewLogs') || 'Open logs folder';
+  log.textContent += `\n\n→ ${linkText}`;
+  log.style.cursor = 'pointer';
+  log.title = linkText;
+  log.onclick = () => {
+    fetch('/api/system/open-logs', { method: 'POST' }).catch(() => {});
+  };
+}
+
 function setUpdateStep(stepName, state, percent) {
   const list = document.getElementById('updateStepList');
+  if (state === 'error') {
+    _appendOpenLogsLink(document.getElementById('updateModalLog'));
+  }
   if (!list) return;
   const order = ['download', 'verify', 'replace', 'restart'];
   const targetIdx = order.indexOf(stepName);
@@ -2106,8 +2136,50 @@ async function showFirstTimeTutorial() {
   });
 }
 
+function _populateSystemInfoFrom(info) {
+  if (!info) return;
+  const versionEl = document.getElementById('systemCurrentVersion');
+  if (versionEl && info.current) versionEl.textContent = `v${info.current}`;
+  const chip = document.getElementById('topbarVersion');
+  if (chip && info.current) chip.textContent = `v${info.current}`;
+}
+
+function _wireSystemSettings() {
+  const checkBtn = document.getElementById('systemCheckUpdate');
+  const lastEl = document.getElementById('systemLastCheck');
+  if (checkBtn && lastEl) {
+    checkBtn.onclick = async () => {
+      checkBtn.disabled = true;
+      lastEl.textContent = t('settings.system.checking');
+      try {
+        const info = await checkForUpdate({ forceRefresh: true });
+        _populateSystemInfoFrom(info);
+        const ts = new Date().toLocaleTimeString();
+        if (info && info.update_available) {
+          lastEl.textContent = `${ts} · v${info.latest} ${t('update.title')}`;
+        } else {
+          lastEl.textContent = `${ts} · ${t('settings.system.upToDate')}`;
+        }
+      } catch (err) {
+        lastEl.textContent = `${new Date().toLocaleTimeString()} · ${err.message}`;
+      } finally {
+        checkBtn.disabled = false;
+      }
+    };
+  }
+  const logsBtn = document.getElementById('systemOpenLogs');
+  if (logsBtn) {
+    logsBtn.onclick = () => {
+      fetch('/api/system/open-logs', { method: 'POST' }).catch(() => {
+        /* best-effort; silent if browser-only or 501 */
+      });
+    };
+  }
+}
+
 window.addEventListener('load', () => {
-  checkForUpdate();
+  checkForUpdate().then(_populateSystemInfoFrom).catch(() => { /* offline ok */ });
+  _wireSystemSettings();
   renderChatEmptyState();
   // Defer tutorial to let dashboard render first.
   setTimeout(showFirstTimeTutorial, 800);

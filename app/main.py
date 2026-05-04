@@ -677,6 +677,23 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
         threading.Timer(0.8, lambda: os._exit(0)).start()
         return {"status": "updating", "next_version": latest, "from_version": current}
 
+    @fastapi_app.post("/api/system/open-logs")
+    def open_logs_folder() -> dict[str, Any]:
+        """Open the logs directory in the OS file explorer.
+
+        Used by the Settings "Open logs" button and the update modal's
+        error-state link. Lets non-developer users grab `updater.log`
+        for support without hunting through `data/logs/` by hand.
+        """
+        log_dir = container.workspace_dir / "data" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(str(log_dir))
+            return {"ok": True, "path": str(log_dir)}
+        raise HTTPException(
+            status_code=501, detail="open_logs_unsupported_on_platform"
+        )
+
     @fastapi_app.delete("/api/update/lock")
     def clear_update_lock() -> dict[str, Any]:
         """Force-clear the update lockfile.

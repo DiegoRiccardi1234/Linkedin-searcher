@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.2.6] — 2026-05-05
+
+Visible app version, manual update check, log access for support.
+
+### Added
+- **Topbar version chip** — `<span class="version-chip">vX.Y.Z</span>` next to the "Job Finder" brand. Populated at boot from `/api/version`. Users always know which version they're running without opening Settings.
+- **Settings → "System" card** — current version, last-check timestamp + result, "Check for updates" button, "Open logs folder" button. The check button calls `checkForUpdate({forceRefresh: true})` which forwards `?refresh=true` to `/api/version` and bypasses the 1 h `_cache` in `app/version.py` so the user gets a real GitHub round-trip on demand.
+- **`POST /api/system/open-logs` endpoint** (`app/main.py`) — opens `data/logs/` in Windows Explorer via `os.startfile`. Returns 501 on non-Windows. Backed by 2 unit tests in `tests/unit/test_open_logs_endpoint.py` (157 → 159 total).
+- **Update modal error state now shows "Open logs folder"** — when any step transitions to `error`, the verbose log block becomes clickable and a `→ Open logs folder for details` line is appended. One click opens `data/logs/` so the user can grab `updater.log` for support without hunting through `data\logs\` by hand. The handler is reset on each new `runUpdate()` call so the link is re-arm-able after a retry.
+
+### Changed
+- **`checkForUpdate()` is now a Promise that resolves to the version info** — was previously fire-and-forget. The Settings check button awaits it to render the result inline.
+
 ## [1.2.5] — 2026-05-05
 
 Updater resilience against Windows Defender file scans.

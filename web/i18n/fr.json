@@ -175,6 +175,15 @@
     "url": "URL",
     "description": "Description",
     "addAnalyze": "Ajouter + Analyser",
+    "system": {
+      "title": "Système",
+      "currentVersion": "Version actuelle",
+      "lastCheck": "Dernière vérification",
+      "checkNow": "Vérifier les mises à jour",
+      "checking": "Vérification…",
+      "upToDate": "Vous êtes sur la dernière version.",
+      "openLogs": "Ouvrir le dossier des journaux"
+    },
     "providers": {
       "title": "Fournisseurs IA",
       "subtitle": "Ajoutez une clé API pour chaque fournisseur que vous voulez utiliser, puis choisissez-en un comme principal.",
@@ -300,6 +309,9 @@
       "verify": "Vérification du paquet",
       "replace": "Installation des fichiers",
       "restart": "Redémarrage de Job Finder"
+    },
+    "modal": {
+      "viewLogs": "Ouvrir le dossier des journaux pour les détails"
     }
   },
   "chat": {

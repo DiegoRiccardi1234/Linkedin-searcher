@@ -175,6 +175,15 @@
     "url": "URL",
     "description": "Descrizione",
     "addAnalyze": "Aggiungi + Analizza",
+    "system": {
+      "title": "Sistema",
+      "currentVersion": "Versione corrente",
+      "lastCheck": "Ultima verifica",
+      "checkNow": "Controlla aggiornamenti",
+      "checking": "Verifica in corso…",
+      "upToDate": "Sei alla versione più recente.",
+      "openLogs": "Apri cartella log"
+    },
     "providers": {
       "title": "Provider IA",
       "subtitle": "Aggiungi una API key per ogni provider che vuoi usare, poi scegline uno come primario.",
@@ -300,6 +309,9 @@
       "verify": "Verifica del pacchetto",
       "replace": "Installazione file",
       "restart": "Riavvio Job Finder"
+    },
+    "modal": {
+      "viewLogs": "Apri cartella log per dettagli"
     }
   },
   "chat": {

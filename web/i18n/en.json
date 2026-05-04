@@ -175,6 +175,15 @@
     "url": "URL",
     "description": "Description",
     "addAnalyze": "Add + Analyze",
+    "system": {
+      "title": "System",
+      "currentVersion": "Current version",
+      "lastCheck": "Last check",
+      "checkNow": "Check for updates",
+      "checking": "Checking…",
+      "upToDate": "You're on the latest version.",
+      "openLogs": "Open logs folder"
+    },
     "providers": {
       "title": "AI Providers",
       "subtitle": "Add an API key for each provider you want to use, then pick one as primary.",
@@ -300,6 +309,9 @@
       "verify": "Verifying package",
       "replace": "Installing files",
       "restart": "Restarting Job Finder"
+    },
+    "modal": {
+      "viewLogs": "Open logs folder for details"
     }
   },
   "chat": {
