@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.2.5] — 2026-05-05
+
+Updater resilience against Windows Defender file scans.
+
+### Fixed
+- **`PermissionError(13)` persisted past the v1.2.1 retry budget** — three real-world update attempts each failed exactly 7 s after `replace_start` (= sum of the v1.2.1 backoff `1 s + 2 s + 4 s`). Likely cause: Windows Defender pre-scanning the freshly-extracted bundle (175 MB → ~10–20 s scan). Extended `_COPY_RETRY_DELAYS` in `app/update_sync.py` from `(1, 2, 4)` to `(1, 2, 4, 8, 16)` — five attempts spread over ~31 s, comfortably outlasting a typical AV scan window.
+- **The retry-exhausted error now names the file that stayed locked** — replaced the bare `PermissionError` re-raise with one that carries `… (locked after 5 retries): D:\…\JobFinder.exe`. When updates fail again in the wild, the log identifies which file (almost always `JobFinder.exe` itself, or an OCR child) was the holdout. Previously the user only saw `Permission denied` with no file context.
+
+### Added
+- **3 s grace period after parent exit before sync starts** (`scripts/updater.py`) — `_wait_for_pid()` returns the moment the PID dies, but Windows can take a few more seconds to flush all inherited handles (uvicorn workers, Tesseract subprocess, AV pre-scan handles). The first file copy now waits 3 s after `parent_exited` instead of racing in immediately. Combined with the extended retry, the worst-case wait against AV is `3 s + 31 s = ~34 s` before the updater gives up — long enough for Defender to release locks on consumer hardware.
+
 ## [1.2.4] — 2026-05-05
 
 Critical updater fix: restart now actually persists after Updater exits.

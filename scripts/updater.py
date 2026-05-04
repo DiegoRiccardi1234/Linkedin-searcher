@@ -143,6 +143,12 @@ def main() -> int:
             _wait_for_pid(args.parent_pid)
             log("parent exited, proceeding")
             event("parent_exited")
+            # Grace period: Windows can take a few seconds after process
+            # exit to flush all inherited handles (uvicorn workers, OCR
+            # subprocesses, AV pre-scan handles). Sync starting too eagerly
+            # races with these and produces PermissionError on the first
+            # file. 3 s is empirically enough on consumer hardware.
+            time.sleep(3.0)
 
             with tempfile.TemporaryDirectory(prefix="jobfinder-update-") as td:
                 tmp = Path(td)

@@ -1,6 +1,6 @@
 [project]
 name = "job-finder"
-version = "1.2.4"
+version = "1.2.5"
 description = "Localhost-first AI-powered job search assistant"
 requires-python = ">=3.11"
 
