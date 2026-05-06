@@ -25,12 +25,47 @@ def _is_common_term(term: str) -> bool:
     return term.strip().lower() in _COMMON_CANARY_TERMS
 
 
+# Map UI experience-level codes to keyword augmentation. We append a token
+# to the search term so LinkedIn's relevance algorithm narrows results,
+# since jobspy doesn't expose LinkedIn's f_E URL filter directly.
+_EXPERIENCE_KEYWORDS: dict[str, str] = {
+    "internship": "internship",
+    "entry": "entry level",
+    "junior": "junior",
+    "mid": "",
+    "senior": "senior",
+    "director": "director",
+    "executive": "executive",
+}
+
+# jobspy supports a single ``job_type`` kwarg (string). Map UI codes onto it.
+_JOBSPY_JOB_TYPE: dict[str, str] = {
+    "fulltime": "fulltime",
+    "parttime": "parttime",
+    "contract": "contract",
+    "temporary": "temporary",
+    "internship": "internship",
+}
+
+
+def _augment_search_term(term: str, exp_levels: list[str], work_types: list[str]) -> str:
+    bits = [term]
+    for lvl in exp_levels:
+        kw = _EXPERIENCE_KEYWORDS.get(lvl, "")
+        if kw and kw not in term.lower():
+            bits.append(kw)
+    if "hybrid" in work_types and "hybrid" not in term.lower():
+        bits.append("hybrid")
+    return " ".join(bits).strip()
+
+
 from app.config import AppSettings
 from app.db import Database
 from app.lifecycle import apply_post_scan_lifecycle
 from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
+from app.services.recruiter_scrape import fetch_recruiter
 
 log = get_logger(__name__)
 
@@ -160,6 +195,14 @@ JSON richiesto:
   "reputazione_azienda": "Ottima|Buona|Nella media|Scarsa|Sconosciuta",
   "adatta_neolaureati": "Sì|No|Non specificato",
   "note_azienda": "1 frase",
+  "requisiti": ["max 5 requisiti chiave dell'offerta, brevi"],
+  "responsabilita": ["max 5 responsabilità principali, brevi"],
+  "benefit": ["max 5 benefit menzionati, brevi"],
+  "skills_match": {{
+    "hai": ["skills che il candidato ha e l'offerta richiede"],
+    "mancano": ["skills richieste che il candidato non ha"]
+  }},
+  "livello_richiesto": "internship|entry|junior|mid|senior|lead",
   "match_axes": {{
     "skills_match": <0-10>,
     "seniority_match": <0-10>,
@@ -354,22 +397,51 @@ def run_scan(
         profile_markdown += f"\n\nLinkedIn profile: {linkedin_url}"
 
     terms = payload.search_terms or settings.default_search_terms
+    exp_levels = list(payload.experience_levels or [])
+    job_types = list(payload.job_types or [])
+    work_types = list(payload.work_types or [])
+
+    is_remote_effective = payload.is_remote or ("remote" in work_types)
+
     location = payload.location or (
-        settings.location_remote_default if payload.is_remote else settings.location_default
+        settings.location_remote_default if is_remote_effective else settings.location_default
     )
-    modalita = "Full Remote IT" if payload.is_remote else "Torino"
+    modalita = "Full Remote IT" if is_remote_effective else "Torino"
+
+    augmented_terms = [_augment_search_term(t, exp_levels, work_types) for t in terms]
+
+    jobspy_job_type: str | None = None
+    if job_types:
+        first = job_types[0].lower()
+        jobspy_job_type = _JOBSPY_JOB_TYPE.get(first)
 
     db.set_preference("last_scan_location", location)
-    db.set_preference("last_scan_is_remote", "1" if payload.is_remote else "0")
+    db.set_preference("last_scan_is_remote", "1" if is_remote_effective else "0")
     db.set_preference("last_scan_terms", json.dumps(terms, ensure_ascii=False))
+    db.set_preference(
+        "last_scan_filters",
+        json.dumps(
+            {"experience_levels": exp_levels, "job_types": job_types, "work_types": work_types},
+            ensure_ascii=False,
+        ),
+    )
 
-    run_id = db.begin_scan(location=location, is_remote=payload.is_remote, terms=terms)
+    run_id = db.begin_scan(location=location, is_remote=is_remote_effective, terms=terms)
+
+    started_at_ms = int(time.time() * 1000)
+    expected_total = max(1, len(terms) * max(1, settings.max_annunci))
 
     yield {
         "status": "started",
         "terms": terms,
         "location": location,
-        "is_remote": payload.is_remote,
+        "is_remote": is_remote_effective,
+        "filters": {
+            "experience_levels": exp_levels,
+            "job_types": job_types,
+            "work_types": work_types,
+        },
+        "expected_total": expected_total,
     }
 
     totale_trovati = 0
@@ -378,23 +450,44 @@ def run_scan(
     totale_scartati = 0
 
     for idx, term in enumerate(terms):
-        # Paced scraping — reduce the chance of rate-limit bans on LinkedIn / Indeed.
         if idx > 0:
             time.sleep(random.uniform(0.8, 2.4))
 
+        effective_term = augmented_terms[idx] if idx < len(augmented_terms) else term
+
+        elapsed_ms = int(time.time() * 1000) - started_at_ms
+        seen = idx * max(1, settings.max_annunci)
+        eta_ms = int((elapsed_ms / max(1, seen)) * (expected_total - seen)) if seen > 0 else 0
+        yield {
+            "status": "progress",
+            "step": "scraping",
+            "term": effective_term,
+            "current": seen,
+            "total": expected_total,
+            "percent": int(seen * 100 / expected_total) if expected_total else 0,
+            "elapsed_ms": elapsed_ms,
+            "eta_ms": eta_ms,
+        }
+
+        scrape_kwargs: dict[str, Any] = {
+            "site_name": payload.sites,
+            "search_term": effective_term,
+            "location": location,
+            "is_remote": is_remote_effective,
+            "results_wanted": settings.max_annunci,
+            "hours_old": settings.hours_old,
+            "country_indeed": "Italy",
+        }
+        if jobspy_job_type:
+            scrape_kwargs["job_type"] = jobspy_job_type
+
         try:
-            df = scrape_jobs(
-                site_name=payload.sites,
-                search_term=term,
-                location=location,
-                is_remote=payload.is_remote,
-                results_wanted=settings.max_annunci,
-                hours_old=settings.hours_old,
-                country_indeed="Italy",
-            )
+            df = scrape_jobs(**scrape_kwargs)
         except Exception as exc:
-            log.warning("scrape_jobs failed (term=%r, location=%r): %s", term, location, exc)
-            yield {"status": "scrape_error", "term": term, "error": str(exc)}
+            log.warning(
+                "scrape_jobs failed (term=%r, location=%r): %s", effective_term, location, exc
+            )
+            yield {"status": "scrape_error", "term": effective_term, "error": str(exc)}
             continue
 
         df = df.drop_duplicates(subset=["title", "company"])
@@ -476,6 +569,23 @@ def run_scan(
 
             db.update_job_analysis(job_id=job_id, analysis=analysis)
             totale_analizzati += 1
+
+            link = payload_job.get("link") or ""
+            if link and "linkedin.com" in link and not db.get_recruiter(job_id):
+                try:
+                    recruiter = fetch_recruiter(link, timeout=3.0)
+                    if recruiter:
+                        db.upsert_recruiter(job_id, recruiter)
+                except Exception as exc:
+                    log.debug("recruiter scrape skipped for job %s: %s", job_id, exc)
+
+            elapsed_ms = int(time.time() * 1000) - started_at_ms
+            seen_now = (idx * max(1, settings.max_annunci)) + totale_analizzati
+            eta_ms = (
+                int((elapsed_ms / max(1, seen_now)) * (expected_total - seen_now))
+                if seen_now > 0
+                else 0
+            )
             yield {
                 "status": "analyzed",
                 "job": {
@@ -483,6 +593,11 @@ def run_scan(
                     "azienda": azienda,
                     "score": analysis.get("punteggio", 0),
                 },
+                "current": seen_now,
+                "total": expected_total,
+                "percent": min(99, int(seen_now * 100 / expected_total)) if expected_total else 0,
+                "elapsed_ms": elapsed_ms,
+                "eta_ms": eta_ms,
             }
             time.sleep(settings.delay_tra_chiamate)
 
@@ -497,6 +612,7 @@ def run_scan(
         totale_scartati=totale_scartati,
     )
 
+    duration_ms = int(time.time() * 1000) - started_at_ms
     yield {
         "status": "complete",
         "run_id": run_id,
@@ -505,4 +621,6 @@ def run_scan(
         "totale_analizzati": totale_analizzati,
         "totale_scartati": totale_scartati,
         "archiviati": archiviati,
+        "duration_ms": duration_ms,
+        "percent": 100,
     }

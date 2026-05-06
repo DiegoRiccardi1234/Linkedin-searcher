@@ -315,23 +315,32 @@ class Database:
         markdown: str,
         summary: dict[str, Any],
         content_hash: str | None = None,
+        name: str | None = None,
     ) -> int:
         cur = self.conn.cursor()
         cur.execute(
             """
-            INSERT INTO candidate_profiles(source_name, markdown, summary_json, content_hash, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO candidate_profiles(source_name, markdown, summary_json, content_hash, name, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 source_name,
                 markdown,
                 json.dumps(summary, ensure_ascii=False),
                 content_hash,
+                name,
                 now_iso(),
             ),
         )
         self.conn.commit()
         return int(cur.lastrowid or 0)
+
+    def update_candidate_profile_name(self, profile_id: int, name: str | None) -> None:
+        self.conn.execute(
+            "UPDATE candidate_profiles SET name = ? WHERE id = ?",
+            (name, profile_id),
+        )
+        self.conn.commit()
 
     def find_candidate_profile_by_hash(self, content_hash: str) -> int | None:
         cur = self.conn.cursor()
@@ -404,6 +413,111 @@ class Database:
             if profile:
                 return profile
         return self.get_latest_candidate_profile()
+
+    # ---- Chat sessions (multi-chat) ----
+
+    def list_chat_sessions(self) -> list[dict[str, Any]]:
+        cur = self.conn.execute(
+            "SELECT cs.id, cs.title, cs.created_at, cs.updated_at, "
+            "(SELECT COUNT(*) FROM chat_messages cm WHERE cm.session_id = cs.id "
+            "AND cm.content_type = 'message') AS message_count "
+            "FROM chat_sessions cs ORDER BY cs.updated_at DESC, cs.id DESC"
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def create_chat_session(self, session_id: str, title: str = "") -> dict[str, Any]:
+        ts = now_iso()
+        self.conn.execute(
+            "INSERT OR IGNORE INTO chat_sessions(id, title, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (session_id, title, ts, ts),
+        )
+        self.conn.commit()
+        return {"id": session_id, "title": title, "created_at": ts, "updated_at": ts}
+
+    def rename_chat_session(self, session_id: str, title: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?",
+            (title, now_iso(), session_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def touch_chat_session(self, session_id: str) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO chat_sessions(id, title, created_at, updated_at) "
+            "VALUES (?, '', ?, ?)",
+            (session_id, now_iso(), now_iso()),
+        )
+        self.conn.execute(
+            "UPDATE chat_sessions SET updated_at = ? WHERE id = ?",
+            (now_iso(), session_id),
+        )
+        self.conn.commit()
+
+    def delete_chat_session(self, session_id: str) -> bool:
+        if session_id == "default":
+            self.conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+            self.conn.execute("DELETE FROM pinned_jobs WHERE session_id = ?", (session_id,))
+            self.conn.commit()
+            return True
+        self.conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+        self.conn.execute("DELETE FROM pinned_jobs WHERE session_id = ?", (session_id,))
+        cur = self.conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # ---- Pinned jobs ----
+
+    def pin_job(self, session_id: str, job_id: int) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO pinned_jobs(session_id, job_id, pinned_at) VALUES (?, ?, ?)",
+            (session_id, int(job_id), now_iso()),
+        )
+        self.conn.commit()
+
+    def unpin_job(self, session_id: str, job_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM pinned_jobs WHERE session_id = ? AND job_id = ?",
+            (session_id, int(job_id)),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def list_pinned_jobs(self, session_id: str) -> list[dict[str, Any]]:
+        cur = self.conn.execute(
+            "SELECT j.* FROM pinned_jobs p JOIN jobs j ON j.id = p.job_id "
+            "WHERE p.session_id = ? ORDER BY p.pinned_at DESC",
+            (session_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    # ---- Recruiter info per job ----
+
+    def upsert_recruiter(self, job_id: int, data: dict[str, Any]) -> None:
+        self.conn.execute(
+            "INSERT INTO recruiters(job_id, name, title, headline, profile_url, raw_text, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(job_id) DO UPDATE SET "
+            "name=excluded.name, title=excluded.title, headline=excluded.headline, "
+            "profile_url=excluded.profile_url, raw_text=excluded.raw_text, "
+            "fetched_at=excluded.fetched_at",
+            (
+                int(job_id),
+                data.get("name"),
+                data.get("title"),
+                data.get("headline"),
+                data.get("profile_url"),
+                data.get("raw_text"),
+                now_iso(),
+            ),
+        )
+        self.conn.commit()
+
+    def get_recruiter(self, job_id: int) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM recruiters WHERE job_id = ?", (int(job_id),))
+        row = cur.fetchone()
+        return dict(row) if row else None
 
     def save_chat_message(
         self,

@@ -32,6 +32,25 @@ def _strip_markdown_fence(text: str) -> str:
     return cleaned
 
 
+def _sanitize_chat_answer(text: str) -> str:
+    """Clean stray JSON fragments / unbalanced braces from chat output.
+
+    Some providers (notably Groq) occasionally emit dangling braces or
+    half-formed JSON when they mis-trigger structured-output mode. We strip
+    obvious leading/trailing braces if they aren't balanced.
+    """
+    if not text:
+        return text
+    cleaned = text.strip()
+    cleaned = _strip_markdown_fence(cleaned)
+    while cleaned and cleaned[0] in "{}" and cleaned.count("{") != cleaned.count("}"):
+        cleaned = cleaned[1:].lstrip()
+    while cleaned and cleaned[-1] in "{}" and cleaned.count("{") != cleaned.count("}"):
+        cleaned = cleaned[:-1].rstrip()
+    cleaned = cleaned.replace('{"answer":', "").replace('"answer":', "")
+    return cleaned.strip() or text
+
+
 def _parse_llm_response(raw: str) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
     """Extract ``answer``, ``action`` and ``suggested_roles`` from the JSON envelope.
 
@@ -87,7 +106,14 @@ def handle_chat_message(
        to a rule-based answer if the provider fails.
     7. Persist the assistant reply and return a summary dict.
     """
+    is_first_message = db.count_chat_messages(session_id, "message") == 0
+    db.touch_chat_session(session_id)
     db.save_chat_message(session_id=session_id, role="user", content=message)
+
+    if is_first_message and session_id != "default":
+        auto_title = message.strip().splitlines()[0][:40] if message.strip() else ""
+        if auto_title:
+            db.rename_chat_session(session_id, auto_title)
 
     updates = extract_pref_updates(message)
     for key, value in updates.items():
@@ -113,7 +139,7 @@ def handle_chat_message(
             "content": (
                 f"=== Candidate Profile ===\n{build_profile_context(db)}\n\n"
                 f"=== Preferences ===\n{build_preferences_context(db)}\n\n"
-                f"=== Top Job Listings ===\n{jobs_context(db)}"
+                f"=== Top Job Listings ===\n{jobs_context(db, session_id=session_id)}"
                 f"{summary_block}\n\n"
                 f"=== User Message ===\n{message}"
             ),
@@ -130,6 +156,7 @@ def handle_chat_message(
         log.error("Provider chat call failed, using fallback: %s", exc, exc_info=True)
         answer, action_payload = fallback_answer(db=db, message=message)
 
+    answer = _sanitize_chat_answer(answer)
     db.save_chat_message(session_id=session_id, role="assistant", content=answer)
     return {
         "session_id": session_id,

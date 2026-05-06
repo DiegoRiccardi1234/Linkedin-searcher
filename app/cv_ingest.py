@@ -290,6 +290,54 @@ def _keyword_present(keyword: str, lower_text: str) -> bool:
     return re.search(pattern, lower_text) is not None
 
 
+_NAME_BLACKLIST = (
+    "curriculum",
+    "vitae",
+    "resume",
+    "cv",
+    "personal information",
+    "contact",
+    "profile",
+    "summary",
+)
+
+
+def extract_candidate_name(markdown_text: str) -> str | None:
+    """Heuristic extraction of the candidate's name from CV markdown.
+
+    Looks for the first non-empty heading (``# Name``, ``## Name``) or the first
+    short line that looks like a person's name (2-4 capitalized words, no
+    digits, length 3-60). Returns ``None`` if nothing plausible is found.
+    """
+    if not markdown_text:
+        return None
+    lines = [line.strip() for line in markdown_text.splitlines()]
+    candidates: list[str] = []
+    for raw in lines[:20]:
+        if not raw:
+            continue
+        stripped = raw.lstrip("#").strip().strip("*_")
+        if not stripped or len(stripped) > 60 or len(stripped) < 3:
+            continue
+        low = stripped.lower()
+        if any(bad in low for bad in _NAME_BLACKLIST):
+            continue
+        if any(ch.isdigit() for ch in stripped):
+            continue
+        if "@" in stripped or "/" in stripped or "://" in stripped:
+            continue
+        words = stripped.split()
+        if not (2 <= len(words) <= 4):
+            continue
+        if not all(w[0].isalpha() for w in words):
+            continue
+        # Each word must look like a name token: at least one uppercase letter.
+        if not all(any(c.isupper() for c in w) for w in words):
+            continue
+        candidates.append(stripped)
+    return candidates[0] if candidates else None
+
+
 def summarize_profile(markdown_text: str) -> dict[str, Any]:
     """Keyword-based profile summary (fast, no LLM needed)."""
     lower = markdown_text.lower()
@@ -584,6 +632,8 @@ def summarize_profile_with_llm(
     prompt = (
         "You are an expert career advisor. Analyze this CV/resume and extract a structured profile.\n"
         "Return a JSON object with these fields:\n"
+        "- name: the candidate's full name as written on the CV (string, e.g. 'Mario Rossi'). "
+        "Use null if you cannot determine it confidently.\n"
         "- skills: list of technical and soft skills found\n"
         "- preferred_roles: list of 3-5 job titles that best match this candidate\n"
         "- experience_level: 'entry' | 'junior' | 'mid' | 'senior'\n"

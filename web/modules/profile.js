@@ -205,6 +205,27 @@ async function _renderHistory() {
   }
 }
 
+function _initialsFromName(name) {
+  if (!name) return "";
+  const words = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  return words.slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+}
+
+function _updateAvatar(profile) {
+  const el = document.querySelector(".topbar-right .avatar");
+  if (!el) return;
+  const name = profile?.name || profile?.summary_json?.name;
+  const initials = _initialsFromName(name);
+  if (initials) {
+    el.textContent = initials;
+    el.setAttribute("title", name);
+  } else {
+    el.textContent = "?";
+    el.removeAttribute("title");
+  }
+}
+
 export async function loadProfile() {
   try {
     const payload = await api("/api/profile");
@@ -212,10 +233,12 @@ export async function loadProfile() {
     const empty = document.getElementById("profileEmpty");
     const content = document.getElementById("profileContent");
     if (!_state.profile) {
+      _updateAvatar(null);
       empty?.classList.remove("hidden");
       content?.classList.add("hidden");
       return;
     }
+    _updateAvatar(_state.profile);
     empty?.classList.add("hidden");
     content?.classList.remove("hidden");
     const summary = _state.profile.summary_json || {};
@@ -242,6 +265,7 @@ async function _persistField(field, list) {
     _state.profile = res.profile;
     const summary = _state.profile?.summary_json || {};
     _renderChips(_chipContainerId(field), summary[field] || [], field);
+    showToast(t("profile.chipSaved") || "Saved", "info");
     return true;
   } catch (err) {
     showToast(`${t("profile.saveFailed") || "Save failed"}: ${err.message}`, "error");

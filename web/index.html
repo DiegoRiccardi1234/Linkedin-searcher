@@ -50,6 +50,7 @@
       <button type="button" class="nav-link" data-view="job-search"><span class="material-symbols-outlined">travel_explore</span> <span data-i18n="topbar.jobSearch">Job Search</span></button>
       <button type="button" class="nav-link" data-view="profile"><span class="material-symbols-outlined">person</span> <span data-i18n="topbar.profile">Profile</span></button>
       <button type="button" class="nav-link" data-view="settings"><span class="material-symbols-outlined">settings</span> <span data-i18n="topbar.settings">Settings</span></button>
+      <button type="button" class="nav-link" data-view="info"><span class="material-symbols-outlined">help</span> <span data-i18n="topbar.info">Info</span></button>
     </nav>
     <div class="topbar-right">
       <select id="langSelect" class="lang-select" title="Language">
@@ -66,6 +67,34 @@
 
   <main class="page-grid">
     <section id="view-dashboard" class="view is-active">
+
+      <!-- Onboarding placeholder (shown until provider key + CV are set) -->
+      <section id="onboardingPlaceholder" class="onboarding-placeholder hidden">
+        <div class="onboarding-card">
+          <span class="onboarding-icon material-symbols-outlined">rocket_launch</span>
+          <h2 data-i18n="onboarding.title">Welcome to Job Finder</h2>
+          <p class="onboarding-subtitle" data-i18n="onboarding.subtitle">Two quick steps and you're ready to scan jobs.</p>
+          <ol class="onboarding-steps">
+            <li id="onbStep1">
+              <span class="onb-bullet">1</span>
+              <div class="onb-text">
+                <strong data-i18n="onboarding.step1Title">Configure an AI provider key</strong>
+                <span class="onb-hint" data-i18n="onboarding.step1Hint">Groq is free and easy to start with.</span>
+              </div>
+              <button type="button" class="ghost-btn" data-onb-action="settings"><span data-i18n="onboarding.openSettings">Open Settings</span></button>
+            </li>
+            <li id="onbStep2">
+              <span class="onb-bullet">2</span>
+              <div class="onb-text">
+                <strong data-i18n="onboarding.step2Title">Upload your CV</strong>
+                <span class="onb-hint" data-i18n="onboarding.step2Hint">PDF or DOCX — used by AI to score listings.</span>
+              </div>
+              <button type="button" class="ghost-btn" data-onb-action="profile"><span data-i18n="onboarding.openProfile">Open Profile</span></button>
+            </li>
+          </ol>
+          <p class="onboarding-hint" data-i18n="onboarding.hint">You can explore the rest of the app freely while completing these.</p>
+        </div>
+      </section>
 
       <!-- Hero -->
       <section class="hero-block">
@@ -281,6 +310,37 @@
             <label class="check-label"><input type="checkbox" id="remoteToggle" /> <span data-i18n="settings.remoteOnly">Remote only</span></label>
           </div>
 
+          <div class="filter-group">
+            <p class="micro filter-group-label" data-i18n="scan.filters.experience">Experience level</p>
+            <div class="scan-options-row">
+              <label class="check-label"><input type="checkbox" name="scanExperience" value="internship" /> <span data-i18n="scan.filters.exp.internship">Internship</span></label>
+              <label class="check-label"><input type="checkbox" name="scanExperience" value="entry" /> <span data-i18n="scan.filters.exp.entry">Entry</span></label>
+              <label class="check-label"><input type="checkbox" name="scanExperience" value="junior" /> <span data-i18n="scan.filters.exp.junior">Junior</span></label>
+              <label class="check-label"><input type="checkbox" name="scanExperience" value="mid" /> <span data-i18n="scan.filters.exp.mid">Mid</span></label>
+              <label class="check-label"><input type="checkbox" name="scanExperience" value="senior" /> <span data-i18n="scan.filters.exp.senior">Senior</span></label>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <p class="micro filter-group-label" data-i18n="scan.filters.jobType">Contract type</p>
+            <div class="scan-options-row">
+              <label class="check-label"><input type="checkbox" name="scanJobType" value="fulltime" /> <span data-i18n="scan.filters.jt.fulltime">Full-time</span></label>
+              <label class="check-label"><input type="checkbox" name="scanJobType" value="parttime" /> <span data-i18n="scan.filters.jt.parttime">Part-time</span></label>
+              <label class="check-label"><input type="checkbox" name="scanJobType" value="contract" /> <span data-i18n="scan.filters.jt.contract">Contract</span></label>
+              <label class="check-label"><input type="checkbox" name="scanJobType" value="temporary" /> <span data-i18n="scan.filters.jt.temporary">Temporary</span></label>
+              <label class="check-label"><input type="checkbox" name="scanJobType" value="internship" /> <span data-i18n="scan.filters.jt.internship">Internship</span></label>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <p class="micro filter-group-label" data-i18n="scan.filters.workType">Work mode</p>
+            <div class="scan-options-row">
+              <label class="check-label"><input type="checkbox" name="scanWorkType" value="onsite" /> <span data-i18n="scan.filters.wt.onsite">On-site</span></label>
+              <label class="check-label"><input type="checkbox" name="scanWorkType" value="hybrid" /> <span data-i18n="scan.filters.wt.hybrid">Hybrid</span></label>
+              <label class="check-label"><input type="checkbox" name="scanWorkType" value="remote" /> <span data-i18n="scan.filters.wt.remote">Remote</span></label>
+            </div>
+          </div>
+
           <button type="submit" class="action-main search-launch">
             <span class="material-symbols-outlined">rocket_launch</span>
             <strong data-i18n="settings.startScan">Start Scan</strong>
@@ -457,6 +517,12 @@
             <option value="" data-i18n="chat.modelAuto">Auto model</option>
           </select>
         </div>
+        <div class="chat-session-bar">
+          <select id="chatSessionSelect" class="mini-select" title="Switch chat"></select>
+          <button type="button" id="chatSessionNew" class="ghost-btn small" title="New chat"><span class="material-symbols-outlined">add</span></button>
+          <button type="button" id="chatSessionDelete" class="ghost-btn small danger" title="Delete chat"><span class="material-symbols-outlined">delete</span></button>
+        </div>
+        <div id="chatPinnedStrip" class="chat-pinned-strip hidden"></div>
         <div id="chatBox" class="chat-box"></div>
         <div id="chatQuickPrompts" class="chat-quick-prompts"></div>
         <form id="chatForm" class="chat-form">
@@ -465,11 +531,93 @@
         </form>
       </div>
     </aside>
+
+    <!-- Info / Help View -->
+    <section id="view-info" class="view">
+      <header class="settings-hero">
+        <h2><span data-i18n="info.title">How Job</span> <em data-i18n="info.titleEm">Finder works</em></h2>
+        <p data-i18n="info.subtitle">A short tour of every feature so you can get the most out of the app.</p>
+      </header>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.what.title">What is Job Finder?</h3>
+        <p data-i18n="info.what.body">Job Finder is a local AI-powered job search assistant. It reads your CV, scans LinkedIn and Indeed, scores listings against your profile, and helps you write targeted cover letters and prepare interviews.</p>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.start.title">Getting started</h3>
+        <ol class="info-steps">
+          <li data-i18n="info.start.step1">Upload your CV in the Profile tab — Job Finder extracts your skills, experience and target roles.</li>
+          <li data-i18n="info.start.step2">Configure at least one AI provider key in Settings (Groq is free and easy to start).</li>
+          <li data-i18n="info.start.step3">Open Job Search, pick filters and keywords, then launch the scan.</li>
+          <li data-i18n="info.start.step4">Review results in the Dashboard and chat with the AI Coach about specific jobs.</li>
+        </ol>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.providers.title">AI providers</h3>
+        <ul class="info-list">
+          <li><strong>Groq</strong> — <span data-i18n="info.providers.groq">Free, fast, generous limits. Great default.</span></li>
+          <li><strong>OpenRouter</strong> — <span data-i18n="info.providers.openrouter">Access many models including free tiers.</span></li>
+          <li><strong>Cerebras</strong> — <span data-i18n="info.providers.cerebras">Very low latency.</span></li>
+          <li><strong>Anthropic / OpenAI / Google</strong> — <span data-i18n="info.providers.paid">Paid, top-tier quality.</span></li>
+        </ul>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.scan.title">Scanning &amp; filters</h3>
+        <p data-i18n="info.scan.body">In Job Search you can pick experience level (internship → senior), contract type (full-time, part-time, internship, contract, temporary) and work mode (remote, hybrid, on-site). The scan shows live progress with percentage and estimated time remaining.</p>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.chat.title">Chat with the AI Coach</h3>
+        <ul class="info-list">
+          <li data-i18n="info.chat.multi">Multiple chats: use the dropdown next to the coach to switch between separate conversations, or start a new one.</li>
+          <li data-i18n="info.chat.pin">Pin jobs to a chat: open a job's details and click "Pin to chat" to give the coach the full description, then ask questions like "compare these two".</li>
+          <li data-i18n="info.chat.cover">Cover letter: from a job's detail panel you can generate a cover letter targeted at the recruiter when their info is visible on LinkedIn.</li>
+        </ul>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.privacy.title">Privacy</h3>
+        <p data-i18n="info.privacy.body">All your data (CV, jobs, chats, keys) is stored locally in a SQLite database under your user folder. Nothing is uploaded except your prompts to the AI provider you choose.</p>
+      </article>
+
+      <article class="card-block info-card-block">
+        <h3 data-i18n="info.version.title">Version</h3>
+        <p>v<span id="infoVersionNumber">1.3.0</span> — <a href="https://github.com/" target="_blank" rel="noopener" data-i18n="info.version.changelog">Changelog</a></p>
+      </article>
+    </section>
   </main>
 
 
   <!-- Toast -->
   <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Post-scan summary modal -->
+  <div id="postScanModal" class="post-scan-modal hidden" role="dialog" aria-modal="true">
+    <div class="post-scan-card">
+      <div class="post-scan-head">
+        <h3 data-i18n="postScan.title">Scan complete</h3>
+        <button type="button" class="icon-btn" data-close-postscan aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div class="post-scan-stats">
+        <div><span class="ps-num" id="psFound">0</span><span class="ps-label" data-i18n="postScan.found">Found</span></div>
+        <div><span class="ps-num" id="psNew">0</span><span class="ps-label" data-i18n="postScan.new">New</span></div>
+        <div><span class="ps-num" id="psAnalyzed">0</span><span class="ps-label" data-i18n="postScan.analyzed">Analyzed</span></div>
+        <div><span class="ps-num" id="psSkipped">0</span><span class="ps-label" data-i18n="postScan.skipped">Skipped</span></div>
+        <div><span class="ps-num" id="psArchived">0</span><span class="ps-label" data-i18n="postScan.archived">Archived</span></div>
+        <div><span class="ps-num" id="psDuration">0s</span><span class="ps-label" data-i18n="postScan.duration">Duration</span></div>
+      </div>
+      <div class="post-scan-section">
+        <h4 data-i18n="postScan.topMatches">Top matches</h4>
+        <ul id="psTopJobs" class="post-scan-top"></ul>
+      </div>
+      <div class="post-scan-actions">
+        <button type="button" class="ghost-btn" data-close-postscan data-i18n="postScan.viewList">View list</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Scan Overlay -->
   <div id="scanOverlay" class="scan-overlay" style="display:none;">

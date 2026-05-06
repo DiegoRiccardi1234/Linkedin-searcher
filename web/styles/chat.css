@@ -370,19 +370,20 @@
 .scan-feed .feed-chip.score-low { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
 .scan-feed .feed-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* No-API-key banner */
+/* No-API-key banner — yellow soft warning, non blocking. */
 .no-key-banner {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: var(--warning-soft, #fcf1dd);
-  color: var(--warning, #c97400);
-  border-bottom: 1px solid var(--warning, #c97400);
+  background: #fff4cc;
+  color: #7a4a00;
+  border-bottom: 2px solid #f0b400;
   font-size: var(--fs-sm);
   position: sticky;
   top: 0;
   z-index: 50;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .no-key-banner .material-symbols-outlined { font-size: 18px; }
 .no-key-banner-text { font-weight: 600; }

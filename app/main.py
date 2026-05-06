@@ -23,6 +23,7 @@ from app import rate_limit
 from app.config import SUPPORTED_PROVIDERS, AppSettings, load_settings, save_local_provider_keys
 from app.cv_ingest import (
     InvalidCVContent,
+    extract_candidate_name,
     extract_markdown_from_upload,
     summarize_profile,
     summarize_profile_with_llm,
@@ -33,9 +34,12 @@ from app.log import configure_logging, get_logger
 from app.models import (
     ChatRequest,
     ChatResponse,
+    ChatSessionCreateRequest,
+    ChatSessionRenameRequest,
     FavoriteRequest,
     JobActionRequest,
     ManualJobCreateRequest,
+    PinJobRequest,
     PreferenceUpdateRequest,
     ProfileUpdate,
     ProviderKeysRequest,
@@ -70,7 +74,10 @@ class AppContainer:
             markdown = cv_path.read_text(encoding="utf-8", errors="replace")
             summary = summarize_profile(markdown)
             created_id = self.db.save_candidate_profile(
-                source_name="cv.md", markdown=markdown, summary=summary
+                source_name="cv.md",
+                markdown=markdown,
+                summary=summary,
+                name=summary.get("name") or extract_candidate_name(markdown),
             )
             self.db.set_active_profile(created_id)
 
@@ -245,11 +252,15 @@ def create_app(workspace_dir: Path) -> FastAPI:
         except Exception as exc:
             container.log.warning("LLM CV summarization failed, using heuristic: %s", exc)
             summary = summarize_profile(markdown)
+        candidate_name = summary.get("name") if isinstance(summary, dict) else None
+        if not candidate_name:
+            candidate_name = extract_candidate_name(markdown)
         profile_id = container.db.save_candidate_profile(
             source_name=file.filename or "cv_upload",
             markdown=markdown,
             summary=summary,
             content_hash=content_hash,
+            name=candidate_name,
         )
         container.db.set_active_profile(profile_id)
 
@@ -321,17 +332,26 @@ def create_app(workspace_dir: Path) -> FastAPI:
         location: str | None = Query(default=None),
         is_remote: bool = Query(default=False),
         sites: str = Query(default="linkedin,indeed"),
+        experience_levels: str = Query(default=""),
+        job_types: str = Query(default=""),
+        work_types: str = Query(default=""),
     ) -> StreamingResponse:
         term_list = (
             [t.strip() for t in search_terms.split(",") if t.strip()] if search_terms else []
         )
         site_list = [s.strip() for s in sites.split(",") if s.strip()]
 
+        def _split(csv: str) -> list[str]:
+            return [s.strip() for s in csv.split(",") if s.strip()] if csv else []
+
         payload = ScanRequest(
             search_terms=term_list,
             location=location,
             is_remote=is_remote,
             sites=site_list,
+            experience_levels=_split(experience_levels),
+            job_types=_split(job_types),
+            work_types=_split(work_types),
         )
 
         def event_generator() -> Iterator[str]:
@@ -444,7 +464,8 @@ def create_app(workspace_dir: Path) -> FastAPI:
         job = container.db.get_job_with_analysis(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        return {"job": job}
+        recruiter = container.db.get_recruiter(job_id)
+        return {"job": job, "recruiter": recruiter}
 
     @fastapi_app.post("/api/jobs/{job_id}/cover-letter")
     def generate_cover_letter(job_id: int) -> dict[str, Any]:
@@ -463,9 +484,38 @@ def create_app(workspace_dir: Path) -> FastAPI:
         azienda = job.get("azienda", "N/A")
         descrizione = job.get("descrizione", "")
 
+        recruiter = container.db.get_recruiter(job_id)
+        if not recruiter and job.get("link") and "linkedin.com" in job.get("link", ""):
+            try:
+                from app.services.recruiter_scrape import fetch_recruiter
+
+                fetched = fetch_recruiter(job["link"], timeout=3.0)
+                if fetched:
+                    container.db.upsert_recruiter(job_id, fetched)
+                    recruiter = container.db.get_recruiter(job_id)
+            except Exception as exc:
+                container.log.debug("on-demand recruiter scrape failed: %s", exc)
+
+        recruiter_block = ""
+        if recruiter and (recruiter.get("name") or recruiter.get("headline")):
+            parts = []
+            if recruiter.get("name"):
+                parts.append(f"Nome: {recruiter['name']}")
+            if recruiter.get("title"):
+                parts.append(f"Ruolo: {recruiter['title']}")
+            if recruiter.get("headline"):
+                parts.append(f"Headline: {recruiter['headline']}")
+            recruiter_block = (
+                "\nDESTINATARIO (recruiter / hiring manager visibile nell'annuncio):\n"
+                + "\n".join(parts)
+                + "\nApri la lettera con un saluto nominale rivolto a questa persona "
+                "(es. 'Gentile {nome},') e fai un breve riferimento al suo ruolo."
+            )
+
         prompt = f"""Sei un assistente che aiuta un IT professional a trovare lavoro.
 Scrivi una Cover Letter / messaggio InMail (circa 100-150 parole, concisa ma efficace e performante, tono professionale ma non ingessato, focalizzato sui risultati) per questo annuncio.
 Usa le informazioni del CV per evidenziare la corrispondenza con l'annuncio.
+{recruiter_block}
 
 CV candidato:
 {profile_markdown[:3500]}
@@ -582,6 +632,55 @@ Non aggiungere testo extra. Devi rispondere SOLO con JSON valido con la chiave "
     def chat_history(session_id: str = "default", limit: int = 30) -> dict[str, Any]:
         items = container.db.list_chat_messages(session_id=session_id, limit=limit)
         return {"messages": items}
+
+    @fastapi_app.get("/api/chat/sessions")
+    def list_chat_sessions() -> dict[str, Any]:
+        sessions = container.db.list_chat_sessions()
+        if not sessions:
+            container.db.create_chat_session("default", "")
+            sessions = container.db.list_chat_sessions()
+        return {"sessions": sessions}
+
+    @fastapi_app.post("/api/chat/sessions")
+    def create_chat_session(payload: ChatSessionCreateRequest) -> dict[str, Any]:
+        import secrets
+
+        new_id = "s_" + secrets.token_hex(6)
+        session = container.db.create_chat_session(new_id, payload.title or "")
+        return {"session": session}
+
+    @fastapi_app.patch("/api/chat/sessions/{session_id}")
+    def rename_chat_session(session_id: str, payload: ChatSessionRenameRequest) -> dict[str, Any]:
+        ok = container.db.rename_chat_session(session_id, payload.title)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"ok": True}
+
+    @fastapi_app.delete("/api/chat/sessions/{session_id}")
+    def delete_chat_session(session_id: str) -> dict[str, Any]:
+        ok = container.db.delete_chat_session(session_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"ok": True}
+
+    @fastapi_app.get("/api/chat/sessions/{session_id}/pinned")
+    def list_pinned(session_id: str) -> dict[str, Any]:
+        return {"jobs": container.db.list_pinned_jobs(session_id)}
+
+    @fastapi_app.post("/api/chat/sessions/{session_id}/pin")
+    def pin_job(session_id: str, payload: PinJobRequest) -> dict[str, Any]:
+        if not container.db.get_job(payload.job_id):
+            raise HTTPException(status_code=404, detail="Job not found")
+        container.db.touch_chat_session(session_id)
+        container.db.pin_job(session_id, payload.job_id)
+        return {"ok": True}
+
+    @fastapi_app.delete("/api/chat/sessions/{session_id}/pin/{job_id}")
+    def unpin_job(session_id: str, job_id: int) -> dict[str, Any]:
+        ok = container.db.unpin_job(session_id, job_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Pin not found")
+        return {"ok": True}
 
     @fastapi_app.get("/api/roles/shortlist")
     def get_role_shortlist() -> dict[str, Any]:

@@ -44,6 +44,9 @@ class ScanRequest(BaseModel):
     location: str | None = None
     is_remote: bool = False
     sites: list[str] = Field(default_factory=lambda: ["linkedin", "indeed"])
+    experience_levels: list[str] = Field(default_factory=list)
+    job_types: list[str] = Field(default_factory=list)
+    work_types: list[str] = Field(default_factory=list)
 
 
 class ScanResponse(BaseModel):
@@ -77,6 +80,18 @@ class ChatResponse(BaseModel):
 
 class RoleShortlistRequest(BaseModel):
     roles: list[str] = Field(default_factory=list)
+
+
+class ChatSessionCreateRequest(BaseModel):
+    title: str = ""
+
+
+class ChatSessionRenameRequest(BaseModel):
+    title: str
+
+
+class PinJobRequest(BaseModel):
+    job_id: int
 
 
 class PreferenceUpdateRequest(BaseModel):

@@ -8,30 +8,62 @@ from typing import Any
 from app.db import Database
 
 
-def jobs_context(db: Database, limit: int = 5) -> str:
+def _format_job_brief(job: dict[str, Any], idx: int) -> str:
+    analysis_raw = job.get("analysis_json") or "{}"
+    try:
+        analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw
+    except (json.JSONDecodeError, TypeError):
+        analysis = {}
+    smart_working = analysis.get("smart_working", "N/A")
+    contratto = analysis.get("contratto", "N/A")
+    exp_years = analysis.get("anni_esperienza_richiesti", "N/A")
+    return (
+        f"{idx}. {job.get('titolo')} @ {job.get('azienda')} | "
+        f"Score: {job.get('punteggio_ai')}/10 | "
+        f"Advice: {job.get('consiglio')} | "
+        f"Remote: {smart_working} | Contract: {contratto} | Exp: {exp_years}y"
+    )
+
+
+def _format_job_full(job: dict[str, Any], idx: int) -> str:
+    desc = (job.get("descrizione") or "")[:800]
+    return (
+        f"[Pinned #{idx}] {job.get('titolo')} @ {job.get('azienda')}\n"
+        f"Location: {job.get('sede') or 'N/A'} | Score: {job.get('punteggio_ai')}/10\n"
+        f"Advice: {job.get('consiglio')}\n"
+        f"Description (excerpt): {desc}\n"
+        f"Link: {job.get('link') or 'N/A'}"
+    )
+
+
+def jobs_context(db: Database, limit: int = 5, session_id: str | None = None) -> str:
+    pinned: list[dict[str, Any]] = []
+    if session_id:
+        pinned = db.list_pinned_jobs(session_id)
+
+    if pinned:
+        pinned_block = "\n\n".join(_format_job_full(j, i + 1) for i, j in enumerate(pinned))
+        remaining = max(0, limit)
+        pinned_ids = {j.get("id") for j in pinned}
+        top = [
+            j
+            for j in db.get_top_jobs(limit=remaining + len(pinned))
+            if j.get("id") not in pinned_ids
+        ]
+        if top:
+            other_block = "\n".join(
+                _format_job_brief(j, i + 1) for i, j in enumerate(top[:remaining])
+            )
+            return (
+                "=== Pinned jobs (user wants to discuss these) ===\n"
+                f"{pinned_block}\n\n=== Other top jobs ===\n{other_block}"
+            )
+        return f"=== Pinned jobs ===\n{pinned_block}"
+
     jobs = db.get_top_jobs(limit=limit)
     if not jobs:
         return "No jobs scanned yet."
-
-    lines: list[str] = []
-    for idx, job in enumerate(jobs, 1):
-        analysis_raw = job.get("analysis_json") or "{}"
-        try:
-            analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw
-        except (json.JSONDecodeError, TypeError):
-            analysis = {}
-
-        smart_working = analysis.get("smart_working", "N/A")
-        contratto = analysis.get("contratto", "N/A")
-        exp_years = analysis.get("anni_esperienza_richiesti", "N/A")
-
-        lines.append(
-            f"{idx}. {job.get('titolo')} @ {job.get('azienda')} | "
-            f"Score: {job.get('punteggio_ai')}/10 | "
-            f"Advice: {job.get('consiglio')} | "
-            f"Remote: {smart_working} | Contract: {contratto} | Exp: {exp_years}y"
-        )
-    return "\n".join(lines)
+    return "\n".join(_format_job_brief(j, i + 1) for i, j in enumerate(jobs))
 
 
 def profile_summary_dict(db: Database) -> dict[str, Any]:

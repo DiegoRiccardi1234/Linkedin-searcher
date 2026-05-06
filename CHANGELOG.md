@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
-## [1.2.8] — 2026-05-05
+## [1.3.0] — 2026-05-06
+
+Major UX & AI release: multi-chat, internship/role filters, recruiter-targeted cover letters, scan progress with ETA, post-scan summary, info tab, smarter chat output.
+
+### Added
+- **Multi-chat sessions** — switch between separate conversations with the AI Coach via dropdown next to the chat panel; create new chats and delete old ones. Auto-titles from the first user message. New tables `chat_sessions` and migration `005_v130_multichat_pin_recruiter_name.py`. Endpoints: `GET/POST/PATCH/DELETE /api/chat/sessions`.
+- **Pin jobs to a chat** — open a job's detail panel and click "Pin to chat" to feed the full description (not just title+score) to the AI Coach. Pinned jobs appear as removable pills above the chat input. Endpoints: `POST/DELETE /api/chat/sessions/{id}/pin`. `chat/context.py::jobs_context` now prioritizes pinned jobs in the system prompt so the model can answer comparative questions ("which is better for me?").
+- **Recruiter-targeted cover letters** — best-effort scrape of the LinkedIn job posting page extracts the poster's name/title/headline (`app/services/recruiter_scrape.py`, table `recruiters`). When available, `/api/jobs/{id}/cover-letter` opens the message with a nominal greeting and references the recruiter's role. Silently falls back to a generic letter when not exposed.
+- **LinkedIn search filters** — Job Search view now exposes Experience (internship → senior), Job type (full-time, part-time, contract, temporary, internship), and Work mode (on-site, hybrid, remote) as multi-checkbox filters. `ScanRequest` carries `experience_levels`, `job_types`, `work_types` and the scanner augments search terms / forwards `job_type` to jobspy.
+- **Scan progress with %, ETA and step labels** — `run_scan` emits `{status: "progress", step, current, total, percent, elapsed_ms, eta_ms}` events; UI renders a real progress bar with "Analyzing 12/80 · ETA 2m 30s".
+- **Post-scan summary modal** — on completion, a modal shows totals (found / new / analyzed / skipped / archived), elapsed time and the top 3 matches with score chips.
+- **Info tab** — new top-level "Info" view with sections: what is Job Finder, getting started, AI providers, scanning & filters, chat coach (multi-chat & pinning), privacy, version. Translated to all 5 languages.
+- **CV name extraction → avatar initials** — the LLM CV summary now extracts the candidate's full name (with a heuristic fallback). The "D" placeholder in the top-right is replaced with the user's actual initials and tooltip.
+- **Enhanced job details** — analysis JSON now includes `requisiti`, `responsabilita`, `benefit`, `skills_match {hai, mancano}`, `livello_richiesto`. The detail panel renders bullet lists, a skills match grid (have vs missing) and a recruiter card when available.
+
+### Changed
+- **Chat output sanitization** — handler now strips orphan braces / partial JSON fragments from the assistant answer (`_sanitize_chat_answer`). System prompt explicitly forbids stray `{}`, JSON fragments and filler. Mostly fixes Groq emitting random `{` characters mid-prose.
+- `candidate_profiles` schema gained a `name` column (nullable). Backfilled lazily on next CV upload.
+
 
 Critical updater self-overwrite fix + chat model dropdown ordering.
 

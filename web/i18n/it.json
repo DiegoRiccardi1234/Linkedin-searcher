@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "jobSearch": "Cerca Lavoro",
     "profile": "Profilo",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "info": "Info"
   },
   "profile": {
     "title": "Il tuo Profilo",
@@ -38,7 +39,8 @@
     "delete": "Elimina",
     "confirmDelete": "Eliminare questo CV dalla cronologia? Operazione non annullabile.",
     "deleted": "Profilo eliminato",
-    "deleteFailed": "Eliminazione fallita"
+    "deleteFailed": "Eliminazione fallita",
+    "chipSaved": "Salvato"
   },
   "jobSearch": {
     "title": "Cerca",
@@ -250,7 +252,16 @@
     "axisSeniority": "Seniority",
     "axisRemote": "Remoto",
     "axisSalary": "Stipendio",
-    "axisContract": "Contratto"
+    "axisContract": "Contratto",
+    "requirements": "Requisiti chiave",
+    "responsibilities": "Responsabilità",
+    "benefits": "Benefit",
+    "skillsMatch": "Match competenze",
+    "skillsHave": "Hai",
+    "skillsMissing": "Mancano",
+    "postedBy": "Pubblicato da",
+    "viewProfile": "Vedi profilo",
+    "pinToChat": "Fissa nella chat"
   },
   "scan": {
     "scanning": "Scansione portali lavoro...",
@@ -266,7 +277,36 @@
     "feedStarted": "Cerco: <b>{terms}</b>",
     "feedScraped": "Trovati {found} annunci su <b>{portal}</b>",
     "feedAnalyzed": "<b>{title}</b> @ {company}",
-    "feedMinimize": "Minimizza"
+    "feedMinimize": "Minimizza",
+    "progress": {
+      "scraping": "Scansione in corso",
+      "analyzing": "Analisi in corso",
+      "eta": "Tempo rimanente"
+    },
+    "filters": {
+      "experience": "Livello di esperienza",
+      "exp": {
+        "internship": "Stage",
+        "entry": "Entry",
+        "junior": "Junior",
+        "mid": "Mid",
+        "senior": "Senior"
+      },
+      "jobType": "Tipo di contratto",
+      "jt": {
+        "fulltime": "Tempo pieno",
+        "parttime": "Part-time",
+        "contract": "A contratto",
+        "temporary": "Temporaneo",
+        "internship": "Stage"
+      },
+      "workType": "Modalità di lavoro",
+      "wt": {
+        "onsite": "In sede",
+        "hybrid": "Ibrido",
+        "remote": "Remoto"
+      }
+    }
   },
   "toast": {
     "enterKeyOrProvider": "Inserisci almeno una chiave o scegli un provider primario.",
@@ -295,7 +335,33 @@
     "keySaveError": "Errore salvataggio chiavi",
     "genError": "Errore generazione",
     "quickActionError": "Errore azione rapida",
-    "quickPromptsUnavail": "Suggerimenti rapidi non disponibili"
+    "quickPromptsUnavail": "Suggerimenti rapidi non disponibili",
+    "jobUpdated": "Lavoro aggiornato",
+    "jobActionFailed": "Impossibile aggiornare il lavoro",
+    "job": {
+      "applied": "Segnato come candidato",
+      "rejected": "Segnato come rifiutato",
+      "archived": "Lavoro archiviato",
+      "open": "Riaperto",
+      "interviewing": "Segnato in fase colloquio"
+    },
+    "favoriteAdded": "Aggiunto ai preferiti",
+    "favoriteRemoved": "Rimosso dai preferiti",
+    "coverLetterReady": "Lettera pronta",
+    "coverLetterFailed": "Generazione lettera fallita",
+    "coverLetterGenerating": "Generazione lettera...",
+    "modelsLoading": "Caricamento modelli...",
+    "modelsFailed": "Caricamento modelli fallito",
+    "recsRefreshing": "Aggiornamento...",
+    "recsFailed": "Aggiornamento fallito",
+    "chatCreated": "Nuova chat creata",
+    "chatDeleted": "Chat eliminata",
+    "chatRenamed": "Chat rinominata",
+    "chatCreateFailed": "Impossibile creare la chat",
+    "chatDeleteFailed": "Impossibile eliminare la chat",
+    "themeDark": "Tema scuro",
+    "themeLight": "Tema chiaro",
+    "languageChanged": "Lingua aggiornata"
   },
   "update": {
     "title": "Nuova versione disponibile",
@@ -326,7 +392,12 @@
       "pythonJobs": "Trova lavori Python a Milano",
       "searchTerms": "Suggerisci parole chiave per un ruolo Junior QA",
       "top5": "Consiglia i top 5 lavori a cui candidarsi"
-    }
+    },
+    "defaultSession": "Predefinita",
+    "confirmDeleteSession": "Eliminare questa chat?",
+    "unpin": "Rimuovi",
+    "pinned": "Fissato nella chat",
+    "pinFailed": "Pin fallito"
   },
   "common": {
     "close": "Chiudi",
@@ -340,7 +411,15 @@
     "stepScan": "Avvia la prima scansione",
     "stepChat": "Chatta col Career Coach",
     "gotoSettings": "Carica CV",
-    "dismiss": "Salta per ora"
+    "dismiss": "Salta per ora",
+    "step1Title": "Configura una chiave AI",
+    "step1Hint": "Groq è gratuito e facile da configurare.",
+    "step2Title": "Carica il tuo CV",
+    "step2Hint": "PDF o DOCX — usato dall'AI per valutare gli annunci.",
+    "subtitle": "Due passi rapidi e sei pronto a cercare lavoro.",
+    "openSettings": "Apri Impostazioni",
+    "openProfile": "Apri Profilo",
+    "hint": "Puoi esplorare il resto dell'app liberamente mentre li completi."
   },
   "banner": {
     "noKey": "Nessun provider AI configurato — la chat usa risposte rule-based.",
@@ -348,6 +427,80 @@
     "signupHint": "Serve una chiave? Entrambe le opzioni sono gratis, senza carta.",
     "signupCerebras": "Ottieni una chiave Cerebras gratis",
     "signupGroq": "Ottieni una chiave Groq",
-    "openSettings": "Apri Impostazioni"
+    "openSettings": "Apri Impostazioni",
+    "warningTitle": "Configura una chiave AI per iniziare a usare Job Finder",
+    "warningHint": "Opzioni gratuite qui sotto — registrazione in un minuto."
+  },
+  "postScan": {
+    "title": "Scansione completata",
+    "found": "Trovati",
+    "new": "Nuovi",
+    "analyzed": "Analizzati",
+    "skipped": "Scartati",
+    "archived": "Archiviati",
+    "duration": "Durata",
+    "topMatches": "Migliori match",
+    "viewList": "Vai alla lista",
+    "noTop": "—"
+  },
+  "info": {
+    "title": "Come funziona Job",
+    "titleEm": "Finder",
+    "subtitle": "Un breve tour di tutte le funzionalità per sfruttare al meglio l'app.",
+    "what": {
+      "title": "Cos'è Job Finder?",
+      "body": "Job Finder è un assistente locale potenziato da AI per la ricerca del lavoro. Legge il tuo CV, scansiona LinkedIn e Indeed, valuta gli annunci rispetto al tuo profilo e aiuta a scrivere cover letter mirate."
+    },
+    "start": {
+      "title": "Per iniziare",
+      "step1": "Carica il CV dalla scheda Profilo — Job Finder estrae skill, esperienza e ruoli target.",
+      "step2": "Configura almeno una chiave provider AI in Impostazioni (Groq è gratuito e facile).",
+      "step3": "Apri Job Search, scegli filtri e parole chiave, poi avvia la scansione.",
+      "step4": "Rivedi i risultati nella Dashboard e parla con l'AI Coach sui singoli lavori."
+    },
+    "providers": {
+      "title": "Provider AI",
+      "groq": "Gratuito, veloce, generoso. Ottimo default.",
+      "openrouter": "Accesso a molti modelli, inclusi tier gratuiti.",
+      "cerebras": "Latenza molto bassa.",
+      "paid": "A pagamento, qualità top."
+    },
+    "scan": {
+      "title": "Scansione e filtri",
+      "body": "In Job Search puoi scegliere livello di esperienza (stage → senior), tipo di contratto (tempo pieno, part-time, stage, contratto, temporaneo) e modalità (remoto, ibrido, in sede). La scansione mostra avanzamento in tempo reale con percentuale e tempo stimato."
+    },
+    "chat": {
+      "title": "Chat con l'AI Coach",
+      "multi": "Chat multiple: usa il menu vicino al coach per cambiare conversazione o crearne una nuova.",
+      "pin": "Fissa lavori in chat: apri i dettagli e clicca \"Fissa nella chat\" per passare la descrizione completa al coach, poi chiedi ad esempio \"confronta questi due\".",
+      "cover": "Cover letter: dal pannello dettagli puoi generare una lettera mirata al recruiter, quando le sue info sono visibili su LinkedIn."
+    },
+    "privacy": {
+      "title": "Privacy",
+      "body": "Tutti i tuoi dati (CV, lavori, chat, chiavi) sono salvati in locale in un database SQLite nella tua cartella utente. Nulla viene inviato online tranne i prompt al provider AI scelto."
+    },
+    "version": {
+      "title": "Versione",
+      "changelog": "Changelog"
+    }
+  },
+  "tutorial": {
+    "stepLabel": "Passo {n} di 3",
+    "step1Title": "Configura un provider AI",
+    "step1Body": "Apri Impostazioni e incolla una chiave API — Groq è gratuito e pronto all'uso.",
+    "step2Title": "Carica il tuo CV",
+    "step2Body": "Apri Profilo e carica un PDF o DOCX. L'AI estrarrà skill, ruoli ed esperienza.",
+    "step3Title": "Lancia la prima scansione",
+    "step3Body": "In Job Search scegli filtri e parole chiave, poi avvia la scansione. Vedrai avanzamento dal vivo e risultati con punteggio AI.",
+    "openSettings": "Apri Impostazioni",
+    "openProfile": "Apri Profilo",
+    "openSearch": "Apri Job Search",
+    "next": "Avanti",
+    "back": "Indietro",
+    "finish": "Fine",
+    "skip": "Salta"
+  },
+  "errors": {
+    "noProviderToast": "Configura prima una chiave AI"
   }
 }

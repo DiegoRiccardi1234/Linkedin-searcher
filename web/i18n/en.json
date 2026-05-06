@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "jobSearch": "Job Search",
     "profile": "Profile",
-    "settings": "Settings"
+    "settings": "Settings",
+    "info": "Info"
   },
   "profile": {
     "title": "Your Profile",
@@ -38,7 +39,8 @@
     "delete": "Delete",
     "confirmDelete": "Delete this CV from the history? This cannot be undone.",
     "deleted": "Profile deleted",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "chipSaved": "Saved"
   },
   "jobSearch": {
     "title": "Job",
@@ -250,7 +252,16 @@
     "axisSeniority": "Seniority",
     "axisRemote": "Remote",
     "axisSalary": "Salary",
-    "axisContract": "Contract"
+    "axisContract": "Contract",
+    "requirements": "Key requirements",
+    "responsibilities": "Responsibilities",
+    "benefits": "Benefits",
+    "skillsMatch": "Skills match",
+    "skillsHave": "You have",
+    "skillsMissing": "You miss",
+    "postedBy": "Posted by",
+    "viewProfile": "View profile",
+    "pinToChat": "Pin to chat"
   },
   "scan": {
     "scanning": "Scanning job portals...",
@@ -266,7 +277,36 @@
     "feedStarted": "Searching for: <b>{terms}</b>",
     "feedScraped": "Found {found} ads on <b>{portal}</b>",
     "feedAnalyzed": "<b>{title}</b> @ {company}",
-    "feedMinimize": "Minimize"
+    "feedMinimize": "Minimize",
+    "progress": {
+      "scraping": "Scraping",
+      "analyzing": "Analyzing",
+      "eta": "ETA"
+    },
+    "filters": {
+      "experience": "Experience level",
+      "exp": {
+        "internship": "Internship",
+        "entry": "Entry",
+        "junior": "Junior",
+        "mid": "Mid",
+        "senior": "Senior"
+      },
+      "jobType": "Contract type",
+      "jt": {
+        "fulltime": "Full-time",
+        "parttime": "Part-time",
+        "contract": "Contract",
+        "temporary": "Temporary",
+        "internship": "Internship"
+      },
+      "workType": "Work mode",
+      "wt": {
+        "onsite": "On-site",
+        "hybrid": "Hybrid",
+        "remote": "Remote"
+      }
+    }
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",
@@ -295,7 +335,33 @@
     "keySaveError": "Key save error",
     "genError": "Generation error",
     "quickActionError": "Quick action error",
-    "quickPromptsUnavail": "Quick prompts unavailable"
+    "quickPromptsUnavail": "Quick prompts unavailable",
+    "jobUpdated": "Job updated",
+    "jobActionFailed": "Could not update job",
+    "job": {
+      "applied": "Marked as applied",
+      "rejected": "Marked as rejected",
+      "archived": "Job archived",
+      "open": "Reopened",
+      "interviewing": "Marked as interviewing"
+    },
+    "favoriteAdded": "Added to favorites",
+    "favoriteRemoved": "Removed from favorites",
+    "coverLetterReady": "Cover letter ready",
+    "coverLetterFailed": "Cover letter generation failed",
+    "coverLetterGenerating": "Generating cover letter...",
+    "modelsLoading": "Loading models...",
+    "modelsFailed": "Failed to load models",
+    "recsRefreshing": "Refreshing...",
+    "recsFailed": "Refresh failed",
+    "chatCreated": "New chat created",
+    "chatDeleted": "Chat deleted",
+    "chatRenamed": "Chat renamed",
+    "chatCreateFailed": "Could not create chat",
+    "chatDeleteFailed": "Could not delete chat",
+    "themeDark": "Dark theme",
+    "themeLight": "Light theme",
+    "languageChanged": "Language updated"
   },
   "update": {
     "title": "New version available",
@@ -326,7 +392,12 @@
       "pythonJobs": "Find Python jobs in Milan",
       "searchTerms": "Suggest search terms for a Junior QA role",
       "top5": "Recommend the top 5 jobs to apply for"
-    }
+    },
+    "defaultSession": "Default",
+    "confirmDeleteSession": "Delete this chat?",
+    "unpin": "Unpin",
+    "pinned": "Pinned to chat",
+    "pinFailed": "Pin failed"
   },
   "common": {
     "close": "Close",
@@ -340,7 +411,15 @@
     "stepScan": "Launch your first job scan",
     "stepChat": "Chat with the Career Coach",
     "gotoSettings": "Upload CV",
-    "dismiss": "Skip for now"
+    "dismiss": "Skip for now",
+    "step1Title": "Configure an AI provider key",
+    "step1Hint": "Groq is free and easy to start with.",
+    "step2Title": "Upload your CV",
+    "step2Hint": "PDF or DOCX — used by AI to score listings.",
+    "subtitle": "Two quick steps and you're ready to scan jobs.",
+    "openSettings": "Open Settings",
+    "openProfile": "Open Profile",
+    "hint": "You can explore the rest of the app freely while completing these."
   },
   "banner": {
     "noKey": "No AI provider configured — chat uses rule-based replies.",
@@ -348,6 +427,80 @@
     "signupHint": "Need a key? Both options are free, no credit card.",
     "signupCerebras": "Get a free Cerebras key",
     "signupGroq": "Get a Groq key",
-    "openSettings": "Open Settings"
+    "openSettings": "Open Settings",
+    "warningTitle": "Configure an AI provider key to start using Job Finder",
+    "warningHint": "Free options below — sign up takes a minute."
+  },
+  "postScan": {
+    "title": "Scan complete",
+    "found": "Found",
+    "new": "New",
+    "analyzed": "Analyzed",
+    "skipped": "Skipped",
+    "archived": "Archived",
+    "duration": "Duration",
+    "topMatches": "Top matches",
+    "viewList": "View list",
+    "noTop": "—"
+  },
+  "info": {
+    "title": "How Job",
+    "titleEm": "Finder works",
+    "subtitle": "A short tour of every feature so you can get the most out of the app.",
+    "what": {
+      "title": "What is Job Finder?",
+      "body": "Job Finder is a local AI-powered job search assistant. It reads your CV, scans LinkedIn and Indeed, scores listings against your profile, and helps you write targeted cover letters and prepare interviews."
+    },
+    "start": {
+      "title": "Getting started",
+      "step1": "Upload your CV in the Profile tab — Job Finder extracts your skills, experience and target roles.",
+      "step2": "Configure at least one AI provider key in Settings (Groq is free and easy to start).",
+      "step3": "Open Job Search, pick filters and keywords, then launch the scan.",
+      "step4": "Review results in the Dashboard and chat with the AI Coach about specific jobs."
+    },
+    "providers": {
+      "title": "AI providers",
+      "groq": "Free, fast, generous limits. Great default.",
+      "openrouter": "Access many models including free tiers.",
+      "cerebras": "Very low latency.",
+      "paid": "Paid, top-tier quality."
+    },
+    "scan": {
+      "title": "Scanning & filters",
+      "body": "In Job Search you can pick experience level (internship → senior), contract type (full-time, part-time, internship, contract, temporary) and work mode (remote, hybrid, on-site). The scan shows live progress with percentage and estimated time remaining."
+    },
+    "chat": {
+      "title": "Chat with the AI Coach",
+      "multi": "Multiple chats: use the dropdown next to the coach to switch between separate conversations, or start a new one.",
+      "pin": "Pin jobs to a chat: open a job's details and click \"Pin to chat\" to give the coach the full description, then ask questions like \"compare these two\".",
+      "cover": "Cover letter: from a job's detail panel you can generate a cover letter targeted at the recruiter when their info is visible on LinkedIn."
+    },
+    "privacy": {
+      "title": "Privacy",
+      "body": "All your data (CV, jobs, chats, keys) is stored locally in a SQLite database under your user folder. Nothing is uploaded except your prompts to the AI provider you choose."
+    },
+    "version": {
+      "title": "Version",
+      "changelog": "Changelog"
+    }
+  },
+  "tutorial": {
+    "stepLabel": "Step {n} of 3",
+    "step1Title": "Configure an AI provider",
+    "step1Body": "Open Settings and paste an API key — Groq is free and works out of the box.",
+    "step2Title": "Upload your CV",
+    "step2Body": "Open the Profile tab and upload a PDF or DOCX. The AI will extract your skills, roles and experience.",
+    "step3Title": "Launch your first scan",
+    "step3Body": "In Job Search, pick filters and keywords, then start the scan. You'll see live progress and AI-scored results.",
+    "openSettings": "Open Settings",
+    "openProfile": "Open Profile",
+    "openSearch": "Open Job Search",
+    "next": "Next",
+    "back": "Back",
+    "finish": "Finish",
+    "skip": "Skip"
+  },
+  "errors": {
+    "noProviderToast": "Configure an AI provider key first"
   }
 }

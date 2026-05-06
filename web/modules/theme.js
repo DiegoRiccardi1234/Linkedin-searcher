@@ -1,5 +1,8 @@
 // Theme toggle (light/dark) with localStorage persistence.
 
+import { showToast } from "./helpers.js";
+import { t } from "./i18n.js";
+
 function setIcon(theme) {
   const span = document.querySelector("#themeToggle .material-symbols-outlined");
   if (span) span.textContent = theme === "dark" ? "light_mode" : "dark_mode";
@@ -18,5 +21,9 @@ export function initTheme() {
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("theme", next);
     setIcon(next);
+    const label = next === "dark"
+      ? (t("toast.themeDark") || "Dark theme")
+      : (t("toast.themeLight") || "Light theme");
+    showToast(label, "info");
   });
 }
