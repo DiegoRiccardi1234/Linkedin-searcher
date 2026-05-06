@@ -14,6 +14,11 @@ def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
     return any(row[1] == column for row in cur.fetchall())
 
 
+def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    cur = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,))
+    return cur.fetchone() is not None
+
+
 def upgrade(conn: sqlite3.Connection) -> None:
     now = datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -32,15 +37,16 @@ def upgrade(conn: sqlite3.Connection) -> None:
         ("default", "", now, now),
     )
 
-    cur = conn.execute("SELECT DISTINCT session_id FROM chat_messages")
-    for (session_id,) in cur.fetchall():
-        if not session_id:
-            continue
-        conn.execute(
-            "INSERT OR IGNORE INTO chat_sessions(id, title, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?)",
-            (session_id, "", now, now),
-        )
+    if _table_exists(conn, "chat_messages"):
+        cur = conn.execute("SELECT DISTINCT session_id FROM chat_messages")
+        for (session_id,) in cur.fetchall():
+            if not session_id:
+                continue
+            conn.execute(
+                "INSERT OR IGNORE INTO chat_sessions(id, title, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?)",
+                (session_id, "", now, now),
+            )
 
     conn.execute(
         """
@@ -69,5 +75,7 @@ def upgrade(conn: sqlite3.Connection) -> None:
         """
     )
 
-    if not _column_exists(conn, "candidate_profiles", "name"):
+    if _table_exists(conn, "candidate_profiles") and not _column_exists(
+        conn, "candidate_profiles", "name"
+    ):
         conn.execute("ALTER TABLE candidate_profiles ADD COLUMN name TEXT")

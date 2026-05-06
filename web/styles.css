@@ -2179,6 +2179,175 @@ pre {
 .onb-hint { font-size: 0.82rem; opacity: 0.7; }
 .onboarding-hint { font-size: 0.85rem; opacity: 0.7; margin: 0.4rem 0 0; }
 
+/* v1.3.2: hide right-rail (chat coach) on specific views via JS toggle. */
+.right-rail.hidden { display: none !important; }
+
+/* ========== v1.3.2: Info view redesign ========== */
+.info-view { padding: 1.5rem 1rem; max-width: 1100px; margin: 0 auto; }
+.info-hero {
+  text-align: center;
+  margin-bottom: 1.6rem;
+  padding: 1.4rem 1rem;
+  background: linear-gradient(135deg, #f6f3ff 0%, #fff 70%);
+  border-radius: 14px;
+  border: 1px solid #e6e0fb;
+}
+.info-hero-icon { font-size: 2.4rem !important; color: var(--accent, #6c4ee0); }
+.info-hero h2 { font-size: 2rem; margin: 0.6rem 0 0.4rem; }
+.info-hero h2 em { font-style: normal; color: var(--accent, #6c4ee0); }
+.info-hero p { opacity: 0.7; margin: 0; }
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+.info-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #ececf3);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.info-card-wide { grid-column: 1 / -1; }
+.info-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border, #ececf3);
+}
+.info-card-head .material-symbols-outlined {
+  font-size: 1.4rem !important;
+  color: var(--accent, #6c4ee0);
+}
+.info-card-head h3 { margin: 0; font-size: 1.05rem; }
+.info-card p { line-height: 1.55; margin: 0.4rem 0; }
+.info-card .info-list { padding-left: 1.1rem; }
+.info-card .info-steps { padding-left: 1.1rem; line-height: 1.55; }
+.info-card .info-steps li { margin: 0.4rem 0; }
+
+.info-provider-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+}
+.info-provider-table th,
+.info-provider-table td {
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--border, #ececf3);
+  font-size: 0.92rem;
+  vertical-align: middle;
+}
+.info-provider-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  font-weight: 600;
+}
+.info-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.info-tag.free { background: #d8f5dd; color: #1a7f37; }
+.info-tag.mixed { background: #e6e0fb; color: #5a3fc0; }
+.info-tag.paid { background: #ffe1d6; color: #b04a16; }
+
+.info-card-version p { margin: 0.5rem 0; font-size: 1rem; }
+.info-card-version a { color: var(--accent, #6c4ee0); text-decoration: none; font-weight: 600; }
+.info-card-version a:hover { text-decoration: underline; }
+
+/* ========== v1.3.2: Job Search pill toggles + collapsible filters ========== */
+.scan-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.4rem;
+}
+
+.pill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #d4d4dc;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.pill-toggle:hover { border-color: var(--accent, #6c4ee0); }
+.pill-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.pill-toggle:has(input:checked) {
+  background: var(--accent, #6c4ee0);
+  border-color: var(--accent, #6c4ee0);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(108, 78, 224, 0.35);
+}
+.pill-toggle:has(input:checked):hover { filter: brightness(1.05); }
+
+.pill-toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.scan-advanced {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border, #ececf3);
+  border-radius: 12px;
+  background: var(--surface-2, #fafafd);
+  padding: 0;
+}
+.scan-advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  border-radius: 12px;
+}
+.scan-advanced > summary::-webkit-details-marker { display: none; }
+.scan-advanced[open] > summary { border-bottom: 1px solid var(--border, #ececf3); }
+.scan-advanced .scan-advanced-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+.scan-advanced[open] .scan-advanced-chevron { transform: rotate(180deg); }
+.scan-advanced .filter-group {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--border, #ececf3);
+}
+.scan-advanced .filter-group:first-of-type { border-top: none; }
+.scan-advanced .filter-group-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+
+
 /* Wizard 3-step tutorial */
 .wizard-card { max-width: 520px; }
 .wizard-stepper {

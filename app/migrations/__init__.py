@@ -84,28 +84,35 @@ def _has_table(conn: sqlite3.Connection, name: str) -> bool:
     return cur.fetchone() is not None
 
 
+#: Last migration version that shipped before the migration tracker was a hard
+#: requirement. Any pre-existing DB without ``schema_version`` is assumed to
+#: be at this version, so future migrations (>BASELINE_VERSION) still apply.
+#: Bump this only after a full release cycle where every user is past it.
+BASELINE_VERSION = 4
+
+
 def apply_migrations(conn: sqlite3.Connection) -> int:
     """Apply pending migrations. Returns the version reached.
 
-    Baseline detection: if ``schema_version`` is missing and the ``jobs`` table
-    already exists (DB predates the migration system), the tracker is seeded
-    with the highest known migration version and no ``upgrade`` runs.
+    Baseline detection: if ``schema_version`` is missing but the ``jobs`` table
+    already exists (DB predates the migration tracker), seed the tracker at
+    :data:`BASELINE_VERSION` and continue. Migrations newer than the baseline
+    still run — every migration uses idempotent guards (``IF NOT EXISTS``,
+    ``INSERT OR IGNORE``, ``ALTER`` with column-existence check) so re-running
+    one against a partially-applied DB is safe.
     """
     migrations = _discover()
-    latest = migrations[-1].version if migrations else 0
 
     tracker_exists = _has_table(conn, "schema_version")
     jobs_exists = _has_table(conn, "jobs")
     _ensure_tracker_table(conn)
 
-    if not tracker_exists and jobs_exists and latest > 0:
-        # Baseline: pre-existing DB, assume it's already at the latest known schema.
+    if not tracker_exists and jobs_exists:
         conn.execute(
             "INSERT OR IGNORE INTO schema_version(version, applied_at) VALUES (?, ?)",
-            (latest, _iso_now()),
+            (BASELINE_VERSION, _iso_now()),
         )
         conn.commit()
-        return latest
 
     current = _current_version(conn)
     for migration in migrations:

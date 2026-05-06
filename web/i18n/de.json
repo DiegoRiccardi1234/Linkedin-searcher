@@ -305,7 +305,8 @@
         "onsite": "Vor Ort",
         "hybrid": "Hybrid",
         "remote": "Remote"
-      }
+      },
+      "advanced": "Erweiterte Filter"
     }
   },
   "toast": {
@@ -463,7 +464,12 @@
       "groq": "Kostenlos, schnell, großzügig. Toller Standard.",
       "openrouter": "Zugang zu vielen Modellen, auch kostenlos.",
       "cerebras": "Sehr geringe Latenz.",
-      "paid": "Kostenpflichtig, Top-Qualität."
+      "paid": "Kostenpflichtig, Top-Qualität.",
+      "col": {
+        "name": "Anbieter",
+        "cost": "Kosten",
+        "notes": "Hinweise"
+      }
     },
     "scan": {
       "title": "Scan & Filter",

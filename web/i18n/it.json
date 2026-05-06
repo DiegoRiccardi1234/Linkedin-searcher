@@ -305,7 +305,8 @@
         "onsite": "In sede",
         "hybrid": "Ibrido",
         "remote": "Remoto"
-      }
+      },
+      "advanced": "Filtri avanzati"
     }
   },
   "toast": {
@@ -463,7 +464,12 @@
       "groq": "Gratuito, veloce, generoso. Ottimo default.",
       "openrouter": "Accesso a molti modelli, inclusi tier gratuiti.",
       "cerebras": "Latenza molto bassa.",
-      "paid": "A pagamento, qualità top."
+      "paid": "A pagamento, qualità top.",
+      "col": {
+        "name": "Provider",
+        "cost": "Costo",
+        "notes": "Note"
+      }
     },
     "scan": {
       "title": "Scansione e filtri",

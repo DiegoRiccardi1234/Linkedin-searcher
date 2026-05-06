@@ -288,7 +288,7 @@ CHIP_TEMPLATES: dict[str, dict[str, str]] = {
 }
 
 
-def suggest_chat_prompts(db: Database, lang: str = "en", limit: int = 5) -> list[str]:
+def suggest_chat_prompts(db: Database, lang: str = "en", limit: int = 2) -> list[str]:
     """Return localized, CV-derived quick-prompt suggestions for the chat.
 
     No CV → onboarding prompts. CV present → detect signals in the markdown

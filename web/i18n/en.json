@@ -305,7 +305,8 @@
         "onsite": "On-site",
         "hybrid": "Hybrid",
         "remote": "Remote"
-      }
+      },
+      "advanced": "Advanced filters"
     }
   },
   "toast": {
@@ -463,7 +464,12 @@
       "groq": "Free, fast, generous limits. Great default.",
       "openrouter": "Access many models including free tiers.",
       "cerebras": "Very low latency.",
-      "paid": "Paid, top-tier quality."
+      "paid": "Paid, top-tier quality.",
+      "col": {
+        "name": "Provider",
+        "cost": "Cost",
+        "notes": "Notes"
+      }
     },
     "scan": {
       "title": "Scanning & filters",

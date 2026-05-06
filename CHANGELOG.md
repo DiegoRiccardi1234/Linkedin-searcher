@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-05-06
+
+UX polish + critical migration baseline fix.
+
+### Fixed
+- **Migration baseline skipped 005 on existing v1.2.x DBs** — `apply_migrations` used to seed the tracker at the highest known version when no `schema_version` table existed, which meant any user upgrading from v1.2.8 → v1.3.0 had migration 005 silently skipped, leaving them without the `chat_sessions` / `pinned_jobs` / `recruiters` tables and the `candidate_profiles.name` column. Result: empty chat-session dropdown, broken new/delete buttons, broken pin-to-chat flow. Fix: introduced `BASELINE_VERSION = 4` constant; baseline now seeds at the last v1.2.x version and pending migrations after it run normally. All v1.3.0 migrations are idempotent (`IF NOT EXISTS`, `INSERT OR IGNORE`, column-existence check) so re-running them on partially-applied DBs is safe.
+- **Chat session dropdown empty** — `refreshChatSessions` swallowed fetch errors and left `ChatSessions.list = []`. Now always falls back to a synthetic `default` session so the dropdown is never empty, even if the backend is unreachable.
+- **Post-scan summary modal didn't appear** — the show call was wrapped in a silent `try { ... } catch (_) {}` and ran *before* the scan overlay closed, so any error vanished and the modal could be covered. Now we close the scan overlay first, then show the modal, and log errors to the console so regressions surface.
+
+### Changed
+- **Chat sidebar hidden on the Info view** — the `right-rail` aside used to overlap the Info docs. `activateView('info')` now toggles `.hidden` on it. Other views keep the sidebar.
+- **Chat suggestions capped at 2** — server-side default `suggest_chat_prompts(limit=2)`; frontend `loadChatPrompts` slices to 2 as a safety. Empty-state suggestions reduced from 4 to 2 keys.
+- **Info view redesigned** — auto-fit grid of cards, icon per card, `<table>` for the AI providers section with cost tags (Free / Mixed / Paid). Less vertical scroll, easier to scan.
+- **Job Search filters made compact** — Experience / Contract / Work-mode checkboxes converted to **pill-toggle groups** inside a collapsible `<details class="scan-advanced">` (closed by default). LinkedIn / Indeed / Remote stay as quick toggles above. Single-page form is now visually concise without losing options.
+
+### Added
+- New i18n keys: `info.providers.col.{name,cost,notes}`, `scan.filters.advanced` — translated into all 5 supported languages.
+
 ## [1.3.1] — 2026-05-06
 
 Critical updater hotfix.

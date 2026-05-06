@@ -534,6 +534,11 @@ function activateView(viewName) {
     btn.classList.toggle("is-active", target === viewName);
     btn.classList.remove("tab-locked");
   });
+
+  // v1.3.2: hide the chat coach sidebar on the Info view so reading docs
+  // is not crowded by the chat panel. Other views keep it for quick access.
+  const rail = document.querySelector(".right-rail");
+  if (rail) rail.classList.toggle("hidden", viewName === "info");
 }
 
 function roleLabel(role) {
@@ -1041,7 +1046,8 @@ async function loadChatPrompts() {
   wrap.innerHTML = "";
   try {
     const payload = await api(`/api/chat/prompts?lang=${encodeURIComponent(getCurrentLang() || "en")}`);
-    const prompts = payload.prompts || [];
+    // Cap to 2 — even if the backend ever returns more, the UI stays tidy.
+    const prompts = (payload.prompts || []).slice(0, 2);
     for (const prompt of prompts) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -1586,8 +1592,20 @@ document.getElementById("scanForm").addEventListener("submit", async (event) => 
         setProgress(100, t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));
         appendFeed("task_alt", t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));
         evtSource.close();
-        try { showPostScanModal(data, lastTopJobs); } catch (_) {}
-        setTimeout(() => { overlay.style.display = "none"; overlay.classList.remove("minimized"); }, 800);
+        // Close the scan overlay first so the post-scan modal isn't covered
+        // by it. Stash the data on closure since the SSE event won't repeat.
+        const completeData = data;
+        const completeTops = lastTopJobs.slice();
+        setTimeout(() => {
+          overlay.style.display = "none";
+          overlay.classList.remove("minimized");
+          try {
+            showPostScanModal(completeData, completeTops);
+          } catch (err) {
+            console.error("post-scan modal failed:", err);
+            showToast("Scan complete (post-scan summary failed to render)", "info");
+          }
+        }, 600);
         Promise.all([loadJobs(), loadRecommendations()]);
       } else if (data.error) {
         progressText.textContent = `${t("scan.error")}: ${data.error}`;
@@ -2255,8 +2273,6 @@ async function runBundleUpdate(log) {
 // ─── Chat empty state + first-time tutorial ─────────────────────
 const CHAT_SUGGESTION_KEYS = [
   'chat.suggestions.roles',
-  'chat.suggestions.pythonJobs',
-  'chat.suggestions.searchTerms',
   'chat.suggestions.top5',
 ];
 
@@ -2530,14 +2546,27 @@ async function initChatSessions() {
 }
 
 async function refreshChatSessions() {
+  let sessions = [];
   try {
-    const res = await fetch("/api/chat/sessions").then((r) => r.json());
-    ChatSessions.list = res.sessions || [];
-    if (!ChatSessions.list.find((s) => s.id === ChatSessions.active)) {
-      ChatSessions.active = "default";
-      localStorage.setItem("activeChatSession", ChatSessions.active);
+    const res = await fetch("/api/chat/sessions");
+    if (res.ok) {
+      const payload = await res.json();
+      sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+    } else {
+      console.warn("chat sessions fetch returned", res.status);
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn("chat sessions fetch failed", err);
+  }
+  // Always guarantee a usable list — the dropdown must never be empty.
+  if (!sessions.length) {
+    sessions = [{ id: "default", title: "", created_at: "", updated_at: "" }];
+  }
+  ChatSessions.list = sessions;
+  if (!ChatSessions.list.find((s) => s.id === ChatSessions.active)) {
+    ChatSessions.active = ChatSessions.list[0].id;
+    localStorage.setItem("activeChatSession", ChatSessions.active);
+  }
 }
 
 function renderChatSessionDropdown() {
