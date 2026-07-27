@@ -18,7 +18,7 @@ from app.models import (
 from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
 from app.services.onboarding import onboarding_context
-from app.services.scanner_service import analyze_offer
+from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer
 from app.services.skill_gap import compute_skill_gap, suggest_learning
 
 if TYPE_CHECKING:
@@ -52,6 +52,7 @@ def build_router(container: AppContainer) -> APIRouter:
         search_text: str | None = Query(default=None),
         min_score: int | None = Query(default=None, ge=0, le=10),
         max_age_days: int | None = Query(default=None, ge=1, le=365),
+        applicable_only: bool = Query(default=False),
         limit: int = Query(default=200, ge=1, le=2000),
     ) -> dict[str, Any]:
         jobs = container.db.list_jobs(
@@ -64,6 +65,14 @@ def build_router(container: AppContainer) -> APIRouter:
             max_age_days=max_age_days,
             limit=limit,
         )
+        if applicable_only:
+            jobs = [job for job in jobs if not (set(job.get("flags") or []) & BLOCKING_FLAGS)]
+        # The list view renders none of these, and they are by far the heaviest
+        # columns (a full posting is ~5k chars; 200 of them is megabytes per
+        # refresh). The detail endpoint still serves them.
+        for job in jobs:
+            for heavy in ("descrizione", "analysis_json", "sources_json"):
+                job.pop(heavy, None)
         return {"jobs": jobs}
 
     @router.get("/api/jobs/{job_id}")

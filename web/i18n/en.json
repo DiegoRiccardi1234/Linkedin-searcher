@@ -213,7 +213,24 @@
     "deleteAllTitle": "Delete all jobs",
     "alsoOn": "Also on",
     "openPosting": "Open posting",
-    "archived": "Archived"
+    "archived": "Archived",
+    "applicableOnly": "Applicable",
+    "applicableOnlyHint": "Hide jobs blocked by location or degree requirements",
+    "flag": {
+      "geo": "Outside the EU",
+      "geoLong": "Based outside the EU and the posting doesn't offer EU-remote work",
+      "grade": "Grade requirement",
+      "gig": "Task work",
+      "gigLong": "Paid per task, no guaranteed hours — not employment",
+      "salary": "Below your minimum",
+      "salaryLong": "The declared pay is below the minimum you set",
+      "shortDesc": "Short description",
+      "heuristic": "Local estimate"
+    },
+    "freshness": {
+      "daysAgo": "Last seen {n} days ago",
+      "likelyExpired": "Probably expired"
+    }
   },
   "kanbanCols": {
     "open": "Open",
@@ -393,7 +410,8 @@
     "copied": "Copied",
     "generateRecruiterMsg": "Recruiter message",
     "recruiterMsg": "Recruiter message",
-    "engagement": "Engagement type"
+    "engagement": "Engagement type",
+    "axisSalaryUnknown": "No source publishes the pay for this posting"
   },
   "scan": {
     "scanning": "Scanning job portals...",
@@ -743,5 +761,16 @@
     "namePrompt": "Name this search:",
     "saved": "Search saved",
     "loaded": "Running: {name}"
+  },
+  "compare": {
+    "title": "Compare offers",
+    "open": "Compare",
+    "clear": "Clear",
+    "pick": "Add to comparison",
+    "selected": "{n} selected",
+    "maxReached": "You can compare up to {n} offers",
+    "needTwo": "Pick at least two offers to compare",
+    "loading": "Loading…",
+    "error": "Couldn't load the comparison"
   }
 }

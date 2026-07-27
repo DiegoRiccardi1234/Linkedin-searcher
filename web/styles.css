@@ -2740,3 +2740,63 @@ pre {
 .kanban-col.drag-over { outline: 2px dashed var(--accent); outline-offset: -4px; background: var(--accent-soft, rgba(99, 102, 241, 0.08)); }
 .kanban-card-actions { display: flex; gap: 0.4rem; align-items: center; margin-top: 8px; }
 .kanban-status { font-size: 0.72rem; padding: 0.15rem 0.3rem; border: 1px solid var(--border); border-radius: 0.4rem; background: inherit; color: inherit; }
+
+/* Why a score is what it is (v1.7.7): the deterministic checks used to cap a
+   score and say nothing, so a job you legally cannot take arrived as a bare
+   3/10. Codes come from the backend (scanner_service), labels from i18n. */
+.job-flags { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; vertical-align: middle; }
+.job-flag {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  padding: 0.05rem 0.35rem; border-radius: 0.4rem;
+  font-size: 0.68rem; line-height: 1.5; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.job-flag .material-symbols-outlined { font-size: 0.85rem; }
+.flag-block { background: rgba(220, 38, 38, 0.12); border-color: rgba(220, 38, 38, 0.35); color: #b91c1c; }
+.flag-warn { background: rgba(217, 119, 6, 0.12); border-color: rgba(217, 119, 6, 0.32); color: #b45309; }
+.flag-info { background: rgba(100, 116, 139, 0.14); border-color: rgba(100, 116, 139, 0.3); color: #475569; }
+[data-theme="dark"] .flag-block { color: #fca5a5; }
+[data-theme="dark"] .flag-warn { color: #fcd34d; }
+[data-theme="dark"] .flag-info { color: #cbd5e1; }
+.kanban-card .job-flags { margin-top: 6px; }
+
+/* Per-axis explanation under the radar: derived from data we already have. */
+.axis-reasons { margin: 0.6rem 0 0; padding-left: 1.1rem; color: var(--text-dim, #64748b); }
+.axis-reasons li { margin-bottom: 0.2rem; }
+
+/* Sortable table headers */
+th.th-sort { cursor: pointer; user-select: none; }
+th.th-sort:hover { color: var(--accent, #635bff); }
+th.th-sort.is-sorted::after { content: " ^"; font-size: 0.7em; }
+th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; }
+
+/* Model track record in Settings */
+.probe-scoreboard { margin-top: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.4rem; }
+.probe-scoreboard-title { opacity: 0.7; margin-bottom: 0.25rem; }
+
+/* Compare drawer (v1.7.7) */
+.compare-bar {
+  position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 0.6rem; z-index: 900;
+  padding: 0.5rem 0.8rem; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
+}
+.compare-bar.hidden { display: none; }
+.compare-card { width: min(1100px, 96vw); max-height: 90vh; overflow-y: auto; }
+.compare-body { display: flex; gap: 0.9rem; align-items: flex-start; flex-wrap: wrap; }
+.compare-col { flex: 1 1 260px; min-width: 240px; border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.7rem; }
+.compare-head { text-align: center; margin-bottom: 0.5rem; }
+.compare-head .job-flags { justify-content: center; margin-top: 0.35rem; }
+.compare-axes { width: 100%; font-size: 0.78rem; margin: 0.4rem 0; }
+.compare-axes td { padding: 0.12rem 0; }
+.compare-num { text-align: right; font-variant-numeric: tabular-nums; }
+.compare-label { margin-top: 0.5rem; opacity: 0.7; }
+.compare-list { margin: 0.15rem 0 0; padding-left: 1.05rem; font-size: 0.78rem; }
+.compare-list.missing li { color: #b45309; }
+[data-theme="dark"] .compare-list.missing li { color: #fcd34d; }
+.compare-pick { display: inline-flex; align-items: center; gap: 0.15rem; cursor: pointer; vertical-align: middle; margin-right: 0.3rem; }
+.compare-pick .material-symbols-outlined { font-size: 1rem; opacity: 0.65; }
+@media (max-width: 720px) {
+  .compare-body { flex-direction: column; }
+}

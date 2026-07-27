@@ -213,7 +213,24 @@
     "deleteAllTitle": "Elimina tutti i lavori",
     "alsoOn": "Anche su",
     "openPosting": "Apri annuncio",
-    "archived": "Archiviata"
+    "archived": "Archiviata",
+    "applicableOnly": "Candidabili",
+    "applicableOnlyHint": "Nascondi le offerte bloccate da sede o titolo di studio",
+    "flag": {
+      "geo": "Fuori UE",
+      "geoLong": "Sede fuori UE e l'annuncio non apre al lavoro remoto dall'UE",
+      "grade": "Voto minimo",
+      "gig": "Lavoro a task",
+      "gigLong": "Pagamento a task, nessun monte ore garantito: non è un'assunzione",
+      "salary": "Sotto la tua RAL minima",
+      "salaryLong": "La retribuzione dichiarata è sotto la minima che hai impostato",
+      "shortDesc": "Descrizione breve",
+      "heuristic": "Stima locale"
+    },
+    "freshness": {
+      "daysAgo": "Vista {n} giorni fa",
+      "likelyExpired": "Probabilmente scaduta"
+    }
   },
   "kanbanCols": {
     "open": "Aperto",
@@ -393,7 +410,8 @@
     "copied": "Copiato",
     "generateRecruiterMsg": "Messaggio recruiter",
     "recruiterMsg": "Messaggio recruiter",
-    "engagement": "Tipo di ingaggio"
+    "engagement": "Tipo di ingaggio",
+    "axisSalaryUnknown": "Nessuna fonte dichiara la retribuzione di questo annuncio"
   },
   "scan": {
     "scanning": "Scansione portali lavoro...",
@@ -743,5 +761,16 @@
     "namePrompt": "Nome della ricerca:",
     "saved": "Ricerca salvata",
     "loaded": "Avvio: {name}"
+  },
+  "compare": {
+    "title": "Confronta offerte",
+    "open": "Confronta",
+    "clear": "Azzera",
+    "pick": "Aggiungi al confronto",
+    "selected": "{n} selezionate",
+    "maxReached": "Puoi confrontare al massimo {n} offerte",
+    "needTwo": "Seleziona almeno due offerte da confrontare",
+    "loading": "Caricamento…",
+    "error": "Impossibile caricare il confronto"
   }
 }

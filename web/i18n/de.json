@@ -213,7 +213,24 @@
     "deleteAllTitle": "Alle Jobs löschen",
     "alsoOn": "Auch auf",
     "openPosting": "Anzeige öffnen",
-    "archived": "Archiviert"
+    "archived": "Archiviert",
+    "applicableOnly": "Bewerbbar",
+    "applicableOnlyHint": "Stellen ausblenden, die an Standort oder Abschluss scheitern",
+    "flag": {
+      "geo": "Außerhalb der EU",
+      "geoLong": "Standort außerhalb der EU, ohne Remote-Option aus der EU",
+      "grade": "Mindestnote",
+      "gig": "Aufgabenbasiert",
+      "gigLong": "Bezahlung pro Aufgabe, keine garantierten Stunden — keine Anstellung",
+      "salary": "Unter deinem Minimum",
+      "salaryLong": "Die angegebene Vergütung liegt unter deinem Minimum",
+      "shortDesc": "Kurze Beschreibung",
+      "heuristic": "Lokale Schätzung"
+    },
+    "freshness": {
+      "daysAgo": "Zuletzt vor {n} Tagen gesehen",
+      "likelyExpired": "Wahrscheinlich abgelaufen"
+    }
   },
   "kanbanCols": {
     "open": "Offen",
@@ -393,7 +410,8 @@
     "copied": "Kopiert",
     "generateRecruiterMsg": "Recruiter-Nachricht",
     "recruiterMsg": "Recruiter-Nachricht",
-    "engagement": "Art der Beschäftigung"
+    "engagement": "Art der Beschäftigung",
+    "axisSalaryUnknown": "Keine Quelle nennt die Vergütung dieser Stelle"
   },
   "scan": {
     "scanning": "Jobportale werden gescannt...",
@@ -743,5 +761,16 @@
     "namePrompt": "Name der Suche:",
     "saved": "Suche gespeichert",
     "loaded": "Starte: {name}"
+  },
+  "compare": {
+    "title": "Angebote vergleichen",
+    "open": "Vergleichen",
+    "clear": "Leeren",
+    "pick": "Zum Vergleich hinzufügen",
+    "selected": "{n} ausgewählt",
+    "maxReached": "Du kannst bis zu {n} Angebote vergleichen",
+    "needTwo": "Wähle mindestens zwei Angebote zum Vergleich",
+    "loading": "Wird geladen…",
+    "error": "Vergleich konnte nicht geladen werden"
   }
 }

@@ -97,6 +97,23 @@ def _parse_sources(raw: Any) -> list[dict[str, str]]:
     return data if isinstance(data, list) else []
 
 
+def _analysis_flags(raw: Any) -> list[str]:
+    """The stored analysis's flag codes (``blocchi``), or an empty list.
+
+    Lifted out of the JSON blob so the job list can badge and filter on "you
+    can't legally take this" without every caller parsing the analysis itself.
+    See ``app.services.scanner_service`` for the codes.
+    """
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    flags = data.get("blocchi") if isinstance(data, dict) else None
+    return [str(f) for f in flags] if isinstance(flags, list) else []
+
+
 def _merge_source(sources: list[dict[str, str]], fonte: str, link: str) -> list[dict[str, str]]:
     """Append ``{fonte, link}`` unless an entry with the same link already exists."""
     link_norm = (link or "").strip().lower()
@@ -542,6 +559,7 @@ class Database:
             raw["is_favorite"] = bool(raw.get("is_favorite", 0))
             raw["is_new"] = bool(raw.get("is_new", 0))
             raw["sources"] = _parse_sources(raw.get("sources_json"))
+            raw["flags"] = _analysis_flags(raw.get("analysis_json"))
             output.append(raw)
         return output
 

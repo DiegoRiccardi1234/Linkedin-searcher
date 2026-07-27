@@ -45,7 +45,8 @@ import {
   wireReminderEditor,
 } from "./modules/reminders.js";
 import { initSavedSearches, loadSavedSearches } from "./modules/saved_searches.js";
-import { initJobList, loadJobs } from "./modules/job_list.js";
+import { initJobList, initJobSorting, loadJobs } from "./modules/job_list.js";
+import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
   showJobDetail,
@@ -880,6 +881,8 @@ document.getElementById("minScore").addEventListener("change", loadJobs);
 document.getElementById("maxAgeDays").addEventListener("change", loadJobs);
 document.getElementById("statusFilter").addEventListener("change", loadJobs);
 document.getElementById("remoteOnly").addEventListener("change", loadJobs);
+document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
+initJobSorting();
 {
   const usageRangeSel = document.getElementById("usageRange");
   if (usageRangeSel) usageRangeSel.addEventListener("change", () => loadUsage());
@@ -1106,7 +1109,14 @@ async function bootstrap() {
   await initI18n();
   refreshModelPickerLabel();
   initJobDetail({ pinJobToActiveSession });
-  initJobList({ showJobDetail, performJobAction, toggleFavorite });
+  initJobList({
+    showJobDetail,
+    performJobAction,
+    toggleFavorite,
+    isCompareSelected: isSelected,
+    toggleCompare,
+  });
+  initCompare();
   initScan({ getKeywords, getLocations, ensureProviderConfigured });
   setupSharedLayout();
   activateView("dashboard");

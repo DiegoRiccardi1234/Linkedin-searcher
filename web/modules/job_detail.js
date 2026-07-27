@@ -5,7 +5,14 @@
 import { api, escapeHtml, setText, showToast } from "./helpers.js";
 import { t } from "./i18n.js";
 import { appState } from "./state.js";
-import { scoreCell, normalizeJobStatus, fmtDate, loadJobs } from "./job_list.js";
+import {
+  scoreCell,
+  normalizeJobStatus,
+  fmtDate,
+  loadJobs,
+  flagBadgesHtml,
+  freshnessHtml,
+} from "./job_list.js";
 import { reminderEditorHtml, wireReminderEditor } from "./reminders.js";
 import { setupGenerationButton } from "./features.js";
 
@@ -79,6 +86,50 @@ function renderMatchRadar(axes) {
       },
     },
   });
+}
+
+// Why each axis reads the way it does — derived from data the app already has,
+// so the radar stops being decorative without costing a single extra token.
+function axisReasonsHtml(analysis) {
+  const axes = (analysis && analysis.match_axes) || {};
+  const skills = (analysis && analysis.skills_match) || {};
+  const flags = new Set(analysis?.blocchi || []);
+  // The blockers are listed under "missing" too, but they are not missing
+  // SKILLS — showing "outside the EU: needs a visa" as a skill gap reads as if
+  // the candidate could go and learn it. Each blocker gets its own row below.
+  const blockerTexts = new Set(Object.values(analysis?.blocchi_dettaglio || {}));
+  const missing = (Array.isArray(skills.mancano) ? skills.mancano : [])
+    .filter((item) => !blockerTexts.has(item))
+    .slice(0, 3);
+  const rows = [];
+  if (axes.skills_match !== undefined && missing.length) {
+    rows.push([t("offcanvas.axisSkills"), missing.join(", ")]);
+  }
+  if (flags.has("geo_non_ue")) {
+    rows.push([t("offcanvas.axisRemote"), t("jobs.flag.geoLong")]);
+  }
+  if (flags.has("voto_minimo")) {
+    rows.push([
+      t("offcanvas.axisSeniority"),
+      analysis?.blocchi_dettaglio?.voto_minimo || t("jobs.flag.grade"),
+    ]);
+  }
+  if (flags.has("ral_sotto_minima")) {
+    rows.push([t("offcanvas.axisSalary"), t("jobs.flag.salaryLong")]);
+  } else if (axes.salary_match === null || axes.salary_match === undefined) {
+    rows.push([t("offcanvas.axisSalary"), t("offcanvas.axisSalaryUnknown")]);
+  }
+  if (flags.has("lavoro_a_task")) {
+    rows.push([t("offcanvas.axisContract"), t("jobs.flag.gigLong")]);
+  }
+  if (!rows.length) return "";
+  const items = rows
+    .map(
+      ([axis, why]) =>
+        `<li><strong>${escapeHtml(axis)}:</strong> ${escapeHtml(String(why))}</li>`,
+    )
+    .join("");
+  return `<ul class="axis-reasons micro">${items}</ul>`;
 }
 
 async function renderTimeline(jobId) {
@@ -246,6 +297,10 @@ export async function showJobDetail(jobId) {
     if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
       ralSpan = `<div class="info-tag"><strong>RAL:</strong> ${escapeHtml(analysis.ral_stimata)}</div>`;
     }
+    // The reasons a score is capped, as badges instead of a sentence glued to
+    // the front of the weakness line.
+    const badges = flagBadgesHtml(analysis?.blocchi) + freshnessHtml(job.last_seen_at);
+    const flagsRow = badges ? `<div class="job-flags mt-8">${badges}</div>` : "";
     // Analyses stored before the rename still carry the old, name-bearing keys.
     const strengths = analysis ? analysis.punti_forza || analysis.punti_forza_per_diego : null;
     const weaknesses = analysis ? analysis.punti_deboli || analysis.punti_deboli_per_diego : null;
@@ -263,6 +318,7 @@ export async function showJobDetail(jobId) {
             <h4>${t("offcanvas.matchScore")}</h4>
             <div class="score-xl ${sc.cls}">${sc.text}</div>
             <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
+            ${flagsRow}
           </div>
           <div class="info-card">
             <h4>${t("offcanvas.positionDetails")}</h4>
@@ -288,6 +344,7 @@ export async function showJobDetail(jobId) {
         <div class="mt-16 info-card">
           <h4>${t("offcanvas.breakdown")}</h4>
           <canvas id="detailMatchRadar" height="220"></canvas>
+          ${axisReasonsHtml(analysis)}
         </div>
         ${requisitiBlock}
         ${responsabilitaBlock}

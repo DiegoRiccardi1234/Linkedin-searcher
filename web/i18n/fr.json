@@ -213,7 +213,24 @@
     "deleteAllTitle": "Supprimer toutes les offres",
     "alsoOn": "Aussi sur",
     "openPosting": "Ouvrir l'offre",
-    "archived": "Archivée"
+    "archived": "Archivée",
+    "applicableOnly": "Éligibles",
+    "applicableOnlyHint": "Masquer les offres bloquées par le lieu ou le diplôme",
+    "flag": {
+      "geo": "Hors UE",
+      "geoLong": "Poste hors UE, sans télétravail depuis l'UE",
+      "grade": "Note minimale",
+      "gig": "Travail à la tâche",
+      "gigLong": "Payé à la tâche, sans heures garanties — ce n'est pas un emploi",
+      "salary": "Sous ton minimum",
+      "salaryLong": "La rémunération annoncée est inférieure à ton minimum",
+      "shortDesc": "Description courte",
+      "heuristic": "Estimation locale"
+    },
+    "freshness": {
+      "daysAgo": "Vue il y a {n} jours",
+      "likelyExpired": "Probablement expirée"
+    }
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -393,7 +410,8 @@
     "copied": "Copié",
     "generateRecruiterMsg": "Message au recruteur",
     "recruiterMsg": "Message au recruteur",
-    "engagement": "Type d'engagement"
+    "engagement": "Type d'engagement",
+    "axisSalaryUnknown": "Aucune source ne publie la rémunération de cette offre"
   },
   "scan": {
     "scanning": "Scan des portails d'emploi...",
@@ -743,5 +761,16 @@
     "namePrompt": "Nom de la recherche :",
     "saved": "Recherche enregistrée",
     "loaded": "Lancement : {name}"
+  },
+  "compare": {
+    "title": "Comparer les offres",
+    "open": "Comparer",
+    "clear": "Effacer",
+    "pick": "Ajouter à la comparaison",
+    "selected": "{n} sélectionnées",
+    "maxReached": "Tu peux comparer jusqu'à {n} offres",
+    "needTwo": "Sélectionne au moins deux offres à comparer",
+    "loading": "Chargement…",
+    "error": "Impossible de charger la comparaison"
   }
 }

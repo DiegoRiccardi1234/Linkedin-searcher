@@ -78,6 +78,24 @@
 
   <div id="jobDetailBackdrop" class="job-detail-backdrop hidden"></div>
 
+  <!-- Side-by-side comparison: the table could show that a job is a 6, never
+       how it differs from the other 6 sitting next to it. -->
+  <div id="compareModal" class="mini-modal hidden" role="dialog" aria-modal="true">
+    <div class="mini-modal-card compare-card">
+      <div class="mini-modal-head">
+        <h3 data-i18n="compare.title">Compare offers</h3>
+        <button type="button" class="icon-btn" data-close-compare aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div id="compareBody" class="compare-body"></div>
+    </div>
+  </div>
+
+  <div id="compareBar" class="compare-bar hidden">
+    <span id="compareCount" class="micro"></span>
+    <button type="button" id="compareOpenBtn" class="primary" data-i18n="compare.open">Compare</button>
+    <button type="button" id="compareClearBtn" class="ghost-btn" data-i18n="compare.clear">Clear</button>
+  </div>
+
   <div id="manualJobModal" class="mini-modal hidden" role="dialog" aria-modal="true">
     <div class="mini-modal-card">
       <div class="mini-modal-head">
@@ -323,6 +341,7 @@
           <label class="filter-check"><input id="onlyFavorites" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">favorite</span> <span data-i18n="jobs.favorites">Favorites</span></label>
           <label class="filter-check"><input id="onlyNew" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">fiber_new</span> <span data-i18n="jobs.new">New</span></label>
           <label class="filter-check"><input id="remoteOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">home_work</span> <span data-i18n="jobs.remote">Remote</span></label>
+          <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
           <select id="statusFilter">
             <option value="" data-i18n="jobs.allStatuses">All statuses</option>
             <option value="open" data-i18n="jobs.open">Open</option>
@@ -340,11 +359,11 @@
           <table>
             <thead>
               <tr>
-                <th data-i18n="jobs.score">Score</th>
+                <th class="th-sort" data-sort="punteggio_ai" data-i18n="jobs.score">Score</th>
                 <th data-i18n="jobs.colStatus">Status</th>
-                <th data-i18n="jobs.title">Title</th>
-                <th data-i18n="jobs.company">Company</th>
-                <th data-i18n="jobs.location">Location</th>
+                <th class="th-sort" data-sort="titolo" data-i18n="jobs.title">Title</th>
+                <th class="th-sort" data-sort="azienda" data-i18n="jobs.company">Company</th>
+                <th class="th-sort" data-sort="sede" data-i18n="jobs.location">Location</th>
                 <th data-i18n="jobs.source">Source</th>
                 <th data-i18n="jobs.advice">Advice</th>
                 <th data-i18n="jobs.detail">Detail</th>

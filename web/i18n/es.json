@@ -213,7 +213,24 @@
     "deleteAllTitle": "Eliminar todos los empleos",
     "alsoOn": "También en",
     "openPosting": "Abrir oferta",
-    "archived": "Archivada"
+    "archived": "Archivada",
+    "applicableOnly": "Aplicables",
+    "applicableOnlyHint": "Oculta las ofertas bloqueadas por ubicación o titulación",
+    "flag": {
+      "geo": "Fuera de la UE",
+      "geoLong": "Ubicación fuera de la UE y la oferta no admite trabajo remoto desde la UE",
+      "grade": "Nota mínima",
+      "gig": "Trabajo por tareas",
+      "gigLong": "Pago por tarea, sin horas garantizadas: no es un empleo",
+      "salary": "Por debajo de tu mínimo",
+      "salaryLong": "El salario declarado está por debajo del mínimo que fijaste",
+      "shortDesc": "Descripción breve",
+      "heuristic": "Estimación local"
+    },
+    "freshness": {
+      "daysAgo": "Vista hace {n} días",
+      "likelyExpired": "Probablemente caducada"
+    }
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -393,7 +410,8 @@
     "copied": "Copiado",
     "generateRecruiterMsg": "Mensaje al reclutador",
     "recruiterMsg": "Mensaje al reclutador",
-    "engagement": "Tipo de contratación"
+    "engagement": "Tipo de contratación",
+    "axisSalaryUnknown": "Ninguna fuente publica el salario de esta oferta"
   },
   "scan": {
     "scanning": "Escaneando portales de empleo...",
@@ -743,5 +761,16 @@
     "namePrompt": "Nombre de la búsqueda:",
     "saved": "Búsqueda guardada",
     "loaded": "Ejecutando: {name}"
+  },
+  "compare": {
+    "title": "Comparar ofertas",
+    "open": "Comparar",
+    "clear": "Limpiar",
+    "pick": "Añadir a la comparación",
+    "selected": "{n} seleccionadas",
+    "maxReached": "Puedes comparar hasta {n} ofertas",
+    "needTwo": "Selecciona al menos dos ofertas para comparar",
+    "loading": "Cargando…",
+    "error": "No se pudo cargar la comparación"
   }
 }

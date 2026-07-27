@@ -897,6 +897,7 @@ def _insufficient_description_analysis(
     )
     result["punteggio"] = min(int(result.get("punteggio", 3) or 3), 6)
     result["consiglio"] = "Valutabile" if result["punteggio"] >= 5 else "Salta"
+    _add_flag(result, FLAG_SHORT_DESCRIPTION)
     if descrizione.strip():
         result["riassunto"] = (
             "Descrizione troppo breve — stima dal titolo. Apri l'annuncio per valutare."
@@ -1065,7 +1066,9 @@ def _apply_salary_expectation(analysis: dict[str, Any], ral_min: int | None) -> 
     """Flag (not cap) an offer whose declared salary is under the user's floor."""
     low, high = _parse_ral(analysis.get("ral_stimata"))
     if ral_min and high and high < ral_min:
-        _add_missing(analysis, f"RAL dichiarata fino a {high} EUR, sotto la tua minima ({ral_min})")
+        detail = f"RAL dichiarata fino a {high} EUR, sotto la tua minima ({ral_min})"
+        _add_flag(analysis, FLAG_SALARY_BELOW, detail)
+        _add_missing(analysis, detail)
         previous = str(analysis.get("punti_deboli") or "").strip()
         analysis["punti_deboli"] = (
             f"Retribuzione sotto la RAL minima dichiarata ({ral_min} EUR). {previous}".strip()
@@ -1173,6 +1176,45 @@ def _detect_engagement(azienda: str, offer_text: str) -> str | None:
     return None
 
 
+# ── machine-readable flags ───────────────────────────────────────────────────
+# Why a score is what it is, as stable codes instead of a sentence glued to the
+# front of the weakness line. The app computes all of these deterministically,
+# so the UI can badge them, filter on them and translate them — until now
+# "you cannot legally take this job" reached the user as a 3/10 and nothing else.
+FLAG_GEO_BLOCKED = "geo_non_ue"  # outside the EU, no visa, no relocation
+FLAG_GRADE_BLOCKED = "voto_minimo"  # posting demands a degree grade above the CV's
+FLAG_SHORT_DESCRIPTION = "descrizione_breve"  # judged on a blurb, capped
+FLAG_HEURISTIC = "analisi_locale"  # no model saw this: keyword score
+FLAG_GIG = "lavoro_a_task"  # platform/gig work, not employment
+FLAG_SALARY_BELOW = "ral_sotto_minima"  # declared pay under the user's floor
+
+#: Flags that mean "you cannot take this job", as opposed to "read carefully".
+BLOCKING_FLAGS = frozenset({FLAG_GEO_BLOCKED, FLAG_GRADE_BLOCKED})
+
+
+def _add_flag(analysis: dict[str, Any], code: str, detail: str = "") -> None:
+    """Record a flag, plus the exact sentence explaining it.
+
+    ``detail`` is kept separate from ``skills_match.mancano`` on purpose: the
+    blocker is listed there too (the user wants to see it), but the UI needs to
+    know which of those entries is a legal blocker and which is a genuinely
+    missing skill — otherwise "outside the EU: needs a visa" is rendered as a
+    skill the candidate lacks.
+    """
+    flags = analysis.get("blocchi")
+    if not isinstance(flags, list):
+        flags = []
+        analysis["blocchi"] = flags
+    if code not in flags:
+        flags.append(code)
+    if detail:
+        details = analysis.get("blocchi_dettaglio")
+        if not isinstance(details, dict):
+            details = {}
+            analysis["blocchi_dettaglio"] = details
+        details[code] = detail
+
+
 def _add_missing(analysis: dict[str, Any], item: str) -> None:
     """Append a blocking requirement to ``skills_match.mancano`` (created if absent)."""
     skills = analysis.get("skills_match")
@@ -1206,6 +1248,7 @@ def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str
         analysis["eleggibilita_geografica"] = label
     if not reason:
         return
+    _add_flag(analysis, FLAG_GEO_BLOCKED, reason)
     _add_missing(analysis, reason)
     _cap_score(analysis, _GEO_INELIGIBLE_CAP, "Sede fuori UE: non candidabile senza visto.")
 
@@ -1218,6 +1261,7 @@ def _apply_grade_requirement(
     analysis["voto_minimo_richiesto"] = label
     if not reason:
         return
+    _add_flag(analysis, FLAG_GRADE_BLOCKED, reason)
     _add_missing(analysis, reason)
     candidate = _profile_grade(profile_markdown)
     _cap_score(
@@ -1318,8 +1362,11 @@ def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
     # version, so the scan loop treats it as "not analysed yet". Previously the
     # marker was one of the keys injected right above, which every analysis got
     # — heuristics included — freezing keyword scores forever.
+    if not isinstance(out.get("blocchi"), list):
+        out["blocchi"] = []
     if str(out.get(ANALYSIS_SOURCE_KEY, "")) == HEURISTIC_SOURCE:
         out.pop(ANALYSIS_VERSION_KEY, None)
+        _add_flag(out, FLAG_HEURISTIC)
     else:
         out.pop(ANALYSIS_SOURCE_KEY, None)
         out[ANALYSIS_VERSION_KEY] = CURRENT_ANALYSIS_VERSION
@@ -1350,6 +1397,8 @@ def enforce_hard_requirements(
     engagement = _detect_engagement(azienda, f"{descrizione} {out.get('contratto', '')}")
     if engagement:
         out["tipo_ingaggio"] = engagement
+    if str(out.get("tipo_ingaggio", "")) in ("Gig a task", "Freelance P.IVA"):
+        _add_flag(out, FLAG_GIG)
     return out
 
 
@@ -1782,7 +1831,9 @@ def run_scan(
             if axis is not None:
                 axes["salary_match"] = axis
         if ral_min and high and high < ral_min:
-            _add_missing(analysis, f"RAL dichiarata fino a {int(high)} EUR, sotto la tua minima")
+            detail = f"RAL dichiarata fino a {int(high)} EUR, sotto la tua minima ({ral_min})"
+            _add_flag(analysis, FLAG_SALARY_BELOW, detail)
+            _add_missing(analysis, detail)
         raw_score = analysis.get("punteggio", 0)
         try:
             analysis["punteggio"] = int(raw_score)
