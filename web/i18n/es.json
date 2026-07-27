@@ -95,7 +95,10 @@
     "editName": "Nombre",
     "editCvText": "Texto del CV (usado por la IA)",
     "save": "Guardar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "roles": "Puestos",
+    "cvParsed": "CV leído: mira el perfil abajo.",
+    "uploadAnother": "Subir otro CV"
   },
   "jobSearch": {
     "title": "Buscar",
@@ -525,7 +528,8 @@
     "themeDark": "Tema oscuro",
     "themeLight": "Tema claro",
     "languageChanged": "Idioma actualizado",
-    "exportError": "Error de exportación"
+    "exportError": "Error de exportación",
+    "cvAlreadyUploaded": "Este CV ya se había subido: reutilizo el análisis guardado."
   },
   "update": {
     "title": "Nueva versión disponible",

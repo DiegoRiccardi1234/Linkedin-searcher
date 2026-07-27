@@ -529,8 +529,13 @@
               <span class="cv-dropzone-text" data-i18n="profile.dropzone">Drop CV here or click to browse</span>
               <small class="cv-dropzone-hint">PDF · DOCX · MD · TXT · IMG (JPG/PNG/AVIF)</small>
             </label>
-            <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx,.jpg,.jpeg,.png,.webp,.avif,.tiff,.bmp,.svg" required hidden />
-            <button type="submit" class="secondary" data-i18n="profile.uploadCv">Upload CV</button>
+            <!-- Not `required`: the input is hidden, and Chrome refuses to
+                 submit a form whose invalid control cannot be focused — which
+                 aborted before any of our JS ran. The handler checks instead. -->
+            <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx,.jpg,.jpeg,.png,.webp,.avif,.tiff,.bmp,.svg" hidden />
+            <!-- The upload starts as soon as a file is chosen or dropped, so
+                 this button does what the label does: open the picker. -->
+            <button type="button" id="cvPickBtn" class="secondary" data-i18n="profile.uploadAnother">Upload another CV</button>
           </form>
           <pre id="cvSummary" class="output hidden"></pre>
         </article>

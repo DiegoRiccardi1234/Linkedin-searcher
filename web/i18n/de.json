@@ -95,7 +95,10 @@
     "editName": "Anzeigename",
     "editCvText": "CV-Text (fließt ins KI-Scoring)",
     "save": "Speichern",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "roles": "Rollen",
+    "cvParsed": "Lebenslauf gelesen — siehe Profil unten.",
+    "uploadAnother": "Weiteren Lebenslauf hochladen"
   },
   "jobSearch": {
     "title": "Job",
@@ -525,7 +528,8 @@
     "themeDark": "Dunkles Design",
     "themeLight": "Helles Design",
     "languageChanged": "Sprache aktualisiert",
-    "exportError": "Export fehlgeschlagen"
+    "exportError": "Export fehlgeschlagen",
+    "cvAlreadyUploaded": "Dieser Lebenslauf wurde bereits hochgeladen — gespeicherte Analyse wird genutzt."
   },
   "update": {
     "title": "Neue Version verfügbar",

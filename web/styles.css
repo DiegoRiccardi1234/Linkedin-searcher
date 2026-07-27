@@ -2916,3 +2916,28 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 @media (max-width: 1120px) {
   .table-wrap td { max-width: 16ch; }
 }
+
+/* Favourite star: same affordance on the table row, the kanban card and the
+   detail drawer — it used to exist only in the table, so favouriting from the
+   board or the drawer had no visible effect at all. */
+.kanban-fav-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: none; border: none; padding: 2px; cursor: pointer;
+  color: var(--text-muted); line-height: 1;
+}
+.kanban-fav-btn .material-symbols-outlined { font-size: 1.05rem; }
+.kanban-fav-btn.is-active { color: #d9a400; }
+.kanban-card { position: relative; }
+.detail-fav { margin-top: var(--space-2); }
+.detail-fav.is-active,
+.icon-btn.is-active .material-symbols-outlined { color: #d9a400; }
+
+/* The dropzone is where the eye is when an upload starts (a dropped file now
+   uploads immediately), so the busy state belongs there too. */
+.cv-dropzone.is-busy { opacity: 0.65; pointer-events: none; position: relative; }
+.cv-dropzone.is-busy::after {
+  content: ""; position: absolute; inset: auto auto 8px 50%;
+  width: 18px; height: 18px; margin-left: -9px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}

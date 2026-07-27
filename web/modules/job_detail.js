@@ -318,6 +318,7 @@ export async function showJobDetail(jobId) {
             <h4>${t("offcanvas.matchScore")}</h4>
             <div class="score-xl ${sc.cls}">${sc.text}</div>
             <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
+            <button type="button" data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn detail-fav${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
             ${flagsRow}
           </div>
           <div class="info-card">
@@ -380,6 +381,10 @@ export async function showJobDetail(jobId) {
 
     renderTimeline(job.id);
     wireReminderEditor(job.id);
+    container.querySelector("button.detail-fav")?.addEventListener("click", (event) => {
+      const btn = event.currentTarget;
+      toggleFavorite(btn.dataset.id, btn.dataset.favorite === "1");
+    });
     const noteBtn = document.getElementById("detailNoteBtn");
     const noteInput = document.getElementById("detailNoteInput");
     if (noteBtn && noteInput) {
@@ -418,18 +423,38 @@ export async function performJobAction(jobId, action) {
 }
 
 export async function toggleFavorite(jobId, isFavorite) {
+  // Paint the star first: the confirmation used to wait for a full reload of
+  // the job list (a 250-row query plus a re-sort), so the click looked ignored
+  // — and if that reload failed, the star never moved at all.
+  paintFavorite(jobId, isFavorite);
   try {
     await api(`/api/jobs/${jobId}/favorite`, {
       method: "POST",
       body: JSON.stringify({ is_favorite: isFavorite }),
     });
-    await Promise.all([loadJobs(), loadRecommendations()]);
     const key = isFavorite ? "toast.favoriteAdded" : "toast.favoriteRemoved";
-    const fallback = isFavorite ? "Added to favorites" : "Removed from favorites";
-    showToast(t(key) || fallback, "info");
+    showToast(t(key), "info");
+    await Promise.all([loadJobs(), loadRecommendations()]);
   } catch (err) {
-    showToast(`${t("toast.jobActionFailed") || "Job action failed"}: ${err.message}`, "error");
+    paintFavorite(jobId, !isFavorite); // the write failed: put the star back
+    showToast(`${t("toast.jobActionFailed")}: ${err.message}`, "error");
   }
+}
+
+// Every surface that shows the flag for this job, updated in place.
+export function paintFavorite(jobId, isFavorite) {
+  const id = String(jobId);
+  document.querySelectorAll(`[data-favorite][data-id="${id}"]`).forEach((btn) => {
+    btn.dataset.favorite = isFavorite ? "0" : "1";
+    btn.classList.toggle("is-active", isFavorite);
+    btn.title = isFavorite ? t("jobs.unfavorite") : t("jobs.favorite");
+    btn.setAttribute("aria-label", btn.title);
+    const icon = btn.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = isFavorite ? "star" : "star_border";
+  });
+  document
+    .querySelectorAll(`.kanban-card[data-id="${id}"] .kanban-fav, .job-fav-mark[data-id="${id}"]`)
+    .forEach((mark) => mark.classList.toggle("hidden", !isFavorite));
 }
 
 function recommendationCardHtml(job) {

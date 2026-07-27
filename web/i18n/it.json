@@ -95,7 +95,10 @@
     "editName": "Nome visualizzato",
     "editCvText": "Testo CV (usato dallo scoring IA)",
     "save": "Salva",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "roles": "Ruoli",
+    "cvParsed": "CV letto — vedi il profilo qui sotto.",
+    "uploadAnother": "Carica un altro CV"
   },
   "jobSearch": {
     "title": "Cerca",
@@ -525,7 +528,8 @@
     "themeDark": "Tema scuro",
     "themeLight": "Tema chiaro",
     "languageChanged": "Lingua aggiornata",
-    "exportError": "Esportazione fallita"
+    "exportError": "Esportazione fallita",
+    "cvAlreadyUploaded": "Questo CV era già stato caricato — riuso l'analisi salvata."
   },
   "update": {
     "title": "Nuova versione disponibile",

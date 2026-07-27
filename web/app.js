@@ -496,13 +496,17 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
   const formData = new FormData();
   formData.append("file", fileInput.files[0]);
 
-  const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById("cvPickBtn");
   const originalLabel = submitBtn ? submitBtn.innerHTML : "";
+  const dropzone = document.getElementById("cvDropzone");
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="spinner-inline"></span> ${t("toast.cvAnalyzing") || "Analyzing CV with AI..."}`;
+    submitBtn.innerHTML = `<span class="spinner-inline"></span> ${t("toast.cvAnalyzing")}`;
   }
-  showToast(t("toast.cvAnalyzing") || "Analyzing CV with AI...", "info");
+  // The upload now starts from the dropzone, so that is where the user is
+  // looking: the button spinner alone left them staring at a static box.
+  dropzone?.classList.add("is-busy");
+  showToast(t("toast.cvAnalyzing"), "info");
 
   try {
     const response = await fetch(
@@ -519,7 +523,9 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     }
 
     const payload = await response.json();
-    setText("cvSummary", JSON.stringify(payload, null, 2));
+    // Was JSON.stringify(payload) — the user got the raw API response dumped
+    // into the page. Show what the AI actually understood.
+    setText("cvSummary", cvSummaryText(payload));
     await loadProfiles();
     await loadProfileView();
     await loadRecommendations();
@@ -545,8 +551,26 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalLabel;
     }
+    dropzone?.classList.remove("is-busy");
   }
 });
+
+// The upload response is a status envelope; the readable part is the profile
+// the parser built from the CV.
+function cvSummaryText(payload) {
+  const summary = payload?.summary || payload?.profile?.summary_json || {};
+  const bits = [];
+  if (summary.name) bits.push(summary.name);
+  if (summary.title || summary.headline) bits.push(summary.title || summary.headline);
+  const skills = Array.isArray(summary.skills) ? summary.skills.slice(0, 12) : [];
+  if (skills.length) bits.push(`${t("profile.skills")}: ${skills.join(", ")}`);
+  const roles = Array.isArray(summary.preferred_roles) ? summary.preferred_roles.slice(0, 6) : [];
+  if (roles.length) bits.push(`${t("profile.roles")}: ${roles.join(", ")}`);
+  const languages = Array.isArray(summary.languages) ? summary.languages : [];
+  if (languages.length) bits.push(`${t("profile.languages")}: ${languages.join(", ")}`);
+  if (payload?.deduplicated) bits.push(t("toast.cvAlreadyUploaded"));
+  return bits.join("\n") || t("profile.cvParsed");
+}
 
 (() => {
   const dz = document.getElementById("cvDropzone");
@@ -577,7 +601,11 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       text.textContent = name;
       dz.classList.add("has-file");
     }
+    // Picking a file IS the request to upload it. Dropping a CV and having
+    // nothing happen until you found the button was the whole friction.
+    if (fileInput.files?.length) document.getElementById("cvForm")?.requestSubmit();
   });
+  document.getElementById("cvPickBtn")?.addEventListener("click", () => fileInput.click());
 })();
 
 {

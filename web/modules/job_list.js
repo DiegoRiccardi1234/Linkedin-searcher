@@ -218,7 +218,7 @@ export async function loadJobs() {
           <button class="apply-btn" data-action="applied" data-id="${job.id}">${t("jobs.apply")}</button>
           <button data-action="rejected" data-id="${job.id}" class="danger">${t("jobs.skip")}</button>
           <button data-action="reopened" data-id="${job.id}" class="secondary icon-btn" title="${t("jobs.reopen")}" aria-label="${t("jobs.reopen")}"><span class="material-symbols-outlined">restart_alt</span></button>
-          <button data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "favorite" : "favorite_border"}</span></button>
+          <button data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
           <button data-delete-id="${job.id}" class="danger icon-btn" title="${t("jobs.delete")}" aria-label="${t("jobs.delete")}"><span class="material-symbols-outlined">delete</span></button>
         </div>
       </td>
@@ -365,6 +365,7 @@ export function renderKanban(jobs) {
       <strong>${escapeHtml(job.titolo || t("jobs.titleUnavailable"))}</strong>
       <div class="micro">${escapeHtml(job.azienda || t("jobs.companyUnavailable"))}</div>
       <div class="micro">${t("jobs.score")}: <span class="${sc.cls}">${sc.text}</span></div>
+      <button type="button" data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="kanban-fav-btn icon-btn${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
       ${_kanbanBadges(job)}
       <div class="mini kanban-card-actions">
         <button class="secondary" data-k-detail-id="${job.id}">${t("jobs.details")}</button>
@@ -391,6 +392,13 @@ export function renderKanban(jobs) {
 
   kanbanView.querySelectorAll("select.kanban-status").forEach((sel) => {
     sel.addEventListener("change", () => _kanbanMoveTo(sel.dataset.id, sel.value));
+  });
+
+  kanbanView.querySelectorAll("button.kanban-fav-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation(); // the card is draggable and clickable
+      _deps.toggleFavorite(btn.dataset.id, btn.dataset.favorite === "1");
+    });
   });
 
   kanbanView.querySelectorAll(".kanban-card").forEach((card) => {

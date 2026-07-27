@@ -95,7 +95,10 @@
     "editName": "Display name",
     "editCvText": "CV text (feeds AI scoring)",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "roles": "Roles",
+    "cvParsed": "CV read — see the profile below.",
+    "uploadAnother": "Upload another CV"
   },
   "jobSearch": {
     "title": "Job",
@@ -525,7 +528,8 @@
     "themeDark": "Dark theme",
     "themeLight": "Light theme",
     "languageChanged": "Language updated",
-    "exportError": "Export failed"
+    "exportError": "Export failed",
+    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis."
   },
   "update": {
     "title": "New version available",
