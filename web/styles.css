@@ -2941,3 +2941,9 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
   border: 2px solid var(--border); border-top-color: var(--accent);
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
+
+/* Daily request budget in the AI-usage card */
+.usage-quota { margin-top: var(--space-3); }
+.usage-quota-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.usage-quota-track { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.usage-quota-fill { height: 100%; background: var(--accent); }

@@ -472,7 +472,8 @@
       "advanced": "Filtros avanzados"
     },
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
-    "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar."
+    "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
+    "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",
@@ -723,7 +724,8 @@
     "all": "Todo",
     "noData": "Sin uso aún",
     "tokens": "Tokens",
-    "calls": "Llamadas"
+    "calls": "Llamadas",
+    "quotaToday": "Solicitudes hoy"
   },
   "manualJob": {
     "title": "Añadir un empleo",

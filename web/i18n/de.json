@@ -472,7 +472,8 @@
       "advanced": "Erweiterte Filter"
     },
     "postScanRenderFailed": "Scan fertig (Zusammenfassung nicht darstellbar).",
-    "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern."
+    "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern.",
+    "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen."
   },
   "toast": {
     "enterKeyOrProvider": "Gib mindestens einen Schlüssel ein oder wähle einen primären Anbieter.",
@@ -723,7 +724,8 @@
     "all": "Gesamt",
     "noData": "Noch keine Nutzung",
     "tokens": "Tokens",
-    "calls": "Aufrufe"
+    "calls": "Aufrufe",
+    "quotaToday": "Anfragen heute"
   },
   "manualJob": {
     "title": "Job hinzufügen",

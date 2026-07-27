@@ -38,11 +38,14 @@ def build_router(container: AppContainer) -> APIRouter:
     @router.get("/api/usage/stats")
     def usage_stats(range: str = "today") -> dict[str, Any]:
         """Token-usage aggregates. ``range`` ∈ {today, week, month, all}."""
+        from app.services.quota import status as quota_status
         from app.services.usage_tracker import aggregate_stats
 
         if range not in {"today", "week", "month", "all"}:
             range = "today"
-        return aggregate_stats(container.db, range_=range)
+        # Today's request count against the daily ceiling: the free tier has one
+        # (1000/day per OpenRouter account) and nothing in the UI ever said so.
+        return {**aggregate_stats(container.db, range_=range), "quota": quota_status(container.db)}
 
     @router.get("/api/setup/status")
     def setup_status() -> dict[str, Any]:

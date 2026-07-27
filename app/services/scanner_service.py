@@ -42,6 +42,7 @@ from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
+from app.services import quota
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
@@ -550,6 +551,60 @@ def analyze_offers_batch(
     return out
 
 
+class _ScanCancelled(Exception):
+    """Raised on a worker that was about to call the model after a stop."""
+
+
+#: Conservative context ceilings (prompt + completion) per provider, used to
+#: size a batch. Cerebras' free tier caps context at 8K — a batch of three long
+#: descriptions plus the CV and the schema goes straight past it and the call
+#: fails, which looked like "the model is down". Only providers with a known
+#: small ceiling need an entry; everything else gets the generous default.
+_CONTEXT_LIMITS = {"cerebras": 8192}
+_DEFAULT_CONTEXT_LIMIT = 32000
+
+#: Rough token estimate from characters. Fine for sizing decisions: the point is
+#: to stay clear of the ceiling, not to predict the tokenizer.
+_CHARS_PER_TOKEN = 4
+
+
+def _context_budget(provider_manager: ProviderManager) -> int:
+    """Prompt tokens a batch may occupy on the provider that will serve it."""
+    settings = getattr(provider_manager, "settings", None)
+    order = getattr(settings, "llm_provider_order", None) or []
+    primary = str(order[0]).lower() if order else ""
+    ceiling = _CONTEXT_LIMITS.get(primary, _DEFAULT_CONTEXT_LIMIT)
+    # Leave room for the answer: the completion budget is per offer.
+    return max(1500, ceiling - _scoring_max_tokens(1))
+
+
+def _scoring_units(
+    items: list[dict[str, Any]], batch_size: int, budget_tokens: int, profile_chars: int
+) -> list[list[dict[str, Any]]]:
+    """Split offers into work units that fit both the batch size AND the context.
+
+    Chunking by count alone ignores how long the postings are: three 5000-char
+    descriptions do not fit where three 800-char ones do.
+    """
+    units: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    base_tokens = (profile_chars + 2000) // _CHARS_PER_TOKEN  # CV + schema + rules
+    current_tokens = base_tokens
+    for item in items:
+        cost = (len(str(item.get("descrizione") or "")) + 200) // _CHARS_PER_TOKEN
+        too_many = len(current) >= batch_size
+        too_big = current and (current_tokens + cost) > budget_tokens
+        if too_many or too_big:
+            units.append(current)
+            current = []
+            current_tokens = base_tokens
+        current.append(item)
+        current_tokens += cost
+    if current:
+        units.append(current)
+    return units
+
+
 def run_scan(
     db: Database,
     settings: AppSettings,
@@ -570,6 +625,14 @@ def run_scan(
     cancelled = cancel_check or (lambda: False)
     if scrape_jobs is None:
         yield {"error": "python-jobspy not installed"}
+        return
+
+    # A scan is the one action that spends hundreds of requests: if today's
+    # budget is already gone it stops here, with the numbers, instead of finding
+    # out through a wall of 429s halfway through and scoring the rest locally.
+    quota_block = quota.blocks_scan(db)
+    if quota_block:
+        yield {"error": quota_block, "quota": quota.status(db)}
         return
 
     # Structural penalties are sticky within a scan (long cooldown) but reset
@@ -753,7 +816,15 @@ def run_scan(
 
     def _score_unit(unit: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Score a work unit: >1 offer → one batched call; a lone offer → single
-        call (avoids wasting a batch prompt on the last odd job)."""
+        call (avoids wasting a batch prompt on the last odd job).
+
+        Checked here, on the worker, right before the call: cancelling a scan
+        only stopped futures that had not STARTED yet, so every worker already
+        running went on to spend its quota on results nobody would read (and the
+        pool holds several at a time).
+        """
+        if cancelled():
+            raise _ScanCancelled
         if len(unit) > 1:
             return _score_batch(unit)
         return [_score_job(unit[0])]
@@ -965,8 +1036,17 @@ def run_scan(
         # one future. Concurrency bounds concurrent LLM *calls*, so batching cuts
         # total calls. A drained unit yields one "analyzed" event per offer.
         if to_score and not cancelled():
+            # Progress is measured over the whole grid, so this counts what THIS
+            # (location, term) pair contributed; the cumulative total lives in
+            # ``batch_no``.
+            pair_analyzed = 0
             batch_size = max(1, settings.scan_batch_size)
-            units = [to_score[i : i + batch_size] for i in range(0, len(to_score), batch_size)]
+            units = _scoring_units(
+                to_score,
+                batch_size,
+                _context_budget(provider_manager),
+                len(profile_markdown),
+            )
             workers = max(1, min(settings.scan_concurrency, len(units)))
             pool = ThreadPoolExecutor(max_workers=workers)
             try:
@@ -976,6 +1056,8 @@ def run_scan(
                         break
                     try:
                         results = fut.result()
+                    except _ScanCancelled:
+                        continue  # the user pressed stop; nothing was spent
                     except Exception as exc:  # analyze_offer(s) degrade internally
                         log.warning("scoring task failed: %s", exc)
                         continue
@@ -984,9 +1066,19 @@ def run_scan(
                         if result["recruiter"]:
                             db.upsert_recruiter(result["job_id"], result["recruiter"])
                         totale_analizzati += 1
+                        pair_analyzed += 1
 
                         elapsed_ms = int(time.time() * 1000) - started_at_ms
-                        seen_now = (idx * max(1, settings.max_annunci)) + totale_analizzati
+                        # batch_no, not idx: the scraping phase counts progress
+                        # over the whole location x term grid, while ``idx`` is
+                        # the TERM index and resets at every new location — so on
+                        # a multi-location scan the bar walked backwards. And it
+                        # is the pair's own count that is added, not the running
+                        # total, which would be counted twice.
+                        seen_now = min(
+                            expected_total,
+                            (batch_no * max(1, settings.max_annunci)) + pair_analyzed,
+                        )
                         eta_ms = (
                             int((elapsed_ms / max(1, seen_now)) * (expected_total - seen_now))
                             if seen_now > 0

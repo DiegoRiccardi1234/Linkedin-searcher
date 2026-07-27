@@ -472,7 +472,8 @@
       "advanced": "Filtri avanzati"
     },
     "postScanRenderFailed": "Scansione completata (riepilogo non mostrabile).",
-    "volumeWarning": "Scan ampio ({n} ricerche) — potrebbe richiedere un po'."
+    "volumeWarning": "Scan ampio ({n} ricerche) — potrebbe richiedere un po'.",
+    "quotaReached": "Il budget di richieste di oggi è esaurito — lo scan si fermerebbe a metà. Si azzera a mezzanotte UTC, oppure alza il limite nelle Impostazioni."
   },
   "toast": {
     "enterKeyOrProvider": "Inserisci almeno una chiave o scegli un provider primario.",
@@ -723,7 +724,8 @@
     "all": "Sempre",
     "noData": "Ancora nessun uso",
     "tokens": "Token",
-    "calls": "Chiamate"
+    "calls": "Chiamate",
+    "quotaToday": "Richieste oggi"
   },
   "manualJob": {
     "title": "Aggiungi un lavoro",

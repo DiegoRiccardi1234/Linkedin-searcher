@@ -472,7 +472,8 @@
       "advanced": "Advanced filters"
     },
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
-    "volumeWarning": "Large scan ({n} searches) — this may take a while."
+    "volumeWarning": "Large scan ({n} searches) — this may take a while.",
+    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",
@@ -723,7 +724,8 @@
     "all": "All time",
     "noData": "No usage yet",
     "tokens": "Tokens",
-    "calls": "Calls"
+    "calls": "Calls",
+    "quotaToday": "Requests today"
   },
   "manualJob": {
     "title": "Add a job",
