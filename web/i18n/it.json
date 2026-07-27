@@ -346,7 +346,15 @@
       "auto": "Auto (consigliato)",
       "saved": "Modello salvato"
     },
-    "country": "Paese"
+    "country": "Paese",
+    "appearance": {
+      "title": "Aspetto",
+      "subtitle": "Su un portatile piccolo, o con lo scaling di Windows al 125%, la modalità compatta restituisce spazio.",
+      "density": "Densità",
+      "densityNormal": "Normale",
+      "densityCompact": "Compatta",
+      "densitySaved": "Densità aggiornata"
+    }
   },
   "coach": {
     "title": "Career Coach",

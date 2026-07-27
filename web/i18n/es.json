@@ -346,7 +346,15 @@
       "auto": "Auto (recomendado)",
       "saved": "Modelo guardado"
     },
-    "country": "País"
+    "country": "País",
+    "appearance": {
+      "title": "Apariencia",
+      "subtitle": "En un portátil pequeño, o con el escalado de Windows al 125%, el modo compacto devuelve espacio.",
+      "density": "Densidad",
+      "densityNormal": "Normal",
+      "densityCompact": "Compacta",
+      "densitySaved": "Densidad actualizada"
+    }
   },
   "coach": {
     "title": "Career Coach",

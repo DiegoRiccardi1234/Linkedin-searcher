@@ -346,7 +346,15 @@
       "auto": "Auto (recommended)",
       "saved": "Model saved"
     },
-    "country": "Country"
+    "country": "Country",
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "On a small laptop, or with Windows display scaling at 125%, the compact setting gives back a step of room.",
+      "density": "Density",
+      "densityNormal": "Normal",
+      "densityCompact": "Compact",
+      "densitySaved": "Density updated"
+    }
   },
   "coach": {
     "title": "Career Coach",

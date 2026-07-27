@@ -346,7 +346,15 @@
       "auto": "Auto (empfohlen)",
       "saved": "Modell gespeichert"
     },
-    "country": "Land"
+    "country": "Land",
+    "appearance": {
+      "title": "Darstellung",
+      "subtitle": "Auf einem kleinen Laptop oder bei 125% Windows-Skalierung schafft die kompakte Ansicht Platz.",
+      "density": "Dichte",
+      "densityNormal": "Normal",
+      "densityCompact": "Kompakt",
+      "densitySaved": "Dichte aktualisiert"
+    }
   },
   "coach": {
     "title": "Career Coach",

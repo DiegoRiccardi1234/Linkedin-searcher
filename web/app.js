@@ -1,5 +1,6 @@
 import { api, escapeHtml, setText, truncate, showToast, renderCoachMarkdown } from "./modules/helpers.js";
 import { initTheme } from "./modules/theme.js";
+import { initLayout, syncStickyOffset } from "./modules/layout.js";
 import { loadShortlist as _loadShortlistApi, addToShortlist as _addToShortlistApi, removeFromShortlist as _removeFromShortlistApi } from "./modules/shortlist.js";
 import { initI18n, t, loadLanguage, getCurrentLang, onLanguageChange } from "./modules/i18n.js";
 import { loadProfile as loadProfileView, bindProfileEvents, addRolesToProfile } from "./modules/profile.js";
@@ -63,6 +64,7 @@ window.addEventListener("unhandledrejection", (e) => console.error("Unhandled pr
 window.addEventListener("error", (e) => console.error("Uncaught error:", e.error || e.message));
 
 initTheme();
+initLayout();
 
 // Inject core refresh callbacks the provider module needs after a key save
 // (avoids a circular import). loadHealth/loadKeysStatus/refreshOnboardingPlaceholder
@@ -120,9 +122,13 @@ function activateView(viewName) {
   });
 
   // v1.3.2: hide the chat coach sidebar on the Info view so reading docs
-  // is not crowded by the chat panel. Other views keep it for quick access.
+  // is not crowded by the chat panel. v1.7.7: the Jobs archive joins it — a
+  // 9-column table plus a 4-column board cannot share the row with a 300px+
+  // rail on a 1366px laptop (it pushed the board past the viewport).
+  const railless = viewName === "info" || viewName === "jobs";
   const rail = document.querySelector(".right-rail");
-  if (rail) rail.classList.toggle("hidden", viewName === "info");
+  if (rail) rail.classList.toggle("hidden", railless);
+  document.body.classList.toggle("rail-hidden", railless);
 
   // Mobile chrome: navigating closes any open menu/drawer and the chat FAB
   // is suppressed on the Info view (where the rail is hidden).
@@ -132,7 +138,8 @@ function activateView(viewName) {
   const overlay = document.getElementById("mobileOverlay");
   if (overlay) { overlay.classList.remove("active"); overlay.hidden = true; }
   const fab = document.getElementById("chatFab");
-  if (fab) fab.classList.toggle("hidden", viewName === "info");
+  if (fab) fab.classList.toggle("hidden", railless);
+  syncStickyOffset();
 }
 
 function roleLabel(role) {

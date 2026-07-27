@@ -20,11 +20,12 @@ _WRITABLE_KEYS = frozenset(
     {
         "active_profile_id",
         "dedup_mode",
-        "language",
+        "density",
         "linkedin_url",
         "preferred_roles",
         "theme",
         "tutorial_seen",
+        "ui_language",
     }
 )
 _MAX_PREFERENCE_LEN = 20_000

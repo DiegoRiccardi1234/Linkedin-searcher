@@ -346,7 +346,15 @@
       "auto": "Auto (recommandé)",
       "saved": "Modèle enregistré"
     },
-    "country": "Pays"
+    "country": "Pays",
+    "appearance": {
+      "title": "Apparence",
+      "subtitle": "Sur un petit portable, ou avec la mise à l'échelle Windows à 125%, le mode compact rend de la place.",
+      "density": "Densité",
+      "densityNormal": "Normale",
+      "densityCompact": "Compacte",
+      "densitySaved": "Densité mise à jour"
+    }
   },
   "coach": {
     "title": "Career Coach",
