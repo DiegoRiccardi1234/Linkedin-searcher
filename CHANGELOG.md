@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+## [1.7.7] — 2026-07-27
+
+Scores you can trust and act on: the scan stops quietly falling back to keyword guesses, every capped score says why, and offers can be compared side by side.
+
+### Fixed
+- **Individually-scored jobs no longer fall back to a keyword guess** — the single-job scoring request asked the model for a two-dozen-field answer while allowing it barely enough room for two sentences. Every such request was cut off mid-answer, was blamed on the model, worked through every alternative model in turn and ended on the local keyword estimate — and that same path is what a batch falls back to when one of its slots comes back wrong. Both paths now ask for the room the answer needs.
+- **A keyword estimate no longer freezes a job's score forever** — a job scored locally (because the AI was unreachable, cut off, or the description was too thin) counted as "already analysed" and was never looked at again. Such estimates are now shown for what they are and re-scored on the next scan; genuine AI analyses carry an explicit version, so a change to the scoring rules re-scores everything once instead of leaving old verdicts frozen. **The first scan after this update re-scores your whole archive.**
+- **The salary axis is compared against your own minimum** — the posting's real pay arrived *after* the axis had been decided and was then overwritten with a flat average. It is now compared with the minimum you set (and stays "N/D" when either side is unknown).
+- **A failed auto-scan no longer restarts every minute** — the scheduler only recorded successful runs, so a scan that failed was relaunched on the very next tick, forever, spending AI quota each time. A scheduled scan also kept only the first of several saved locations.
+- **"Check for updates" tells the truth after you dismiss a banner** — dismissing an update made the button report "up to date" from then on, with no way to undo it.
+- **The app works offline** — the match radar and every icon came from the internet, so without a connection the chart vanished and the buttons showed raw words like "delete" and "restart_alt". Both now ship inside the app.
+- **Job titles with special characters can't break the table** — titles, companies and AI advice are scraped or model-written text and were inserted into the page unescaped.
+- **Imported jobs are location-checked too** — a job imported from a URL never recorded its location, so the "outside the EU" check could not apply to it.
+- **A cover letter that fails to generate reports an error** — the failure used to be returned as the letter text and rendered as if the AI had written it.
+
+### Added
+- **Every capped score says why** — badges on the job row, the kanban card and the detail panel: outside the EU, degree-grade requirement, task/gig work, pay below your minimum, description too short, local estimate. Translated in all five languages, with a filter to hide the offers you can't apply to.
+- **Compare offers side by side** — pick up to three and see their match axes, blockers, matching and missing skills and salary in one view.
+- **The match radar explains itself** — each axis gets a one-line reason drawn from data the app already has, at no extra AI cost.
+- **Freshness on every offer** — "last seen N days ago", and "probably expired" past a month, so a stale archive says so.
+- **Sortable job table** — by score, title, company or location.
+
+### Changed
+- **The scoring model is picked from what your models actually did** — the app reads back its own call log (valid-JSON rate, cut-off answers, latency) and de-ranks models with a bad record, instead of judging them by their name; unlike before, this memory survives a restart. Rate-limited calls are not held against a model. The "Test models" check now uses the real scoring prompt on a sample posting rather than a toy question that every model passes.
+- **The AI is asked for less, in a better order** — five fields nothing ever read (or that the app computes itself) left the request, and the score is now asked for *last*, after the requirements and skills the model has just written, with an explicit scale to follow. The strengths/weaknesses fields no longer carry the developer's name.
+- **The job list stops downloading every posting's full text** on each refresh (the list never showed it).
+- Faster job list, chat history and timeline queries (indexes on the three hottest lookups).
+
+### Security
+- `POST /api/preferences` accepts only known preference keys. It previously accepted any key, so a single local request could switch off Privacy Mode before a CV was sent to a model.
+- A rate-limited or unauthorised provider no longer gets a second request for the same answer.
+
 ## [1.7.6] — 2026-07-22
 
 Scores you can act on: offers you legally can't take stop outranking the ones you can, and the app stops burning its daily quota on models that never answer.

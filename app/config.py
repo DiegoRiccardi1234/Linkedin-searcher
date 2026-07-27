@@ -45,7 +45,6 @@ class AppSettings:
     retention_days: int
     hours_old: int
     max_annunci: int
-    delay_tra_chiamate: float
     delay_tra_ricerche: float
     location_default: str
     location_remote_default: str
@@ -89,6 +88,33 @@ def _load_optional_json(path: Path) -> dict[str, Any]:
         # at least say why, so the user knows what to repair.
         logging.getLogger(__name__).warning("Corrupt JSON config ignored: %s (%s)", path, exc)
         return {}
+
+
+def _as_int(cfg: dict[str, Any], key: str, default: int) -> int:
+    """Read a numeric setting without letting a typo take the app down.
+
+    ``settings.json`` is a user-editable file and the whole container is built at
+    import time, so ``{"max_annunci": "venti"}`` used to raise a ValueError out
+    of a module import — an unrecoverable traceback with no UI to report it. A
+    bad value now falls back to the default and says so in the log.
+    """
+    try:
+        return int(cfg.get(key, default))
+    except (TypeError, ValueError):
+        logging.getLogger(__name__).warning(
+            "Setting %r is not a number (%r); using %s", key, cfg.get(key), default
+        )
+        return default
+
+
+def _as_float(cfg: dict[str, Any], key: str, default: float) -> float:
+    try:
+        return float(cfg.get(key, default))
+    except (TypeError, ValueError):
+        logging.getLogger(__name__).warning(
+            "Setting %r is not a number (%r); using %s", key, cfg.get(key), default
+        )
+        return default
 
 
 def save_local_provider_keys(
@@ -302,11 +328,10 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         scoring_model=local_secrets.get("scoring_model") or None,
         chat_model=local_secrets.get("chat_model") or None,
         cv_model=local_secrets.get("cv_model") or None,
-        retention_days=int(cfg.get("retention_days", 15)),
-        hours_old=int(cfg.get("hours_old", 336)),
-        max_annunci=int(cfg.get("max_annunci", 20)),
-        delay_tra_chiamate=float(cfg.get("delay_tra_chiamate", 1.5)),
-        delay_tra_ricerche=float(cfg.get("delay_tra_ricerche", 4.0)),
+        retention_days=_as_int(cfg, "retention_days", 15),
+        hours_old=_as_int(cfg, "hours_old", 336),
+        max_annunci=_as_int(cfg, "max_annunci", 20),
+        delay_tra_ricerche=_as_float(cfg, "delay_tra_ricerche", 4.0),
         location_default=str(cfg.get("location_default", "Torino, Italy")),
         location_remote_default=str(cfg.get("location_remote_default", "Italy")),
         country_default=str(cfg.get("country_default", "italy")),
@@ -323,6 +348,6 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         mistral_api_key=mistral_api_key,
         glm_base_url=glm_base_url,
         model_selection_policy=merged_policy,
-        scan_concurrency=max(1, int(cfg.get("scan_concurrency", 4))),
-        scan_batch_size=max(1, int(cfg.get("scan_batch_size", 3))),
+        scan_concurrency=max(1, _as_int(cfg, "scan_concurrency", 4)),
+        scan_batch_size=max(1, _as_int(cfg, "scan_batch_size", 3)),
     )

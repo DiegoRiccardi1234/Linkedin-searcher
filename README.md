@@ -30,7 +30,7 @@ Don't want to install Python? Grab the standalone Windows bundle from the [lates
 4. Your browser opens automatically on `http://127.0.0.1:8000`.
 5. The app shows a "No API key configured" banner — click **Get a free Cerebras key** to register (no credit card, free tier, 30 seconds), copy your key into **Settings → API keys**, you're done.
 
-Everything stays on your machine: the SQLite DB, your CV, your notes. The bundle is just Python packaged as a single executable, no telemetry, no remote calls except the LLM provider you configure and the LinkedIn / Indeed scrape.
+Everything stays on your machine: the SQLite DB, your CV, your notes. The bundle is just Python packaged as a single executable, no telemetry, no remote calls except the LLM provider you configure and the LinkedIn / Indeed scrape — the charting library and the icon font ship inside the bundle (v1.7.7), so the app also works offline.
 
 > **Windows SmartScreen**: the first launch may show "Windows protected your PC". Click **More info** → **Run anyway**. The exe is unsigned (code-signing certificates cost ~$200/year and are out of scope for a personal project).
 
@@ -92,6 +92,10 @@ The result is a portfolio-grade FastAPI app with a multi-provider LLM backbone, 
 - **Truncation-aware scoring** (v1.7.1) — the scan now detects when a model cut off its answer (hit its token limit mid-JSON — common with large "reasoning" models on a busy free tier), drops it for the rest of the run, and scores with a leaner model that answers cleanly, so scans no longer crawl. The model quality floor was also tuned (~26B) so reliable mid-size models aren't passed over for larger ones that truncate. Works across all OpenAI-API providers (OpenRouter, Cerebras, Google, OpenAI).
 - **Reads LinkedIn job descriptions** (v1.7.2) — LinkedIn's search only returns job cards (title/company), so the AI used to score LinkedIn jobs blind: a role needing 3-5 years' experience could get a 9 for a junior profile. The scan now fetches each LinkedIn job's full description (Indeed already had it), so experience, seniority and required skills are actually weighed. A job whose description can't be fetched is flagged ("description unavailable") with a capped title-only estimate instead of a fabricated high score.
 - **Reads requirements + drops off-topic jobs** (v1.7.3) — the scorer now keeps the "Requirements" section in view even on long postings (it used to see only the first ~1800 characters, so a Master/PhD role could still score high for a junior), and jobs whose text shares nothing with your skills/domain (a niche search dragging in manufacturing/food/spa Quality Control) are skipped before scoring — on-topic archive, less AI quota wasted. Removing a search keyword is now permanent (it won't re-appear next visit).
+- **Scans stay usable under load** (v1.7.4) — a full audit of the scan pipeline: scored jobs are no longer lost to thread races, a posting served as an 82-character marketing blurb takes an honest capped path instead of being invented from, and an empty AI reply can no longer freeze a job at 0 forever.
+- **Degree requirements count** (v1.7.5) — a role asking for a Master's or PhD can no longer score 9 against a Bachelor's CV: the scorer compares the posting's hard requirements (degree, minimum grade, years, language) with your CV and must make the gap visible. Indeed also stopped returning a handful of results per search (its API applies only one server-side filter, so the freshness window silently cancelled the others).
+- **Offers you can't take stop outranking the ones you can** (v1.7.6) — postings based outside the EU (no visa, no relocation) and postings demanding a degree grade above yours are capped, and detected *before* the AI call so they cost no quota. Work mode is read from the posting instead of your search flag. You can set a **minimum and target salary** (with an AI suggestion from your CV and market) and the match radar hides the salary axis when nothing is known about pay, instead of drawing a confident average.
+- **Every score says why** (v1.7.7) — the reasons behind a capped score are shown as badges on the job row, the kanban card and the detail drawer ("Outside the EU", "Grade requirement", "Task work", "Local estimate"), translated in all five languages, with a filter to hide offers you can't apply to. Offers can be **compared side by side** (up to three: axes, blockers, matching and missing skills), the table sorts by score / title / company / location, and a freshness badge flags postings the scan hasn't seen in a while. Under the hood, the app now picks its scoring model from **what each model actually did** on your past calls (valid JSON rate, truncations, latency — read from the usage log, no extra requests) rather than from its name, and the app no longer needs a CDN to draw its charts and icons.
 - **Multilingual UI** — English, Italian, Spanish, French, German (100% key parity across locales).
 - **Responsive layout** (v1.4.2+) — mobile-friendly below 960px: hamburger nav, off-canvas Career Coach drawer, horizontally-scrollable tables, single-column dashboards. Desktop layout unchanged.
 - **Multi-LLM fallback** — Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI (Grok), Zhipu GLM, Mistral — configurable order, skips a dead (401) key, exponential backoff retry.
@@ -215,7 +219,7 @@ The chat service is split into single-responsibility modules:
 | OCR | Tesseract 5.x (via `pytesseract` + `pdf2image`) — scanned PDFs and image CVs (JPG/PNG/AVIF/WEBP/TIFF). Bundle ships **5 languages**: EN/IT/ES/FR/DE (~13 MB tessdata) |
 | Scraping | [python-jobspy](https://github.com/Bunsly/JobSpy) |
 | Streaming | Server-Sent Events |
-| Testing | pytest (unit, 385 tests), Playwright (E2E) |
+| Testing | pytest (unit, 552 tests), Playwright (E2E) |
 | Quality | ruff, mypy strict, pre-commit, 59% line coverage |
 | Deployment | Multi-stage Dockerfile + docker-compose, healthcheck, non-root user |
 | Distribution | Standalone Windows bundle via PyInstaller (`make build-exe`) — Tesseract bundled, auto-update over GitHub Releases |
@@ -227,32 +231,48 @@ The chat service is split into single-responsibility modules:
 
 ```
 app/
-├── main.py                  FastAPI app, AppContainer wiring
+├── main.py                  FastAPI app + versioned asset routes
+├── container.py             AppContainer wiring (DB, providers, scheduler)
 ├── config.py                AppSettings + local secrets persistence
 ├── db.py                    SQLite Database (WAL + lock)
 ├── log.py                   Centralized logging setup
 ├── cv_ingest.py             CV → markdown → LLM summary + OCR fallback (Tesseract)
 ├── lifecycle.py             Post-scan retention/archive policy
 ├── models.py                Pydantic request/response models
+├── notify.py                Native desktop notification (tray)
 ├── rate_limit.py            Token-bucket limiter for /api/chat, /api/scan, /api/upload-cv
+├── scoring_schema.py        Analysis schema version (drives the re-score marker)
 ├── version.py               Version metadata + GitHub release checker
 ├── migrations/              Numbered SQLite schema migrations (idempotent runner)
-├── prompts/chat/            System-prompt templates (.txt)
+├── prompts/                 Prompt templates (.txt) for chat and generation
 ├── providers/               LLM factory + 10 provider implementations (retry + backoff)
+├── routers/                 9 API routers (jobs, chat, scan, profile, providers, …)
 └── services/
     ├── chat/                Chat package (state/context/memory/prompts/intents/fallback/handler)
-    ├── chat_service.py      Backwards-compat facade
-    ├── roles_shortlist.py   Role suggestion CRUD + dedup
-    └── scanner_service.py   Job scraping + scoring orchestration
+    ├── scanner_service.py   Job scraping + scoring orchestration
+    ├── onboarding.py        Search goals + salary expectations → prompt context
+    ├── generation.py        Cover letter / interview prep / CV tools
+    ├── model_scoreboard.py  Per-model track record read back from usage_log
+    ├── model_stats.py       OpenRouter live health (free, no inference)
+    ├── model_probe.py       Opt-in probe with the real scoring prompt
+    ├── autoscan.py          In-process scheduler
+    ├── skill_gap.py         Aggregated missing skills + learning ideas
+    ├── job_import.py        Import a posting from a URL / pasted text
+    ├── recruiter_scrape.py  Best-effort recruiter + LinkedIn description fetch
+    ├── usage_tracker.py     usage_log writes + aggregates
+    ├── pii.py               Privacy Mode redaction
+    └── …                    (scan_control, roles_shortlist, chat_service facade)
 web/
 ├── app.js                   Bootstrap + per-feature wiring (ES module entry)
 ├── index.html               Single-page shell, mounts /web/* assets
-├── modules/                 Feature modules (helpers, theme, shortlist, i18n, profile)
+├── modules/                 16 feature modules (job_list, job_detail, compare, scan,
+│                            providers, profile, features, update, analytics, i18n, …)
+├── vendor/                  Chart.js + icon font, bundled so the app works offline
 ├── styles/                  Per-feature CSS (chat.css extracted)
 ├── styles.css               Core stylesheet (glassmorphism + tokens)
-└── i18n/                    Per-locale JSON (en, it, es, fr, de — 617 keys each)
+└── i18n/                    Per-locale JSON (en, it, es, fr, de — 649 keys each)
 tests/
-├── unit/                    pytest suite (385 tests, FakeProviderManager fixture)
+├── unit/                    pytest suite (552 tests, FakeProviderManager fixture)
 └── e2e/                     Playwright specs (smoke, README screenshots, demo GIF)
 scripts/
 ├── check_i18n.py            i18n coverage audit (fails CI on missing keys)

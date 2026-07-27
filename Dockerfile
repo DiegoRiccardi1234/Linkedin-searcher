@@ -25,6 +25,11 @@ RUN useradd -m -u 1000 appuser \
     && mkdir -p /app/data \
     && chown -R appuser /app
 USER appuser
+# Bind to every interface INSIDE the container, or the published port maps to
+# nothing: the health check below still passes (it runs from inside), so the
+# container reports healthy while being unreachable. The app itself defaults to
+# loopback everywhere else — see run_webapp.py.
+ENV JOBFINDER_HOST=0.0.0.0
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1

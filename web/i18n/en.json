@@ -61,7 +61,8 @@
       "ralMin": "Minimum salary (gross/year)",
       "ralTarget": "Target salary (gross/year)",
       "ralSuggest": "Suggest salary with AI",
-      "ralSuggested": "Salary suggested — review and save"
+      "ralSuggested": "Salary suggested — review and save",
+      "saveFailed": "Couldn't save your search goals — check the app logs"
     },
     "features": {
       "title": "CV tools & privacy",

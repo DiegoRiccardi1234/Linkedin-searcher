@@ -139,7 +139,10 @@ def build_router(container: AppContainer) -> APIRouter:
             )
             container.db.save_cover_letter(job_id, cover_letter)
         except Exception as e:
-            cover_letter = f"Error generating cover letter: {e}"
+            # This used to return 200 with the exception text AS the letter, so
+            # a provider 401 was rendered in the UI as generated prose. The three
+            # sibling generation endpoints below all raise; so does this one now.
+            raise HTTPException(status_code=502, detail=f"Cover letter failed: {e}") from e
 
         return {"cover_letter": cover_letter}
 

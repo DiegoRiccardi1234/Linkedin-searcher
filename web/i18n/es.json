@@ -61,7 +61,8 @@
       "ralMin": "Salario mínimo (bruto/año)",
       "ralTarget": "Salario objetivo (bruto/año)",
       "ralSuggest": "Sugerir salario con IA",
-      "ralSuggested": "Salario sugerido: revísalo y guárdalo"
+      "ralSuggested": "Salario sugerido: revísalo y guárdalo",
+      "saveFailed": "No se pudieron guardar tus objetivos de búsqueda: revisa los registros"
     },
     "features": {
       "title": "Herramientas de CV y privacidad",

@@ -53,6 +53,29 @@ def is_unauthorized(exc: Exception) -> bool:
     )
 
 
+def is_transport_failure(exc: Exception) -> bool:
+    """True for an error a second call to the same host cannot fix: auth, quota
+    or rate limit (401 / 403 / 429).
+
+    ``complete_json`` degrades to a plain-text call when the JSON parse fails —
+    the right move for a chatty model, the wrong one for a throttled host: it
+    doubles the request count on exactly the failures that should fail fast and
+    rotate. The factory already treats these as failover-worthy; this keeps the
+    provider from spending an extra request before it gets there.
+    """
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        response = getattr(exc, "response", None)
+        if response is not None:
+            status = getattr(response, "status_code", None)
+    if status in (401, 403, 429):
+        return True
+    if is_unauthorized(exc):
+        return True
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "quota" in text
+
+
 def is_truncated(response: Any) -> bool:
     """True when the model stopped at its max_tokens limit (output cut off).
 

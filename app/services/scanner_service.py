@@ -915,11 +915,6 @@ def _insufficient_description_analysis(
     return result
 
 
-def _no_description_analysis(profile_markdown: str, titolo: str, azienda: str) -> dict[str, Any]:
-    """Backwards-compatible wrapper: empty-description case."""
-    return _insufficient_description_analysis(profile_markdown, titolo, azienda, "")
-
-
 # ─── Deterministic hard-requirement checks (run AFTER the model) ───────────
 # _SCORING_RULES already asks the model to weigh these, and it repeatedly didn't:
 # on the 2026-07-21 scan a posting demanding "min. 102/110" scored 10 against a
@@ -1385,10 +1380,10 @@ def enforce_hard_requirements(
     """Normalise the schema, then apply the deterministic checks.
 
     Single post-processing point for EVERY scoring path — single offer, batch
-    slot, heuristic fallback and the manual re-score endpoint — so an offer can
-    never be recommended over a hard blocker just because a given path skipped
-    the check. Caps (geo, grade) can only lower a score; the salary and
-    engagement checks only annotate.
+    slot and heuristic fallback — so an offer can never be recommended over a
+    hard blocker just because a given path skipped the check. Caps (geo, grade)
+    can only lower a score; the salary and engagement checks only annotate, and
+    every check records a flag code so the UI can say WHY (see ``_add_flag``).
     """
     out = _normalize_analysis(analysis)
     _apply_grade_requirement(out, profile_markdown, descrizione)

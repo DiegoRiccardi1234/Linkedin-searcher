@@ -8,6 +8,7 @@ from app.providers.base import (
     TruncatedCompletionError,
     extract_usage,
     first_choice,
+    is_transport_failure,
     is_truncated,
     is_unauthorized,
 )
@@ -127,6 +128,10 @@ class OpenAIProvider(LLMProvider):
         except (TruncatedCompletionError, EmptyCompletionError):
             # Structural failures: a complete_text retry would hit the same wall.
             raise
-        except Exception:
+        except Exception as exc:
+            # Same for a 401/403/429: the retry spends a request to be told the
+            # same thing. Only a badly-shaped reply is worth re-asking in prose.
+            if is_transport_failure(exc):
+                raise
             text = self.complete_text(prompt=prompt, model=resolved_model, max_tokens=max_tokens)
             return _extract_json(text)

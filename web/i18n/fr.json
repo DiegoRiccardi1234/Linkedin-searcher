@@ -61,7 +61,8 @@
       "ralMin": "Salaire minimum (brut/an)",
       "ralTarget": "Salaire cible (brut/an)",
       "ralSuggest": "Proposer un salaire avec l'IA",
-      "ralSuggested": "Salaire proposé — vérifiez et enregistrez"
+      "ralSuggested": "Salaire proposé — vérifiez et enregistrez",
+      "saveFailed": "Impossible d'enregistrer tes objectifs — consulte les journaux"
     },
     "features": {
       "title": "Outils CV et confidentialité",

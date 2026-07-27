@@ -426,16 +426,20 @@ async function _prefillOnboarding() {
 }
 
 async function _saveOnboarding() {
+  // Every write used to be swallowed and the success toast shown regardless —
+  // including for the salary floor, which the scorer then silently never had.
+  let failed = 0;
   for (const [id, key] of _ONBOARDING_FIELDS) {
     const el = document.getElementById(id);
     const value = (el?.value || "").trim();
     try {
       await api("/api/preferences", { method: "POST", body: JSON.stringify({ key, value }) });
     } catch {
-      /* per-key best-effort */
+      failed += 1;
     }
   }
-  showToast(t("profile.onboarding.saved") || "Saved", "info");
+  if (failed) showToast(t("profile.onboarding.saveFailed"), "error");
+  else showToast(t("profile.onboarding.saved"), "info");
 }
 
 export async function loadProfile() {

@@ -61,7 +61,8 @@
       "ralMin": "Mindestgehalt (brutto/Jahr)",
       "ralTarget": "Zielgehalt (brutto/Jahr)",
       "ralSuggest": "Gehalt mit KI vorschlagen",
-      "ralSuggested": "Gehalt vorgeschlagen — prüfen und speichern"
+      "ralSuggested": "Gehalt vorgeschlagen — prüfen und speichern",
+      "saveFailed": "Suchziele konnten nicht gespeichert werden — sieh in den Logs nach"
     },
     "features": {
       "title": "CV-Tools & Datenschutz",
