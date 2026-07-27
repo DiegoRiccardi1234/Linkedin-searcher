@@ -906,11 +906,22 @@ class Database:
         role: str,
         content: str,
         content_type: str = "message",
+        meta: dict[str, Any] | None = None,
     ) -> int:
+        """Persist one message. ``meta`` carries the extras the UI renders with
+        it (today: the suggested roles shown as clickable pills), which used to
+        live only in the HTTP response and vanished on reload."""
         cur = self.conn.execute(
-            "INSERT INTO chat_messages(session_id, role, content, content_type, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (session_id, role, content, content_type, now_iso()),
+            "INSERT INTO chat_messages(session_id, role, content, content_type, meta_json, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                session_id,
+                role,
+                content,
+                content_type,
+                json.dumps(meta, ensure_ascii=False) if meta else None,
+                now_iso(),
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid or 0)
@@ -936,6 +947,13 @@ class Database:
                 (session_id, limit),
             )
         rows = [dict(r) for r in cur.fetchall()]
+        for row in rows:
+            raw_meta = row.pop("meta_json", None)
+            try:
+                meta = json.loads(raw_meta) if raw_meta else {}
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+            row["meta"] = meta if isinstance(meta, dict) else {}
         rows.reverse()
         return rows
 

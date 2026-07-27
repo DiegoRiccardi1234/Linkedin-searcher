@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from app.db import Database
@@ -20,6 +21,11 @@ from app.services.chat.state import extract_pref_updates, get_chat_state
 
 log = get_logger(__name__)
 
+#: Completion budget for one chat turn. The reply is an envelope carrying prose
+#: plus up to five suggested roles with keywords; at 1400 it was routinely cut
+#: off inside that list.
+_CHAT_MAX_TOKENS = 2200
+
 
 def _strip_markdown_fence(text: str) -> str:
     cleaned = text.strip()
@@ -33,39 +39,111 @@ def _strip_markdown_fence(text: str) -> str:
 
 
 def _sanitize_chat_answer(text: str) -> str:
-    """Clean stray JSON fragments / unbalanced braces from chat output.
+    """Last-ditch tidy of a reply that never parsed as the envelope.
 
-    Some providers (notably Groq) occasionally emit dangling braces or
-    half-formed JSON when they mis-trigger structured-output mode. We strip
-    obvious leading/trailing braces if they aren't balanced.
+    Only reached when :func:`_parse_llm_response` gave up: a successfully parsed
+    ``answer`` is left alone, because a coach explaining JSON or code has every
+    right to write braces.
     """
     if not text:
         return text
-    cleaned = text.strip()
-    cleaned = _strip_markdown_fence(cleaned)
+    cleaned = _strip_markdown_fence(text.strip())
     while cleaned and cleaned[0] in "{}" and cleaned.count("{") != cleaned.count("}"):
         cleaned = cleaned[1:].lstrip()
     while cleaned and cleaned[-1] in "{}" and cleaned.count("{") != cleaned.count("}"):
         cleaned = cleaned[:-1].rstrip()
-    cleaned = cleaned.replace('{"answer":', "").replace('"answer":', "")
     return cleaned.strip() or text
+
+
+def _first_json_object(text: str) -> str | None:
+    """The first complete ``{...}`` in ``text``, brace-matched, or None.
+
+    Models routinely wrap the envelope in a sentence ("Sure! Here it is: {…}")
+    or add a closing remark after it. ``json.loads`` refuses both, and the chat
+    path — unlike ``complete_json`` — had no salvage step, so the whole reply
+    was handed to the user as the answer: the JSON contract, rendered in the
+    chat bubble.
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
+
+
+#: Recovers the prose from an envelope that was cut off mid-object — the reply
+#: hit the token ceiling somewhere inside ``suggested_roles``. ``chat()`` returns
+#: a bare string, so there is no ``finish_reason`` to read here; an unterminated
+#: object IS the signal.
+_ANSWER_RE = re.compile(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"', re.DOTALL)
+
+
+def _recover_answer(text: str) -> str | None:
+    match = _ANSWER_RE.search(text)
+    if not match:
+        return None
+    try:
+        recovered = json.loads(f'"{match.group(1)}"')
+    except json.JSONDecodeError:
+        return None
+    recovered = str(recovered).strip()
+    return recovered or None
 
 
 def _parse_llm_response(raw: str) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
     """Extract ``answer``, ``action`` and ``suggested_roles`` from the JSON envelope.
 
-    Falls back to the raw text as ``answer`` if JSON parsing fails.
+    Returns ``("", None, [])`` when nothing usable can be recovered — the caller
+    then shows an honest message. What it must never do is return the raw
+    payload as the answer, which is how a user ended up reading
+    ``"action": null, "suggested_roles": [ … ]`` in a chat bubble.
     """
-    try:
-        parsed = json.loads(_strip_markdown_fence(raw))
-    except json.JSONDecodeError as exc:
-        log.info("Chat response not valid JSON, using raw text: %s", exc)
-        return raw, None, []
+    candidate = _strip_markdown_fence(raw)
+    parsed: Any = None
+    for text in (candidate, _first_json_object(candidate)):
+        if not text:
+            continue
+        try:
+            parsed = json.loads(text)
+            break
+        except json.JSONDecodeError:
+            continue
 
     if not isinstance(parsed, dict):
-        return raw, None, []
+        recovered = _recover_answer(candidate)
+        if recovered:
+            # Truncated or malformed envelope, but the prose survived: show it
+            # and drop the half-written extras.
+            log.info("Chat envelope unparseable; recovered the answer text only")
+            return recovered, None, []
+        log.warning("Chat response could not be parsed as the envelope (%d chars)", len(raw))
+        return "", None, []
 
-    answer = parsed.get("answer") or raw
+    answer = str(parsed.get("answer") or "").strip()
+    if not answer:
+        # A valid envelope with an empty answer used to fall back to the whole
+        # raw payload as the message body.
+        answer = _recover_answer(candidate) or ""
     action = parsed.get("action") if isinstance(parsed.get("action"), dict) else None
 
     roles_raw = parsed.get("suggested_roles")
@@ -84,6 +162,22 @@ def _parse_llm_response(raw: str) -> tuple[str, dict[str, Any] | None, list[dict
                 kws = []
             roles.append({"label": label, "keywords": kws or [label]})
     return str(answer), action, roles
+
+
+#: Shown when the model's reply cannot be turned into an answer at all. Better
+#: an honest sentence in the user's language than the raw contract on screen.
+_UNPARSEABLE_MESSAGE = {
+    "en": "I couldn't put that answer together — please ask me again.",
+    "it": "Non sono riuscito a formulare la risposta — riprova a chiedermelo.",
+    "es": "No he podido formular la respuesta: vuelve a preguntármelo.",
+    "de": "Ich konnte die Antwort nicht formulieren — frag mich bitte noch einmal.",
+    "fr": "Je n'ai pas réussi à formuler la réponse — repose-moi la question.",
+}
+
+
+def _unparseable_message(db: Database) -> str:
+    lang = str(db.get_preference("ui_language", "en") or "en").lower()[:2]
+    return _UNPARSEABLE_MESSAGE.get(lang, _UNPARSEABLE_MESSAGE["en"])
 
 
 def handle_chat_message(
@@ -166,16 +260,31 @@ def handle_chat_message(
         degraded = False
         try:
             raw_answer = provider_manager.chat(
-                prompt_messages, max_tokens=1400, provider_name=provider, model_name=model
+                # The envelope carries prose AND up to five suggested roles with
+                # their keywords; 1400 tokens cut that off mid-object often
+                # enough that the truncated JSON reached the user as the answer.
+                prompt_messages,
+                max_tokens=_CHAT_MAX_TOKENS,
+                provider_name=provider,
+                model_name=model,
             )
             answer, action_payload, suggested_roles = _parse_llm_response(raw_answer)
+            if not answer:
+                answer = _unparseable_message(db)
+                degraded = True
         except Exception as exc:
             log.error("Provider chat call failed, using fallback: %s", exc, exc_info=True)
             answer, action_payload = fallback_answer(db=db, message=message)
             degraded = True  # canned fallback, not a real LLM answer
-
-        answer = _sanitize_chat_answer(answer)
-        db.save_chat_message(session_id=session_id, role="assistant", content=answer)
+            answer = _sanitize_chat_answer(answer)
+        db.save_chat_message(
+            session_id=session_id,
+            role="assistant",
+            content=answer,
+            # Stored with the message so the pills survive a reload or a session
+            # switch, instead of living only in this response.
+            meta={"suggested_roles": suggested_roles} if suggested_roles else None,
+        )
         return {
             "session_id": session_id,
             "answer": answer,

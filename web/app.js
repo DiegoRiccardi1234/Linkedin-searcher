@@ -456,7 +456,9 @@ async function loadChatHistory() {
   const box = document.getElementById("chatBox");
   box.innerHTML = "";
   for (const msg of messages) {
-    appendChat(msg.role, msg.content);
+    // The role pills are stored with the message, so they come back on reload
+    // instead of disappearing the moment the page refreshed.
+    appendChat(msg.role, msg.content, msg.meta || null);
   }
 }
 
@@ -1570,7 +1572,7 @@ async function reloadChatHistoryForActive() {
   box.innerHTML = "";
   try {
     const res = await fetch(`/api/chat/history?session_id=${encodeURIComponent(ChatSessions.active)}&limit=30`).then((r) => r.json());
-    (res.messages || []).forEach((m) => appendChat(m.role, m.content));
+    (res.messages || []).forEach((m) => appendChat(m.role, m.content, m.meta || null));
   } catch (_) {}
 }
 

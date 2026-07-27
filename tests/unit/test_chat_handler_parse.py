@@ -19,20 +19,60 @@ def test_parse_strips_json_fence() -> None:
     assert answer == "wrapped"
 
 
-def test_parse_invalid_json_returns_raw_as_answer() -> None:
-    raw = "this is not json"
-    answer, action, roles = _parse_llm_response(raw)
-    assert answer == raw
+def test_parse_unusable_reply_yields_nothing_rather_than_the_payload() -> None:
+    """Returning the raw text is how the contract ended up in a chat bubble.
+
+    The caller turns an empty answer into an honest sentence; it must never
+    turn a failed parse into "here is your answer".
+    """
+    answer, action, roles = _parse_llm_response("this is not json")
+    assert answer == ""
     assert action is None
     assert roles == []
 
 
 def test_parse_non_dict_payload() -> None:
-    raw = '["a", "b"]'
-    answer, action, roles = _parse_llm_response(raw)
-    assert answer == raw
+    answer, action, roles = _parse_llm_response('["a", "b"]')
+    assert answer == ""
     assert action is None
     assert roles == []
+
+
+def test_parse_salvages_json_wrapped_in_prose() -> None:
+    """Models routinely announce the JSON before emitting it."""
+    raw = 'Certo! Ecco la risposta:\n{"answer": "ciao", "action": null}\nSpero sia utile.'
+    answer, action, roles = _parse_llm_response(raw)
+    assert answer == "ciao"
+    assert action is None
+
+
+def test_parse_recovers_the_prose_from_a_truncated_envelope() -> None:
+    """The real report: the reply was cut off inside suggested_roles, and the
+    user read `"action": null, "suggested_roles": [ {...` in the chat."""
+    raw = (
+        '{"answer": "Ti consiglio questi ruoli.", "action": null, '
+        '"suggested_roles": [{"label": "Consulente HR", "keywords": ["HR Consultant"]}, '
+        '{"label": "Psicologo del'
+    )
+    answer, action, roles = _parse_llm_response(raw)
+    assert answer == "Ti consiglio questi ruoli."
+    assert "suggested_roles" not in answer
+    assert "{" not in answer
+    assert roles == []  # half-written extras are dropped, not guessed at
+    assert action is None
+
+
+def test_parse_empty_answer_does_not_fall_back_to_the_envelope() -> None:
+    raw = '{"answer": "", "action": null, "suggested_roles": []}'
+    answer, _, _ = _parse_llm_response(raw)
+    assert answer == ""
+
+
+def test_parsed_answer_keeps_braces_the_coach_meant_to_write() -> None:
+    """A coach explaining JSON must be allowed to type braces."""
+    raw = '{"answer": "Usa {\\"ruolo\\": \\"AI QA\\"} come esempio.", "action": null}'
+    answer, _, _ = _parse_llm_response(raw)
+    assert answer == 'Usa {"ruolo": "AI QA"} come esempio.'
 
 
 def test_parse_extracts_suggested_roles() -> None:
