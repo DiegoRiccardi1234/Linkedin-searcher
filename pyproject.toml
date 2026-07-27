@@ -1,8 +1,12 @@
 [project]
 name = "job-finder"
-version = "1.4.2"
 description = "Localhost-first AI-powered job search assistant"
 requires-python = ">=3.11"
+# No version here on purpose. There is no build backend — this file only carries
+# tool config — so a version string would be decorative, and it drifted three
+# minor releases behind (1.4.2 vs 1.7.x) because nothing ever read it. The one
+# source of truth is app/version.py, which the app, the updater and the release
+# workflow all use.
 
 [tool.ruff]
 line-length = 100

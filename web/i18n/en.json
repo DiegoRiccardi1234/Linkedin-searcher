@@ -61,7 +61,10 @@
       "ralMin": "Minimum salary (gross/year)",
       "ralTarget": "Target salary (gross/year)",
       "ralSuggest": "Suggest salary with AI",
-      "ralSuggested": "Salary suggested — review and save"
+      "ralSuggested": "Salary suggested — review and save",
+      "saveFailed": "Couldn't save your search goals — check the app logs",
+      "goalsSuggest": "Suggest goals with AI",
+      "goalsSuggested": "Goals proposed — review them, then save"
     },
     "features": {
       "title": "CV tools & privacy",
@@ -94,7 +97,10 @@
     "editName": "Display name",
     "editCvText": "CV text (feeds AI scoring)",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "roles": "Roles",
+    "cvParsed": "CV read — see the profile below.",
+    "uploadAnother": "Upload another CV"
   },
   "jobSearch": {
     "title": "Job",
@@ -213,7 +219,24 @@
     "deleteAllTitle": "Delete all jobs",
     "alsoOn": "Also on",
     "openPosting": "Open posting",
-    "archived": "Archived"
+    "archived": "Archived",
+    "applicableOnly": "Applicable",
+    "applicableOnlyHint": "Hide jobs blocked by location or degree requirements",
+    "flag": {
+      "geo": "Outside the EU",
+      "geoLong": "Based outside the EU and the posting doesn't offer EU-remote work",
+      "grade": "Grade requirement",
+      "gig": "Task work",
+      "gigLong": "Paid per task, no guaranteed hours — not employment",
+      "salary": "Below your minimum",
+      "salaryLong": "The declared pay is below the minimum you set",
+      "shortDesc": "Short description",
+      "heuristic": "Local estimate"
+    },
+    "freshness": {
+      "daysAgo": "Last seen {n} days ago",
+      "likelyExpired": "Probably expired"
+    }
   },
   "kanbanCols": {
     "open": "Open",
@@ -290,7 +313,14 @@
       "probeError": "Test failed",
       "probeEmpty": "No models to test",
       "probeConfirm": "Confirm top models (uses AI)",
-      "probeConfirmDone": "Top models confirmed"
+      "probeConfirmDone": "Top models confirmed",
+      "scoreboardTitle": "Track record (from your usage log)",
+      "scoreboardCalls": "calls",
+      "freeBadge": "Free",
+      "getKey": "Get a free key",
+      "endpoint": "Endpoint (base URL)",
+      "apiKeyOptional": "API key (optional)",
+      "showHide": "Show / hide"
     },
     "features": {
       "title": "Automation",
@@ -326,7 +356,15 @@
       "auto": "Auto (recommended)",
       "saved": "Model saved"
     },
-    "country": "Country"
+    "country": "Country",
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "On a small laptop, or with Windows display scaling at 125%, the compact setting gives back a step of room.",
+      "density": "Density",
+      "densityNormal": "Normal",
+      "densityCompact": "Compact",
+      "densitySaved": "Density updated"
+    }
   },
   "coach": {
     "title": "Career Coach",
@@ -391,7 +429,8 @@
     "copied": "Copied",
     "generateRecruiterMsg": "Recruiter message",
     "recruiterMsg": "Recruiter message",
-    "engagement": "Engagement type"
+    "engagement": "Engagement type",
+    "axisSalaryUnknown": "No source publishes the pay for this posting"
   },
   "scan": {
     "scanning": "Scanning job portals...",
@@ -440,7 +479,8 @@
       "advanced": "Advanced filters"
     },
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
-    "volumeWarning": "Large scan ({n} searches) — this may take a while."
+    "volumeWarning": "Large scan ({n} searches) — this may take a while.",
+    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",
@@ -496,7 +536,8 @@
     "themeDark": "Dark theme",
     "themeLight": "Light theme",
     "languageChanged": "Language updated",
-    "exportError": "Export failed"
+    "exportError": "Export failed",
+    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis."
   },
   "update": {
     "title": "New version available",
@@ -690,7 +731,8 @@
     "all": "All time",
     "noData": "No usage yet",
     "tokens": "Tokens",
-    "calls": "Calls"
+    "calls": "Calls",
+    "quotaToday": "Requests today"
   },
   "manualJob": {
     "title": "Add a job",
@@ -741,5 +783,78 @@
     "namePrompt": "Name this search:",
     "saved": "Search saved",
     "loaded": "Running: {name}"
+  },
+  "compare": {
+    "title": "Compare offers",
+    "open": "Compare",
+    "clear": "Clear",
+    "pick": "Add to comparison",
+    "selected": "{n} selected",
+    "maxReached": "You can compare up to {n} offers",
+    "needTwo": "Pick at least two offers to compare",
+    "loading": "Loading…",
+    "error": "Couldn't load the comparison"
+  },
+  "watchlist": {
+    "title": "Companies you follow",
+    "hint": "A keyword scan never finds an employer that words its postings differently. Followed companies are searched by name.",
+    "placeholder": "Company name",
+    "add": "Follow",
+    "remove": "Stop following",
+    "empty": "You are not following any company yet.",
+    "suggestionsLabel": "Suggestions:",
+    "include": "Include followed companies",
+    "added": "Now following {name}",
+    "neverSeen": "no postings seen yet",
+    "seenToday": "posting seen today",
+    "seenDays": "last posting {days} days ago"
+  },
+  "application": {
+    "title": "Application",
+    "sentOn": "Sent on",
+    "dateUnknown": "date not recorded",
+    "cvUsed": "CV used",
+    "cvUnknown": "not recorded",
+    "cvGone": "profile since deleted",
+    "outcomeLabel": "Outcome",
+    "saved": "Outcome saved",
+    "outcome": {
+      "pending": "Still open",
+      "no_response": "No response",
+      "rejected": "Rejected",
+      "offer": "Offer received",
+      "accepted": "Accepted",
+      "withdrawn": "Withdrawn"
+    }
+  },
+  "feedback": {
+    "question": "Is this score right?",
+    "agree": "The score is right",
+    "disagree": "The score is wrong",
+    "addDetail": "Add detail (optional)",
+    "expectedPlaceholder": "0-10",
+    "reasonPlaceholder": "Why? e.g. wants five years",
+    "saved": "Thanks — recorded",
+    "summaryTitle": "Scoring quality",
+    "summaryEmpty": "No judgements yet. Rate a few scores in the job detail and they land here.",
+    "agreementLabel": "agree with the AI",
+    "casesLabel": "judged offers",
+    "avgGapLabel": "average gap",
+    "export": "Export cases (JSONL)"
+  },
+  "local": {
+    "title": "Run a model on this PC",
+    "subtitle": "A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.",
+    "refresh": "Check again",
+    "noGpu": "No NVIDIA GPU detected",
+    "needOllama": "Ollama is what downloads and serves local models. Install it from",
+    "ollamaStopped": "Ollama is installed but not running: start it and check again.",
+    "noneDownloaded": "No model downloaded yet.",
+    "useForScoring": "Use for scoring",
+    "nowUsing": "Scoring now runs on {model}",
+    "couldAlsoRun": "This machine could also run:",
+    "download": "Download",
+    "pullStarting": "Starting download of {model}…",
+    "pullDone": "{model} is ready"
   }
 }

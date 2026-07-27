@@ -1,5 +1,6 @@
 import { api, escapeHtml, setText, truncate, showToast, renderCoachMarkdown } from "./modules/helpers.js";
 import { initTheme } from "./modules/theme.js";
+import { initLayout, syncStickyOffset } from "./modules/layout.js";
 import { loadShortlist as _loadShortlistApi, addToShortlist as _addToShortlistApi, removeFromShortlist as _removeFromShortlistApi } from "./modules/shortlist.js";
 import { initI18n, t, loadLanguage, getCurrentLang, onLanguageChange } from "./modules/i18n.js";
 import { loadProfile as loadProfileView, bindProfileEvents, addRolesToProfile } from "./modules/profile.js";
@@ -45,7 +46,10 @@ import {
   wireReminderEditor,
 } from "./modules/reminders.js";
 import { initSavedSearches, loadSavedSearches } from "./modules/saved_searches.js";
-import { initJobList, loadJobs } from "./modules/job_list.js";
+import { initLocalModels, loadLocalModels } from "./modules/local_models.js";
+import { initWatchlist, loadWatchlist } from "./modules/watchlist.js";
+import { initJobList, initJobSorting, loadJobs } from "./modules/job_list.js";
+import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
   showJobDetail,
@@ -62,6 +66,7 @@ window.addEventListener("unhandledrejection", (e) => console.error("Unhandled pr
 window.addEventListener("error", (e) => console.error("Uncaught error:", e.error || e.message));
 
 initTheme();
+initLayout();
 
 // Inject core refresh callbacks the provider module needs after a key save
 // (avoids a circular import). loadHealth/loadKeysStatus/refreshOnboardingPlaceholder
@@ -119,9 +124,13 @@ function activateView(viewName) {
   });
 
   // v1.3.2: hide the chat coach sidebar on the Info view so reading docs
-  // is not crowded by the chat panel. Other views keep it for quick access.
+  // is not crowded by the chat panel. v1.7.7: the Jobs archive joins it — a
+  // 9-column table plus a 4-column board cannot share the row with a 300px+
+  // rail on a 1366px laptop (it pushed the board past the viewport).
+  const railless = viewName === "info" || viewName === "jobs";
   const rail = document.querySelector(".right-rail");
-  if (rail) rail.classList.toggle("hidden", viewName === "info");
+  if (rail) rail.classList.toggle("hidden", railless);
+  document.body.classList.toggle("rail-hidden", railless);
 
   // Mobile chrome: navigating closes any open menu/drawer and the chat FAB
   // is suppressed on the Info view (where the rail is hidden).
@@ -131,7 +140,8 @@ function activateView(viewName) {
   const overlay = document.getElementById("mobileOverlay");
   if (overlay) { overlay.classList.remove("active"); overlay.hidden = true; }
   const fab = document.getElementById("chatFab");
-  if (fab) fab.classList.toggle("hidden", viewName === "info");
+  if (fab) fab.classList.toggle("hidden", railless);
+  syncStickyOffset();
 }
 
 function roleLabel(role) {
@@ -448,7 +458,9 @@ async function loadChatHistory() {
   const box = document.getElementById("chatBox");
   box.innerHTML = "";
   for (const msg of messages) {
-    appendChat(msg.role, msg.content);
+    // The role pills are stored with the message, so they come back on reload
+    // instead of disappearing the moment the page refreshed.
+    appendChat(msg.role, msg.content, msg.meta || null);
   }
 }
 
@@ -486,13 +498,17 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
   const formData = new FormData();
   formData.append("file", fileInput.files[0]);
 
-  const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById("cvPickBtn");
   const originalLabel = submitBtn ? submitBtn.innerHTML : "";
+  const dropzone = document.getElementById("cvDropzone");
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="spinner-inline"></span> ${t("toast.cvAnalyzing") || "Analyzing CV with AI..."}`;
+    submitBtn.innerHTML = `<span class="spinner-inline"></span> ${t("toast.cvAnalyzing")}`;
   }
-  showToast(t("toast.cvAnalyzing") || "Analyzing CV with AI...", "info");
+  // The upload now starts from the dropzone, so that is where the user is
+  // looking: the button spinner alone left them staring at a static box.
+  dropzone?.classList.add("is-busy");
+  showToast(t("toast.cvAnalyzing"), "info");
 
   try {
     const response = await fetch(
@@ -509,7 +525,9 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     }
 
     const payload = await response.json();
-    setText("cvSummary", JSON.stringify(payload, null, 2));
+    // Was JSON.stringify(payload) — the user got the raw API response dumped
+    // into the page. Show what the AI actually understood.
+    setText("cvSummary", cvSummaryText(payload));
     await loadProfiles();
     await loadProfileView();
     await loadRecommendations();
@@ -535,8 +553,26 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalLabel;
     }
+    dropzone?.classList.remove("is-busy");
   }
 });
+
+// The upload response is a status envelope; the readable part is the profile
+// the parser built from the CV.
+function cvSummaryText(payload) {
+  const summary = payload?.summary || payload?.profile?.summary_json || {};
+  const bits = [];
+  if (summary.name) bits.push(summary.name);
+  if (summary.title || summary.headline) bits.push(summary.title || summary.headline);
+  const skills = Array.isArray(summary.skills) ? summary.skills.slice(0, 12) : [];
+  if (skills.length) bits.push(`${t("profile.skills")}: ${skills.join(", ")}`);
+  const roles = Array.isArray(summary.preferred_roles) ? summary.preferred_roles.slice(0, 6) : [];
+  if (roles.length) bits.push(`${t("profile.roles")}: ${roles.join(", ")}`);
+  const languages = Array.isArray(summary.languages) ? summary.languages : [];
+  if (languages.length) bits.push(`${t("profile.languages")}: ${languages.join(", ")}`);
+  if (payload?.deduplicated) bits.push(t("toast.cvAlreadyUploaded"));
+  return bits.join("\n") || t("profile.cvParsed");
+}
 
 (() => {
   const dz = document.getElementById("cvDropzone");
@@ -567,7 +603,11 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       text.textContent = name;
       dz.classList.add("has-file");
     }
+    // Picking a file IS the request to upload it. Dropping a CV and having
+    // nothing happen until you found the button was the whole friction.
+    if (fileInput.files?.length) document.getElementById("cvForm")?.requestSubmit();
   });
+  document.getElementById("cvPickBtn")?.addEventListener("click", () => fileInput.click());
 })();
 
 {
@@ -590,10 +630,19 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
         await onRemoveProviderKey(name);
         return;
       }
+      if (target.classList.contains("provider-preset-btn")) {
+        const endpoint = card.querySelector(".provider-endpoint-input");
+        if (endpoint) endpoint.value = target.dataset.url || "";
+        return;
+      }
       if (target.classList.contains("provider-save-btn")) {
         const input = card.querySelector(".provider-key-input");
         const value = input ? input.value.trim() : "";
-        if (!value) {
+        // A local model server authenticates nobody: for the custom provider
+        // the endpoint is what has to be filled in, not the key.
+        const endpointEl = card.querySelector(".provider-endpoint-input");
+        const endpoint = endpointEl ? endpointEl.value.trim() : "";
+        if (!value && !endpoint) {
           showToast(t("toast.enterKeyOrProvider"), "info");
           return;
         }
@@ -871,6 +920,8 @@ initSavedSearches({
   applyConfig: applyScanConfig,
   submitScan: () => document.getElementById("scanForm")?.requestSubmit(),
 });
+initWatchlist();
+initLocalModels();
 
 document.getElementById("refreshJobsBtn").addEventListener("click", loadJobs);
 document.getElementById("onlyNew").addEventListener("change", loadJobs);
@@ -880,6 +931,8 @@ document.getElementById("minScore").addEventListener("change", loadJobs);
 document.getElementById("maxAgeDays").addEventListener("change", loadJobs);
 document.getElementById("statusFilter").addEventListener("change", loadJobs);
 document.getElementById("remoteOnly").addEventListener("change", loadJobs);
+document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
+initJobSorting();
 {
   const usageRangeSel = document.getElementById("usageRange");
   if (usageRangeSel) usageRangeSel.addEventListener("change", () => loadUsage());
@@ -1106,7 +1159,14 @@ async function bootstrap() {
   await initI18n();
   refreshModelPickerLabel();
   initJobDetail({ pinJobToActiveSession });
-  initJobList({ showJobDetail, performJobAction, toggleFavorite });
+  initJobList({
+    showJobDetail,
+    performJobAction,
+    toggleFavorite,
+    isCompareSelected: isSelected,
+    toggleCompare,
+  });
+  initCompare();
   initScan({ getKeywords, getLocations, ensureProviderConfigured });
   setupSharedLayout();
   activateView("dashboard");
@@ -1119,6 +1179,10 @@ async function bootstrap() {
   await loadSkillGap();
   await loadReminders();
   await loadSavedSearches();
+  await loadWatchlist();
+  // Probes the GPU and asks Ollama: slow enough to keep off the critical path,
+  // and useless until the user opens Settings anyway.
+  loadLocalModels();
   await loadSchedulerStatus();
   await loadChatPrompts();
   // i18n is ready here, so the session dropdown / empty-state get localised
@@ -1553,7 +1617,7 @@ async function reloadChatHistoryForActive() {
   box.innerHTML = "";
   try {
     const res = await fetch(`/api/chat/history?session_id=${encodeURIComponent(ChatSessions.active)}&limit=30`).then((r) => r.json());
-    (res.messages || []).forEach((m) => appendChat(m.role, m.content));
+    (res.messages || []).forEach((m) => appendChat(m.role, m.content, m.meta || null));
   } catch (_) {}
 }
 

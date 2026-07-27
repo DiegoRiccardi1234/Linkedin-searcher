@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from app.db import Database
+from app.services.onboarding import onboarding_context
 from app.services.pii import redact_pii
 
 
@@ -118,6 +119,12 @@ def build_profile_context(db: Database) -> str:
 
 def build_preferences_context(db: Database) -> str:
     prefs: list[str] = []
+    # The search goals the user filled in on the Profile page. The coach read a
+    # different, legacy set of keys and so was the one surface in the app that
+    # could not see them — it asked about things the user had already answered.
+    goals = onboarding_context(db)
+    if goals:
+        prefs.append(goals)
     remote = db.get_preference("remote_mode", "")
     if remote:
         prefs.append(f"Work mode: {remote}")

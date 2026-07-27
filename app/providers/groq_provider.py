@@ -9,6 +9,7 @@ from app.providers.base import (
     TruncatedCompletionError,
     extract_usage,
     first_choice,
+    is_transport_failure,
     is_truncated,
     is_unauthorized,
 )
@@ -119,7 +120,14 @@ class GroqProvider(LLMProvider):
             return cast(dict[str, Any], json.loads(content))
         except (TruncatedCompletionError, EmptyCompletionError):
             raise
-        except (json.JSONDecodeError, Exception) as exc:
+        except Exception as exc:
+            # A throttled or unauthorised host answers the retry the same way:
+            # falling back to prose here just spends a second request before the
+            # factory fails over. (json.JSONDecodeError was listed alongside
+            # Exception in this clause — it is a ValueError, so it never
+            # matched separately.)
+            if is_transport_failure(exc):
+                raise
             log.info("groq complete_json fallback (model=%s): %s", resolved_model, exc)
             text = self.complete_text(prompt=prompt, model=resolved_model, max_tokens=max_tokens)
             return _extract_json(text)

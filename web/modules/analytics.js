@@ -3,6 +3,7 @@
 // "no data yet" note instead of an empty/broken canvas when its series is empty.
 import { api } from "./helpers.js";
 import { getCurrentLang, t } from "./i18n.js";
+import { loadScoreFeedbackSummary } from "./score_feedback.js";
 
 let statusChart = null;
 let scoreChart = null;
@@ -40,6 +41,9 @@ function _hasData(obj) {
 }
 
 export async function loadAnalytics() {
+  // Not a chart and not from /api/analytics: it renders itself and must not be
+  // skipped when the charts below have nothing to draw.
+  loadScoreFeedbackSummary();
   try {
     const data = await api("/api/analytics");
 
@@ -137,8 +141,10 @@ export async function loadUsage(range) {
     body.innerHTML = `<p class="analytics-empty">${t("usage.noData")}</p>`;
     return;
   }
+  const quota = data.quota || null;
   if (!data.total_calls) {
-    body.innerHTML = `<p class="analytics-empty">${t("usage.noData")}</p>`;
+    body.innerHTML =
+      `<p class="analytics-empty">${t("usage.noData")}</p>` + quotaBarHtml(quota);
     return;
   }
   const fmt = (n) => Number(n || 0).toLocaleString(getCurrentLang());
@@ -155,5 +161,25 @@ export async function loadUsage(range) {
       <div class="usage-stat"><span class="usage-num">${fmt(data.total_tokens)}</span><span class="usage-lbl">${t("usage.tokens")}</span></div>
       <div class="usage-stat"><span class="usage-num">${fmt(data.total_calls)}</span><span class="usage-lbl">${t("usage.calls")}</span></div>
     </div>
-    <div class="usage-list">${rows}</div>`;
+    <div class="usage-list">${rows}</div>
+    ${quotaBarHtml(quota)}`;
+}
+
+// Today's requests against the daily ceiling. A free OpenRouter account gets
+// 1000 a day shared across every key, and nothing in the app ever said so —
+// you found out through a wall of 429s in the middle of a scan.
+function quotaBarHtml(quota) {
+  if (!quota || !quota.limit) return "";
+  const used = Number(quota.used || 0);
+  const limit = Number(quota.limit);
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  const level = pct >= 100 ? "flag-block" : pct >= 80 ? "flag-warn" : "";
+  return `
+    <div class="usage-quota">
+      <div class="usage-quota-head micro">
+        <span>${t("usage.quotaToday")}</span>
+        <span class="${level}">${used} / ${limit}</span>
+      </div>
+      <div class="usage-quota-track"><div class="usage-quota-fill" style="width:${pct}%"></div></div>
+    </div>`;
 }

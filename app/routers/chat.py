@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app import rate_limit
 from app.models import (
@@ -44,7 +44,9 @@ def build_router(container: AppContainer) -> APIRouter:
         return ChatResponse(**result)
 
     @router.get("/api/chat/history")
-    def chat_history(session_id: str = "default", limit: int = 30) -> dict[str, Any]:
+    def chat_history(
+        session_id: str = "default", limit: int = Query(default=30, ge=1, le=500)
+    ) -> dict[str, Any]:
         items = container.db.list_chat_messages(session_id=session_id, limit=limit)
         return {"messages": items}
 

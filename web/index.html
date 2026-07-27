@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Job Finder — AI Job Search</title>
   <link rel="icon" type="image/svg+xml" href="/web/favicon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400" rel="stylesheet" />
+  <!-- Everything below is served from the bundle. A desktop app that needs a CDN
+       to draw its charts and icons is broken offline: the match radar vanished
+       and every icon button rendered its ligature text ("delete", "restart_alt").
+       Body/mono fonts fall back to the system stack (see --font-sans/--font-mono). -->
+  <link rel="stylesheet" href="/web/vendor/material-symbols.css?v={{VERSION}}" />
   <link rel="stylesheet" href="/web/styles.css?v={{VERSION}}" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/web/vendor/chart.umd.min.js?v={{VERSION}}"></script>
 </head>
 <body>
   <div id="updateBanner" class="update-banner hidden" role="status">
@@ -76,6 +77,24 @@
   </div>
 
   <div id="jobDetailBackdrop" class="job-detail-backdrop hidden"></div>
+
+  <!-- Side-by-side comparison: the table could show that a job is a 6, never
+       how it differs from the other 6 sitting next to it. -->
+  <div id="compareModal" class="mini-modal hidden" role="dialog" aria-modal="true">
+    <div class="mini-modal-card compare-card">
+      <div class="mini-modal-head">
+        <h3 data-i18n="compare.title">Compare offers</h3>
+        <button type="button" class="icon-btn" data-close-compare aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div id="compareBody" class="compare-body"></div>
+    </div>
+  </div>
+
+  <div id="compareBar" class="compare-bar hidden">
+    <span id="compareCount" class="micro"></span>
+    <button type="button" id="compareOpenBtn" class="primary" data-i18n="compare.open">Compare</button>
+    <button type="button" id="compareClearBtn" class="ghost-btn" data-i18n="compare.clear">Clear</button>
+  </div>
 
   <div id="manualJobModal" class="mini-modal hidden" role="dialog" aria-modal="true">
     <div class="mini-modal-card">
@@ -209,6 +228,10 @@
             <h4><span class="material-symbols-outlined">apartment</span> <span data-i18n="analytics.topCompanies">Top Companies</span></h4>
             <canvas id="topCompaniesChart" role="img" aria-label="Top companies chart"></canvas>
           </div>
+          <div class="analytics-card">
+            <h4><span class="material-symbols-outlined">rule</span> <span data-i18n="feedback.summaryTitle">Scoring quality</span></h4>
+            <div id="scoreFeedbackSummary" class="score-feedback-summary"></div>
+          </div>
           <div class="analytics-card" id="usageCard">
             <h4 class="usage-head">
               <span><span class="material-symbols-outlined">data_usage</span> <span data-i18n="usage.title">AI Usage</span></span>
@@ -322,6 +345,7 @@
           <label class="filter-check"><input id="onlyFavorites" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">favorite</span> <span data-i18n="jobs.favorites">Favorites</span></label>
           <label class="filter-check"><input id="onlyNew" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">fiber_new</span> <span data-i18n="jobs.new">New</span></label>
           <label class="filter-check"><input id="remoteOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">home_work</span> <span data-i18n="jobs.remote">Remote</span></label>
+          <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
           <select id="statusFilter">
             <option value="" data-i18n="jobs.allStatuses">All statuses</option>
             <option value="open" data-i18n="jobs.open">Open</option>
@@ -339,11 +363,11 @@
           <table>
             <thead>
               <tr>
-                <th data-i18n="jobs.score">Score</th>
+                <th class="th-sort" data-sort="punteggio_ai" data-i18n="jobs.score">Score</th>
                 <th data-i18n="jobs.colStatus">Status</th>
-                <th data-i18n="jobs.title">Title</th>
-                <th data-i18n="jobs.company">Company</th>
-                <th data-i18n="jobs.location">Location</th>
+                <th class="th-sort" data-sort="titolo" data-i18n="jobs.title">Title</th>
+                <th class="th-sort" data-sort="azienda" data-i18n="jobs.company">Company</th>
+                <th class="th-sort" data-sort="sede" data-i18n="jobs.location">Location</th>
                 <th data-i18n="jobs.source">Source</th>
                 <th data-i18n="jobs.advice">Advice</th>
                 <th data-i18n="jobs.detail">Detail</th>
@@ -423,6 +447,7 @@
             <label class="pill-toggle"><input type="checkbox" name="scanSites" value="linkedin" checked /><span>LinkedIn</span></label>
             <label class="pill-toggle"><input type="checkbox" name="scanSites" value="indeed" checked /><span>Indeed</span></label>
             <label class="pill-toggle"><input type="checkbox" id="remoteToggle" /><span data-i18n="settings.remoteOnly">Remote only</span></label>
+            <label class="pill-toggle" id="watchlistTogglePill" hidden><input type="checkbox" id="watchlistToggle" /><span data-i18n="watchlist.include">Include followed companies</span></label>
           </div>
 
           <details class="scan-advanced">
@@ -487,6 +512,21 @@
           <div id="savedSearchList" class="saved-search-list"></div>
           <p id="savedSearchEmpty" class="micro" data-i18n="savedSearch.empty" style="display:none;">No saved searches yet.</p>
         </section>
+
+        <section class="search-section watchlist-section">
+          <header class="search-section-head">
+            <h3><span class="material-symbols-outlined">business_center</span> <span data-i18n="watchlist.title">Companies you follow</span></h3>
+          </header>
+          <p class="micro" data-i18n="watchlist.hint">A keyword scan never finds an employer that words its postings differently. Followed companies are searched by name.</p>
+          <div class="watchlist-add">
+            <input type="text" id="watchlistInput" data-i18n-placeholder="watchlist.placeholder" placeholder="Company name" />
+            <button type="button" id="watchlistAddBtn" class="ghost-btn small"><span class="material-symbols-outlined">add</span> <span data-i18n="watchlist.add">Follow</span></button>
+          </div>
+          <div id="watchlistList" class="watchlist-list"></div>
+          <p id="watchlistEmpty" class="micro" data-i18n="watchlist.empty" style="display:none;">You are not following any company yet.</p>
+          <p class="micro" data-i18n="watchlist.suggestionsLabel">Suggestions:</p>
+          <div id="watchlistSuggestions" class="watchlist-suggestions"></div>
+        </section>
       </article>
     </section>
 
@@ -509,8 +549,13 @@
               <span class="cv-dropzone-text" data-i18n="profile.dropzone">Drop CV here or click to browse</span>
               <small class="cv-dropzone-hint">PDF · DOCX · MD · TXT · IMG (JPG/PNG/AVIF)</small>
             </label>
-            <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx,.jpg,.jpeg,.png,.webp,.avif,.tiff,.bmp,.svg" required hidden />
-            <button type="submit" class="secondary" data-i18n="profile.uploadCv">Upload CV</button>
+            <!-- Not `required`: the input is hidden, and Chrome refuses to
+                 submit a form whose invalid control cannot be focused — which
+                 aborted before any of our JS ran. The handler checks instead. -->
+            <input id="cvFile" type="file" accept=".md,.txt,.pdf,.docx,.jpg,.jpeg,.png,.webp,.avif,.tiff,.bmp,.svg" hidden />
+            <!-- The upload starts as soon as a file is chosen or dropped, so
+                 this button does what the label does: open the picker. -->
+            <button type="button" id="cvPickBtn" class="secondary" data-i18n="profile.uploadAnother">Upload another CV</button>
           </form>
           <pre id="cvSummary" class="output hidden"></pre>
         </article>
@@ -536,6 +581,8 @@
             <input id="obWorkMode" type="text" data-i18n-placeholder="profile.onboarding.workMode" placeholder="Preferred work mode (remote/hybrid)" />
             <input id="obRalMin" type="number" min="0" step="1000" data-i18n-placeholder="profile.onboarding.ralMin" placeholder="Minimum salary (gross/year)" />
             <input id="obRalTarget" type="number" min="0" step="1000" data-i18n-placeholder="profile.onboarding.ralTarget" placeholder="Target salary (gross/year)" />
+            <button type="button" id="goalsSuggestBtn" class="secondary" data-i18n="profile.onboarding.goalsSuggest">Suggest goals with AI</button>
+            <p class="micro" id="goalsSuggestNote" hidden></p>
             <button type="button" id="ralSuggestBtn" class="secondary" data-i18n="profile.onboarding.ralSuggest">Suggest salary</button>
             <p class="micro" id="ralSuggestNote" hidden></p>
             <button type="submit" class="secondary" data-i18n="profile.onboarding.save">Save goals</button>
@@ -704,6 +751,16 @@
           </select>
           <pre id="keysStatus" class="output hidden"></pre>
         </article>
+        <article class="card-block card-block--wide" id="localModelsCard">
+          <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>
+          <p class="micro" data-i18n="local.subtitle">A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.</p>
+          <div id="localHardware" class="local-hardware"></div>
+          <p id="localVerdict" class="local-verdict"></p>
+          <div id="localReady" class="local-ready"></div>
+          <div id="localSuggestions" class="local-suggestions"></div>
+          <p id="localProgress" class="micro local-progress" hidden></p>
+          <button type="button" id="localRefresh" class="ghost-btn small"><span class="material-symbols-outlined">refresh</span> <span data-i18n="local.refresh">Check again</span></button>
+        </article>
 
         <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">smart_toy</span> <span data-i18n="settings.models.title">AI models</span></h3>
@@ -738,6 +795,18 @@
               <button type="button" id="autoscanRunNow" class="secondary" data-i18n="settings.features.runNow">Run now</button>
             </div>
           </div>
+        </article>
+
+        <article class="card-block card-block--wide">
+          <h3><span class="material-symbols-outlined">format_size</span> <span data-i18n="settings.appearance.title">Appearance</span></h3>
+          <p class="micro" data-i18n="settings.appearance.subtitle">On a small laptop, or with Windows display scaling at 125%, the compact setting gives back a step of room.</p>
+          <label class="settings-field">
+            <span class="micro" data-i18n="settings.appearance.density">Density</span>
+            <select id="densitySelect" class="settings-select">
+              <option value="normal" data-i18n="settings.appearance.densityNormal">Normal</option>
+              <option value="compact" data-i18n="settings.appearance.densityCompact">Compact</option>
+            </select>
+          </label>
         </article>
 
         <article class="card-block card-block--wide">

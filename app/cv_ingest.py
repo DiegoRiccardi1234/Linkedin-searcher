@@ -673,6 +673,24 @@ _SUMMARY_LANGUAGES = {
 }
 
 
+def _cv_parse_call_kwargs(provider_manager: Any) -> dict[str, Any]:
+    """Provider/model kwargs for reading a CV into JSON.
+
+    This was the only CV call-site that passed nothing at all, so it ran on the
+    global default policy while the other four (review, improve, RAL and goals
+    suggestions) all state what they need. getattr-guarded because test stubs
+    stand in for the real manager and have neither ``settings`` nor ``pin_kwargs``.
+    """
+    from app.services.generation import CV_PARSE_POLICY
+
+    pin = getattr(provider_manager, "pin_kwargs", None)
+    if not callable(pin):
+        return {}
+    settings = getattr(provider_manager, "settings", None)
+    kwargs = pin(getattr(settings, "cv_model", None), CV_PARSE_POLICY)
+    return kwargs if isinstance(kwargs, dict) else {}
+
+
 def summarize_profile_with_llm(
     markdown_text: str,
     provider_manager: "Any",
@@ -731,7 +749,15 @@ def summarize_profile_with_llm(
         f"CV Content:\n{content[:3000]}"
     )
     try:
-        result = provider_manager.complete_json(prompt=prompt, max_tokens=600)
+        result = provider_manager.complete_json(
+            prompt=prompt,
+            # The profile JSON carries seven lists and a summary; 600 tokens cut
+            # off the richer CVs, and a cut-off answer silently becomes the
+            # heuristic profile below. Rare call (once per upload), so the budget
+            # is generous on purpose.
+            max_tokens=1200,
+            **_cv_parse_call_kwargs(provider_manager),
+        )
         if isinstance(result, dict):
             heuristic = summarize_profile(markdown_text)
             # Merge LLM output with heuristic-derived fields so years_experience

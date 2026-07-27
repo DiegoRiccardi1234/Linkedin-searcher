@@ -61,7 +61,10 @@
       "ralMin": "Salario mínimo (bruto/año)",
       "ralTarget": "Salario objetivo (bruto/año)",
       "ralSuggest": "Sugerir salario con IA",
-      "ralSuggested": "Salario sugerido: revísalo y guárdalo"
+      "ralSuggested": "Salario sugerido: revísalo y guárdalo",
+      "saveFailed": "No se pudieron guardar tus objetivos de búsqueda: revisa los registros",
+      "goalsSuggest": "Sugerir objetivos con IA",
+      "goalsSuggested": "Objetivos propuestos: revísalos y guarda"
     },
     "features": {
       "title": "Herramientas de CV y privacidad",
@@ -94,7 +97,10 @@
     "editName": "Nombre",
     "editCvText": "Texto del CV (usado por la IA)",
     "save": "Guardar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "roles": "Puestos",
+    "cvParsed": "CV leído: mira el perfil abajo.",
+    "uploadAnother": "Subir otro CV"
   },
   "jobSearch": {
     "title": "Buscar",
@@ -213,7 +219,24 @@
     "deleteAllTitle": "Eliminar todos los empleos",
     "alsoOn": "También en",
     "openPosting": "Abrir oferta",
-    "archived": "Archivada"
+    "archived": "Archivada",
+    "applicableOnly": "Aplicables",
+    "applicableOnlyHint": "Oculta las ofertas bloqueadas por ubicación o titulación",
+    "flag": {
+      "geo": "Fuera de la UE",
+      "geoLong": "Ubicación fuera de la UE y la oferta no admite trabajo remoto desde la UE",
+      "grade": "Nota mínima",
+      "gig": "Trabajo por tareas",
+      "gigLong": "Pago por tarea, sin horas garantizadas: no es un empleo",
+      "salary": "Por debajo de tu mínimo",
+      "salaryLong": "El salario declarado está por debajo del mínimo que fijaste",
+      "shortDesc": "Descripción breve",
+      "heuristic": "Estimación local"
+    },
+    "freshness": {
+      "daysAgo": "Vista hace {n} días",
+      "likelyExpired": "Probablemente caducada"
+    }
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -290,7 +313,14 @@
       "probeError": "Prueba fallida",
       "probeEmpty": "Sin modelos que probar",
       "probeConfirm": "Confirmar los mejores (usa IA)",
-      "probeConfirmDone": "Mejores confirmados"
+      "probeConfirmDone": "Mejores confirmados",
+      "scoreboardTitle": "Historial real (del registro de uso)",
+      "scoreboardCalls": "llamadas",
+      "freeBadge": "Gratis",
+      "getKey": "Consigue una clave gratis",
+      "endpoint": "Endpoint (URL base)",
+      "apiKeyOptional": "Clave API (opcional)",
+      "showHide": "Mostrar / ocultar"
     },
     "features": {
       "title": "Automatización",
@@ -326,7 +356,15 @@
       "auto": "Auto (recomendado)",
       "saved": "Modelo guardado"
     },
-    "country": "País"
+    "country": "País",
+    "appearance": {
+      "title": "Apariencia",
+      "subtitle": "En un portátil pequeño, o con el escalado de Windows al 125%, el modo compacto devuelve espacio.",
+      "density": "Densidad",
+      "densityNormal": "Normal",
+      "densityCompact": "Compacta",
+      "densitySaved": "Densidad actualizada"
+    }
   },
   "coach": {
     "title": "Career Coach",
@@ -391,7 +429,8 @@
     "copied": "Copiado",
     "generateRecruiterMsg": "Mensaje al reclutador",
     "recruiterMsg": "Mensaje al reclutador",
-    "engagement": "Tipo de contratación"
+    "engagement": "Tipo de contratación",
+    "axisSalaryUnknown": "Ninguna fuente publica el salario de esta oferta"
   },
   "scan": {
     "scanning": "Escaneando portales de empleo...",
@@ -440,7 +479,8 @@
       "advanced": "Filtros avanzados"
     },
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
-    "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar."
+    "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
+    "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",
@@ -496,7 +536,8 @@
     "themeDark": "Tema oscuro",
     "themeLight": "Tema claro",
     "languageChanged": "Idioma actualizado",
-    "exportError": "Error de exportación"
+    "exportError": "Error de exportación",
+    "cvAlreadyUploaded": "Este CV ya se había subido: reutilizo el análisis guardado."
   },
   "update": {
     "title": "Nueva versión disponible",
@@ -690,7 +731,8 @@
     "all": "Todo",
     "noData": "Sin uso aún",
     "tokens": "Tokens",
-    "calls": "Llamadas"
+    "calls": "Llamadas",
+    "quotaToday": "Solicitudes hoy"
   },
   "manualJob": {
     "title": "Añadir un empleo",
@@ -741,5 +783,78 @@
     "namePrompt": "Nombre de la búsqueda:",
     "saved": "Búsqueda guardada",
     "loaded": "Ejecutando: {name}"
+  },
+  "compare": {
+    "title": "Comparar ofertas",
+    "open": "Comparar",
+    "clear": "Limpiar",
+    "pick": "Añadir a la comparación",
+    "selected": "{n} seleccionadas",
+    "maxReached": "Puedes comparar hasta {n} ofertas",
+    "needTwo": "Selecciona al menos dos ofertas para comparar",
+    "loading": "Cargando…",
+    "error": "No se pudo cargar la comparación"
+  },
+  "watchlist": {
+    "title": "Empresas que sigues",
+    "hint": "Una busqueda por palabras clave nunca encuentra a una empresa que redacta sus ofertas de otra forma. Las empresas seguidas se buscan por nombre.",
+    "placeholder": "Nombre de la empresa",
+    "add": "Seguir",
+    "remove": "Dejar de seguir",
+    "empty": "Todavía no sigues ninguna empresa.",
+    "suggestionsLabel": "Sugerencias:",
+    "include": "Incluir las empresas seguidas",
+    "added": "Ahora sigues a {name}",
+    "neverSeen": "ninguna oferta vista aún",
+    "seenToday": "oferta vista hoy",
+    "seenDays": "última oferta hace {days} días"
+  },
+  "application": {
+    "title": "Candidatura",
+    "sentOn": "Enviada el",
+    "dateUnknown": "fecha no registrada",
+    "cvUsed": "CV usado",
+    "cvUnknown": "no registrado",
+    "cvGone": "perfil eliminado después",
+    "outcomeLabel": "Resultado",
+    "saved": "Resultado guardado",
+    "outcome": {
+      "pending": "Aún abierta",
+      "no_response": "Sin respuesta",
+      "rejected": "Rechazada",
+      "offer": "Oferta recibida",
+      "accepted": "Aceptada",
+      "withdrawn": "Retirada"
+    }
+  },
+  "feedback": {
+    "question": "¿El puntaje es correcto?",
+    "agree": "El puntaje es correcto",
+    "disagree": "El puntaje es incorrecto",
+    "addDetail": "Añadir detalle (opcional)",
+    "expectedPlaceholder": "0-10",
+    "reasonPlaceholder": "¿Por qué? p. ej. pide cinco años",
+    "saved": "Gracias, registrado",
+    "summaryTitle": "Calidad de la puntuación",
+    "summaryEmpty": "Aún sin valoraciones. Vota algunos puntajes en el detalle de la oferta y aparecerán aquí.",
+    "agreementLabel": "de acuerdo con la IA",
+    "casesLabel": "ofertas valoradas",
+    "avgGapLabel": "diferencia media",
+    "export": "Exportar casos (JSONL)"
+  },
+  "local": {
+    "title": "Usa un modelo en este PC",
+    "subtitle": "Un modelo en tu GPU no tiene cuota diaria ni límites de frecuencia, y nada sale del equipo. Lo que importa es si cabe en la memoria de vídeo.",
+    "refresh": "Volver a comprobar",
+    "noGpu": "No se detectó GPU NVIDIA",
+    "needOllama": "Ollama descarga y sirve los modelos locales. Instálalo desde",
+    "ollamaStopped": "Ollama está instalado pero no se está ejecutando: inícialo y vuelve a comprobar.",
+    "noneDownloaded": "Todavía no hay ningún modelo descargado.",
+    "useForScoring": "Usar para la puntuación",
+    "nowUsing": "La puntuación ahora usa {model}",
+    "couldAlsoRun": "Este equipo también podría ejecutar:",
+    "download": "Descargar",
+    "pullStarting": "Iniciando la descarga de {model}…",
+    "pullDone": "{model} está listo"
   }
 }

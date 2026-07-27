@@ -254,9 +254,12 @@ async function _onScanSubmit(event) {
         }, 600);
         Promise.all([loadJobs(), loadRecommendations()]);
       } else if (data.error) {
-        progressText.textContent = `${t("scan.error")}: ${data.error}`;
-        appendFeed("error", `${t("scan.error")}: ${escHtml(data.error)}`);
-        showToast(`${t("scan.error")}: ${data.error}`, "error");
+        // The daily request budget is a known, explainable stop — not a crash.
+        const quotaStop = String(data.error).startsWith("daily_limit_");
+        const message = quotaStop ? t("scan.quotaReached") : `${t("scan.error")}: ${data.error}`;
+        progressText.textContent = message;
+        appendFeed("error", escHtml(message));
+        showToast(message, "error");
         evtSource.close();
         setTimeout(() => { overlay.style.display = "none"; overlay.classList.remove("minimized"); }, 3000);
       }

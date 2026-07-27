@@ -77,9 +77,13 @@ class AppContainer:
     def keys_status(self) -> dict[str, Any]:
         primary = self.settings.llm_provider_order[0] if self.settings.llm_provider_order else ""
         status: dict[str, Any] = {
-            f"{name}_configured": bool(getattr(self.settings, f"{name}_api_key"))
+            f"{name}_configured": bool(getattr(self.settings, f"{name}_api_key", None))
             for name in SUPPORTED_PROVIDERS
         }
+        # The custom endpoint is configured by its URL: a local model server has
+        # no key to give, so requiring one would make it permanently "missing".
+        status["custom_configured"] = bool(self.settings.custom_base_url)
+        status["custom_base_url"] = self.settings.custom_base_url or ""
         status["primary_provider"] = primary
         status["preferred_model"] = self.settings.preferred_model or ""
         status["scoring_model"] = self.settings.scoring_model or ""

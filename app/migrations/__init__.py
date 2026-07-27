@@ -15,8 +15,12 @@ order.
 
 Design goals:
 - Zero external deps.
-- Idempotent (safe to call on every boot).
-- Each migration runs inside a single transaction.
+- Idempotent (safe to call on every boot). This is what makes a partially
+  applied migration survivable: Python's ``sqlite3`` in its default isolation
+  mode does NOT wrap DDL in a transaction, so a migration that creates a table
+  and then backfills it is not atomic. Every migration therefore guards its own
+  steps (``IF NOT EXISTS``, ``INSERT OR IGNORE``, column-existence checks)
+  instead of relying on a rollback that would not happen.
 """
 
 from __future__ import annotations

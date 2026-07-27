@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from app.db import Database
+from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
 from app.services import scanner_service as ss
 
 # --- prompt + schema ----------------------------------------------------------
@@ -49,7 +50,7 @@ def test_fallback_penalizes_masters_requirement() -> None:
     )
     assert masters["punteggio"] < plain["punteggio"]
     assert masters["titolo_studio_richiesto"] == "Magistrale"
-    assert "magistrale" in masters["punti_deboli_per_diego"].lower()
+    assert "magistrale" in masters["punti_deboli"].lower()
 
 
 def test_fallback_penalizes_phd_requirement() -> None:
@@ -82,7 +83,44 @@ def test_job_has_analysis_false_for_legacy_schema(tmp_path: Path) -> None:
         # Education-era shape: still stale, it can't have weighed geo/grade blockers.
         db.update_job_analysis(jid, {"punteggio": 7, "titolo_studio_richiesto": "Triennale"})
         assert db.job_has_analysis(jid) is False
+        # Eligibility-era shape: also stale — the marker key it used to be
+        # recognised by is injected into heuristic fallbacks too.
         db.update_job_analysis(jid, {"punteggio": 7, "eleggibilita_geografica": "Italia/UE"})
+        assert db.job_has_analysis(jid) is False
+        db.update_job_analysis(
+            jid, {"punteggio": 7, ANALYSIS_VERSION_KEY: CURRENT_ANALYSIS_VERSION}
+        )
+        assert db.job_has_analysis(jid) is True
+    finally:
+        db.close()
+
+
+def test_heuristic_analysis_never_counts_as_scored(tmp_path: Path) -> None:
+    """A keyword-only analysis must not freeze the job at that score.
+
+    It used to: the normaliser injects the marker key into EVERY analysis, so a
+    job that fell back to the heuristic (e.g. because the model truncated) was
+    "already analysed" forever.
+    """
+    db = Database(tmp_path / "h.db")
+    try:
+        jid, _, _ = db.upsert_job({"titolo": "AI QA", "azienda": "A", "link": "https://x/2"})
+        heuristic = ss.enforce_hard_requirements(
+            ss._heuristic_analysis("CV python", "AI QA Engineer", "A", "descrizione"),
+            profile_markdown="CV python",
+            descrizione="descrizione",
+        )
+        assert ANALYSIS_VERSION_KEY not in heuristic
+        db.update_job_analysis(jid, heuristic)
+        assert db.job_has_analysis(jid) is False
+
+        scored = ss.enforce_hard_requirements(
+            {"punteggio": 8, "consiglio": "Valutabile"},
+            profile_markdown="CV python",
+            descrizione="descrizione",
+        )
+        assert scored[ANALYSIS_VERSION_KEY] == CURRENT_ANALYSIS_VERSION
+        db.update_job_analysis(jid, scored)
         assert db.job_has_analysis(jid) is True
     finally:
         db.close()

@@ -47,7 +47,13 @@ export async function checkForUpdate(opts) {
       return info;
     }
     const dismissed = localStorage.getItem("updateDismissed");
-    if (dismissed === info.latest) return;
+    // Dismissed = hide the banner, NOT swallow the answer: returning undefined
+    // here made the caller in wireSystemSettings render "up to date" forever,
+    // with no way to un-dismiss from the UI.
+    if (dismissed === info.latest) {
+      banner.classList.add("hidden");
+      return info;
+    }
 
     document.getElementById("updateBannerVersions").textContent = `${info.current} → ${info.latest}`;
     const link = document.getElementById("updateBannerLink");
@@ -305,6 +311,10 @@ export function wireSystemSettings() {
       checkBtn.disabled = true;
       lastEl.textContent = t("settings.system.checking");
       try {
+        // An explicit check overrides an earlier "dismiss": otherwise the banner
+        // stays hidden and this button is the only way to learn about the
+        // update it is being asked about.
+        localStorage.removeItem("updateDismissed");
         const info = await checkForUpdate({ forceRefresh: true });
         populateSystemInfo(info);
         const ts = new Date().toLocaleTimeString();

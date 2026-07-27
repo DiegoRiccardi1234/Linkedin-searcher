@@ -44,26 +44,37 @@
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
 
-  --fs-xs: clamp(11px, 0.75vw + 6px, 13px);
-  --fs-sm: clamp(12px, 0.85vw + 7px, 14px);
-  --fs-base: clamp(13px, 0.95vw + 7px, 15px);
-  --fs-md: clamp(14px, 1vw + 8px, 16px);
-  --fs-lg: clamp(16px, 1.2vw + 9px, 19px);
-  --fs-xl: clamp(19px, 1.4vw + 11px, 23px);
-  --fs-2xl: clamp(22px, 2vw + 12px, 30px);
-  --fs-3xl: clamp(26px, 2.6vw + 14px, 38px);
+  /* Fluid up to ~1600px, not up to ~900px.
+     The previous ramps carried such a large fixed offset that every token hit
+     its maximum between 800 and 1286px: from there up the design was pure fixed
+     px, so a 1366px laptop (or a 1920 screen at 125% Windows scaling, which is
+     1536 CSS px) got spacing and type sized for a 2560px monitor. That is what
+     "everything looks zoomed in" was. Smaller offsets + a bigger vw share keep
+     the scale moving across the whole laptop range. */
+  --fs-xs: clamp(11px, 0.18vw + 8.6px, 13px);
+  --fs-sm: clamp(12px, 0.19vw + 9.5px, 14px);
+  --fs-base: clamp(13px, 0.2vw + 10.4px, 15px);
+  --fs-md: clamp(14px, 0.2vw + 11.4px, 16px);
+  --fs-lg: clamp(16px, 0.3vw + 12.4px, 19px);
+  --fs-xl: clamp(19px, 0.4vw + 14.6px, 23px);
+  --fs-2xl: clamp(22px, 0.8vw + 14.4px, 30px);
+  --fs-3xl: clamp(26px, 1.2vw + 16.4px, 38px);
 
   --lh-tight: 1.2;
   --lh-base: 1.55;
 
-  /* spacing (4px base) */
-  --space-1: clamp(3px, 0.25vw + 2px, 5px);
-  --space-2: clamp(6px, 0.45vw + 4px, 9px);
-  --space-3: clamp(9px, 0.7vw + 5px, 14px);
-  --space-4: clamp(12px, 1vw + 6px, 18px);
-  --space-5: clamp(18px, 1.5vw + 9px, 28px);
-  --space-6: clamp(22px, 2.2vw + 10px, 36px);
-  --space-7: clamp(32px, 3.2vw + 12px, 52px);
+  /* Height of whatever is stuck to the top right now (topbar, plus the update
+     and no-key banners when they show). Set from JS; this is the fallback. */
+  --sticky-offset: 72px;
+
+  /* spacing (4px base) — same reasoning as the type scale above */
+  --space-1: clamp(3px, 0.2vw + 1.9px, 5px);
+  --space-2: clamp(6px, 0.3vw + 3.9px, 9px);
+  --space-3: clamp(9px, 0.5vw + 5.2px, 14px);
+  --space-4: clamp(12px, 0.6vw + 7.4px, 18px);
+  --space-5: clamp(18px, 1vw + 10.4px, 28px);
+  --space-6: clamp(22px, 1.4vw + 12.4px, 36px);
+  --space-7: clamp(32px, 2vw + 17.6px, 52px);
 
   /* radii */
   --r-sm: 6px;
@@ -129,7 +140,34 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv11", "ss01";
+  /* At every width, not only on mobile: a single wide element used to drag the
+     whole document into horizontal scrolling. */
+  overflow-x: clip;
 }
+
+/* Compact density (Settings). Windows display scaling at 125-150% shrinks the
+   CSS viewport without shrinking the design, so a 1920 screen behaves like a
+   1536 or 1280 one: this gives back a step of room on demand, on any screen. */
+:root[data-density="compact"] {
+  --fs-xs: 10.5px;
+  --fs-sm: 11.5px;
+  --fs-base: 12.5px;
+  --fs-md: 13.5px;
+  --fs-lg: 15px;
+  --fs-xl: 17px;
+  --fs-2xl: 20px;
+  --fs-3xl: 24px;
+  --space-1: 3px;
+  --space-2: 5px;
+  --space-3: 8px;
+  --space-4: 11px;
+  --space-5: 15px;
+  --space-6: 18px;
+  --space-7: 24px;
+}
+:root[data-density="compact"] .analytics-card { min-height: 220px; }
+:root[data-density="compact"] .table-wrap td { padding: 7px 10px; }
+:root[data-density="compact"] .table-wrap th { padding: 6px 10px; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
@@ -266,7 +304,12 @@ input, select, textarea { font-family: inherit; font-size: var(--fs-base); }
 /* ============== page grid ============== */
 .page-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(360px, 32vw, 620px);
+  /* The chat rail must be able to YIELD. It used to be a fixed track
+     (clamp(360px,…)), which a grid can never shrink below its minimum: at
+     1366px it took 437px and left the 9-column jobs table 863px, and the kanban
+     (922px of hard minimum) simply overflowed the page. minmax(0, …) lets the
+     track give way when the content column needs the room. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(300px, 26vw, 560px));
   gap: clamp(var(--space-3), 1.6vw, var(--space-6));
   padding: clamp(var(--space-3), 1.6vw, var(--space-6));
   max-width: min(1700px, 100%);
@@ -275,12 +318,32 @@ input, select, textarea { font-family: inherit; font-size: var(--fs-base); }
 }
 
 @media (min-width: 1400px) {
-  .page-grid { grid-template-columns: minmax(0, 1fr) minmax(520px, 640px); }
+  .page-grid { grid-template-columns: minmax(0, 1fr) minmax(0, clamp(480px, 30vw, 640px)); }
+}
+
+/* The band nothing used to cover: 961-1399px is where most laptops live
+   (1366x768, and 1920 at 125% = 1536, at 150% = 1280). Give the content the
+   room and keep the rail usable rather than dominant. */
+@media (max-width: 1399px) {
+  .page-grid { grid-template-columns: minmax(0, 1fr) minmax(0, clamp(280px, 24vw, 380px)); }
+}
+
+@media (max-width: 1120px) {
+  /* Below this the rail costs more than it gives: the content column would be
+     under ~700px, which the jobs table cannot use. */
+  .page-grid { grid-template-columns: minmax(0, 1fr); }
+  .page-grid > .right-rail { display: none; }
+  /* The rail is gone, so the coach has to be reachable some other way. */
+  body:not(.rail-hidden) .chat-fab:not(.hidden) { display: inline-flex; }
 }
 
 @media (max-width: 960px) {
   .page-grid { grid-template-columns: 1fr; }
 }
+
+/* The jobs archive is a wide table plus a 4-column board: it gets the full
+   width on every screen, exactly as the Info view already did. */
+body.rail-hidden .page-grid { grid-template-columns: minmax(0, 1fr); }
 
 .view { display: none; }
 .view.is-active { display: block; }
@@ -520,6 +583,18 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
   border-bottom: 1px solid var(--border);
   color: var(--text);
   vertical-align: middle;
+  /* Cells were unbounded: a long title or an unbreakable URL pushed the 9
+     columns past the container and every row wrapped to 3-4 lines. */
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+/* The action columns hold buttons, not text — they must not be clipped. */
+.table-wrap td:nth-last-child(-n + 2) {
+  max-width: none;
+  white-space: normal;
 }
 .table-wrap tbody tr { transition: background var(--transition); }
 .table-wrap tbody tr:hover { background: var(--surface-hover); cursor: pointer; }
@@ -595,8 +670,12 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
 /* ============== kanban ============== */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  /* auto-fit, not repeat(4): the fixed form had a hard 922px floor (4x220 +
+     gaps) and no overflow wrapper, so on anything under ~1440px the board
+     pushed the whole page into horizontal scrolling. Columns now wrap. */
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: var(--space-3);
+  min-width: 0;
 }
 .kanban-col {
   background: var(--surface-2);
@@ -732,13 +811,21 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
 /* ============== right rail / coach / chat ============== */
 .right-rail {
   position: sticky;
-  top: 80px;
+  /* Was a hardcoded 80px, which ignored the update / no-key banners stacked
+     above (three sticky elements share top: 0) and clipped the rail. */
+  top: calc(var(--sticky-offset, 72px) + var(--space-2));
   align-self: start;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-height: calc(100vh - 100px);
-  max-height: calc(100vh - 100px);
+  min-height: 0;
+  /* On a 1366x768 laptop the rail was taller than the viewport with no scroll,
+     so the chat composer sat below the fold with no way to reach it. The height
+     subtracts the same offset it starts at, plus a margin, so it always ends
+     above the fold. */
+  max-height: calc(100vh - var(--sticky-offset, 72px) - var(--space-2) - var(--space-4));
+  overflow-y: auto;
+  min-width: 0;
 }
 
 .rail-header {
@@ -783,7 +870,9 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
 /* ============== analytics ============== */
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr), not 1fr: a bare 1fr has a min-content floor, and these
+     cards hold Chart.js canvases — the classic blow-out shape. */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: var(--space-3);
 }
 .analytics-card {
@@ -792,6 +881,7 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
   border-radius: var(--r-lg);
   padding: var(--space-4);
   min-height: 280px;
+  min-width: 0;
 }
 .analytics-card h3, .analytics-card h4 {
   font-size: var(--fs-sm);
@@ -1000,6 +1090,10 @@ button[type="submit"]:hover, .button:hover {
   box-shadow: var(--shadow-lg);
   width: min(640px, 100%);
   padding: var(--space-5);
+  /* Long release notes pushed the Close button off a short screen with no way
+     to scroll to it. */
+  max-height: 90vh;
+  overflow-y: auto;
 }
 .update-modal-card h3 { font-size: var(--fs-lg); margin-bottom: var(--space-3); }
 .update-step-list { list-style: none; padding: 0; margin: 0 0 var(--space-3) 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -2072,7 +2166,7 @@ pre {
 .post-scan-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .post-scan-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -2459,8 +2553,32 @@ pre {
 
 /* Desktop default: mobile-only chrome stays hidden. */
 .nav-toggle { display: none; }
-.chat-fab { display: none; }
 .mobile-overlay { display: none; }
+
+/* Floating button that opens the chat drawer. The look is defined once here;
+   only its visibility is per-breakpoint — it used to live inside the ≤960px
+   block, so the 961-1120px band (where the rail is now suppressed to give the
+   content room) had no way to reach the coach at all. */
+.chat-fab {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  z-index: 85;
+}
+.chat-fab .material-symbols-outlined { font-size: 26px; }
+/* Hidden when the drawer is open or the view suppresses the rail entirely. */
+.chat-fab.hidden { display: none !important; }
 
 @media (max-width: 960px) {
   /* --- Fix horizontal overflow: let 1fr column shrink so wide children
@@ -2537,28 +2655,6 @@ pre {
   .right-rail.drawer-open { transform: translateX(0); }
   /* On views that hide the rail (e.g. Info) keep it fully off-screen. */
   .right-rail.hidden { display: block !important; transform: translateX(100%); }
-
-  /* --- Floating button to open the chat drawer --- */
-  .chat-fab {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: none;
-    background: var(--accent);
-    color: #fff;
-    cursor: pointer;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
-    z-index: 85;
-  }
-  .chat-fab .material-symbols-outlined { font-size: 26px; }
-  /* Hide the FAB when the drawer is open or the rail is suppressed. */
-  .chat-fab.hidden { display: none !important; }
 
   /* --- Shared dimming overlay for nav + drawer --- */
   .mobile-overlay.active {
@@ -2689,6 +2785,68 @@ pre {
 .saved-search-sub { font-size: 0.72rem; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-search-del { flex: 0 0 auto; }
 
+/* Local models panel (hardware → what runs here → what to download). */
+.local-hardware { font-size: 0.85rem; font-weight: 600; margin-top: 0.4rem; }
+.local-verdict { font-size: 0.82rem; opacity: 0.85; margin: 0.3rem 0 0.7rem; }
+.local-verdict[data-verdict="cpu_only"] { color: var(--warning, #d08c30); }
+.local-ready, .local-suggestions { display: flex; flex-direction: column; gap: 0.4rem; }
+.local-suggestions { margin-top: 0.7rem; }
+.local-model {
+  display: flex; align-items: center; gap: 0.6rem; min-width: 0;
+  padding: 0.45rem 0.6rem;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.local-model-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.local-model-main strong { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-progress { margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+
+/* Thumbs up/down on an AI score, inside the score card of the detail drawer. */
+.score-feedback { margin-top: 0.7rem; width: 100%; text-align: center; }
+.score-feedback-q { font-size: 0.72rem; opacity: 0.75; }
+.score-feedback-btns { display: flex; justify-content: center; gap: 0.4rem; margin-top: 0.3rem; }
+.score-feedback-btns .ghost-btn.is-active { border-color: var(--primary); color: var(--primary); }
+.score-feedback-more { margin-top: 0.4rem; font-size: 0.72rem; }
+.score-feedback-more summary { cursor: pointer; opacity: 0.75; }
+.score-feedback-row { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
+.score-feedback-row input {
+  min-width: 0; padding: 0.3rem 0.45rem; font: inherit; font-size: 0.75rem; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.45rem;
+}
+.score-feedback-row input[type="number"] { flex: 0 0 5rem; }
+.score-feedback-row input[type="text"] { flex: 1; }
+.score-feedback-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+/* Application facts (sent on / CV used / outcome) inside the detail drawer. */
+.application-facts { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.82rem; }
+.application-outcome { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.7rem; font-size: 0.82rem; }
+.application-outcome select {
+  flex: 1; min-width: 0; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.82rem; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.5rem;
+}
+
+/* Followed companies (watchlist) — same visual family as saved searches. */
+.watchlist-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+.watchlist-add input {
+  flex: 1; min-width: 0; padding: 0.45rem 0.6rem; font: inherit; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.watchlist-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.6rem; }
+.watchlist-item {
+  display: flex; align-items: center; gap: 0.5rem; min-width: 0;
+  padding: 0.45rem 0.6rem;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.watchlist-item.is-paused { opacity: 0.55; }
+.watchlist-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.watchlist-main strong { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watchlist-sub { font-size: 0.72rem; opacity: 0.7; }
+.watchlist-suggestions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.watchlist-chip {
+  padding: 0.25rem 0.6rem; font: inherit; font-size: 0.78rem; color: inherit; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border); border-radius: 999px;
+}
+.watchlist-chip:hover { border-style: solid; border-color: var(--primary); color: var(--primary); }
+
 /* Skill-gap learning suggestions (F8) */
 .section-head-actions { display: flex; align-items: center; gap: 0.4rem; }
 .skill-gap-learning { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.9rem; }
@@ -2740,3 +2898,130 @@ pre {
 .kanban-col.drag-over { outline: 2px dashed var(--accent); outline-offset: -4px; background: var(--accent-soft, rgba(99, 102, 241, 0.08)); }
 .kanban-card-actions { display: flex; gap: 0.4rem; align-items: center; margin-top: 8px; }
 .kanban-status { font-size: 0.72rem; padding: 0.15rem 0.3rem; border: 1px solid var(--border); border-radius: 0.4rem; background: inherit; color: inherit; }
+
+/* Why a score is what it is (v1.7.7): the deterministic checks used to cap a
+   score and say nothing, so a job you legally cannot take arrived as a bare
+   3/10. Codes come from the backend (scanner_service), labels from i18n. */
+.job-flags { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; vertical-align: middle; }
+.job-flag {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  padding: 0.05rem 0.35rem; border-radius: 0.4rem;
+  font-size: 0.68rem; line-height: 1.5; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.job-flag .material-symbols-outlined { font-size: 0.85rem; }
+.flag-block { background: rgba(220, 38, 38, 0.12); border-color: rgba(220, 38, 38, 0.35); color: #b91c1c; }
+.flag-warn { background: rgba(217, 119, 6, 0.12); border-color: rgba(217, 119, 6, 0.32); color: #b45309; }
+.flag-info { background: rgba(100, 116, 139, 0.14); border-color: rgba(100, 116, 139, 0.3); color: #475569; }
+[data-theme="dark"] .flag-block { color: #fca5a5; }
+[data-theme="dark"] .flag-warn { color: #fcd34d; }
+[data-theme="dark"] .flag-info { color: #cbd5e1; }
+.kanban-card .job-flags { margin-top: 6px; }
+
+/* Per-axis explanation under the radar: derived from data we already have. */
+.axis-reasons { margin: 0.6rem 0 0; padding-left: 1.1rem; color: var(--text-dim, #64748b); }
+.axis-reasons li { margin-bottom: 0.2rem; }
+
+/* Sortable table headers */
+th.th-sort { cursor: pointer; user-select: none; }
+th.th-sort:hover { color: var(--accent, #635bff); }
+th.th-sort.is-sorted::after { content: " ^"; font-size: 0.7em; }
+th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; }
+
+/* Model track record in Settings */
+.probe-scoreboard { margin-top: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.4rem; }
+.probe-scoreboard-title { opacity: 0.7; margin-bottom: 0.25rem; }
+
+/* Compare drawer (v1.7.7) */
+.compare-bar {
+  /* Lifted clear of the table's horizontal scrollbar, which it used to sit on
+     top of — you could not drag the scrollbar while comparing. */
+  position: fixed; bottom: 2.2rem; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 0.6rem; z-index: 900;
+  padding: 0.5rem 0.8rem; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
+}
+.compare-bar.hidden { display: none; }
+.compare-card { width: min(1100px, 96vw); max-height: 90vh; overflow-y: auto; }
+.compare-body { display: flex; gap: 0.9rem; align-items: flex-start; flex-wrap: wrap; }
+.compare-col { flex: 1 1 260px; min-width: 240px; border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.7rem; }
+.compare-head { text-align: center; margin-bottom: 0.5rem; }
+.compare-head .job-flags { justify-content: center; margin-top: 0.35rem; }
+.compare-axes { width: 100%; font-size: 0.78rem; margin: 0.4rem 0; }
+.compare-axes td { padding: 0.12rem 0; }
+.compare-num { text-align: right; font-variant-numeric: tabular-nums; }
+.compare-label { margin-top: 0.5rem; opacity: 0.7; }
+.compare-list { margin: 0.15rem 0 0; padding-left: 1.05rem; font-size: 0.78rem; }
+.compare-list.missing li { color: #b45309; }
+[data-theme="dark"] .compare-list.missing li { color: #fcd34d; }
+.compare-pick { display: inline-flex; align-items: center; gap: 0.15rem; cursor: pointer; vertical-align: middle; margin-right: 0.3rem; }
+.compare-pick .material-symbols-outlined { font-size: 1rem; opacity: 0.65; }
+@media (max-width: 720px) {
+  .compare-body { flex-direction: column; }
+}
+
+/* Short screens (1366x768 and friends): the rail plus its chat panel were
+   taller than the viewport, so the composer sat below the fold unreachable. */
+@media (max-height: 820px) {
+  .coach-panel.rail-chat { max-height: none; flex: 1 1 auto; min-height: 0; }
+  .hero { padding-block: var(--space-3); }
+}
+
+/* Laptop band (961-1399px): give the content the room back. */
+@media (max-width: 1399px) {
+  .kanban-board { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+  .table-wrap td { max-width: 20ch; }
+  .table-wrap th, .table-wrap td { padding-inline: 10px; }
+}
+
+@media (max-width: 1120px) {
+  .table-wrap td { max-width: 16ch; }
+}
+
+/* Favourite star: same affordance on the table row, the kanban card and the
+   detail drawer — it used to exist only in the table, so favouriting from the
+   board or the drawer had no visible effect at all. */
+.kanban-fav-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: none; border: none; padding: 2px; cursor: pointer;
+  color: var(--text-muted); line-height: 1;
+}
+.kanban-fav-btn .material-symbols-outlined { font-size: 1.05rem; }
+.kanban-fav-btn.is-active { color: #d9a400; }
+.kanban-card { position: relative; }
+.detail-fav { margin-top: var(--space-2); }
+.detail-fav.is-active,
+.icon-btn.is-active .material-symbols-outlined { color: #d9a400; }
+
+/* The dropzone is where the eye is when an upload starts (a dropped file now
+   uploads immediately), so the busy state belongs there too. */
+.cv-dropzone.is-busy { opacity: 0.65; pointer-events: none; position: relative; }
+.cv-dropzone.is-busy::after {
+  content: ""; position: absolute; inset: auto auto 8px 50%;
+  width: 18px; height: 18px; margin-left: -9px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+
+/* Daily request budget in the AI-usage card */
+.usage-quota { margin-top: var(--space-3); }
+.usage-quota-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.usage-quota-track { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.usage-quota-fill { height: 100%; background: var(--accent); }
+
+/* Provider cards: what a provider costs, and where to get a key */
+.provider-free-badge {
+  background: rgba(0, 135, 90, 0.14); color: var(--success);
+  border: 1px solid rgba(0, 135, 90, 0.3); border-radius: 999px;
+  padding: 1px 8px; margin-left: auto; margin-right: var(--space-2);
+}
+.provider-hint { color: var(--text-muted); margin: 0 0 var(--space-2); }
+.provider-signup { display: inline-block; margin-top: 4px; }
+.provider-endpoint-row { display: flex; flex-direction: column; gap: 4px; }
+.provider-endpoint-input {
+  width: 100%; padding: 0.4rem 0.55rem; border: 1px solid var(--border);
+  border-radius: 0.5rem; background: inherit; color: inherit; font-size: var(--fs-sm);
+}
+.provider-presets { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.provider-preset-btn { font-size: var(--fs-xs); padding: 2px 8px; }

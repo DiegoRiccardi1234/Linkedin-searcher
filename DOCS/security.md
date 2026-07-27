@@ -4,7 +4,8 @@ Job Finder is designed as a **localhost-only** app. Do not expose it on a public
 
 ## Secret storage
 
-- LLM API keys are stored in SQLite (`preferences` table) and in `data/local_secrets.json` — **plaintext**. This is acceptable for single-user localhost use on a trusted machine; it is **not** safe on shared systems or cloud VMs.
+- LLM API keys are stored in `data/local_secrets.json` — **plaintext**. This is acceptable for single-user localhost use on a trusted machine; it is **not** safe on shared systems or cloud VMs. (Keys are *not* written to the SQLite `preferences` table, as an earlier version of this document claimed: `save_local_provider_keys` writes the JSON file only.)
+- `POST /api/preferences` accepts only known preference keys (feature toggles, onboarding answers, scan defaults, UI state). It used to accept any key/value pair, which meant one unauthenticated local request could switch off Privacy Mode before a CV was sent to a model.
 - To move to an encrypted store, integrate OS keyring (e.g. `keyring` PyPI) and migrate `save_local_provider_keys` accordingly.
 
 ## Network surface

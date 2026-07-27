@@ -23,6 +23,30 @@ def _analysis(**over: Any) -> dict[str, Any]:
     return base
 
 
+# ── pre-LLM gate and post-LLM cap must agree ─────────────────────────────────
+
+
+def test_pre_and_post_checks_share_one_predicate() -> None:
+    """The blocker is evaluated twice — once to skip the LLM call, once to cap
+    the answer — and the two used to be separate implementations of the same
+    condition. Whenever the gate blocks, the cap must apply, and vice versa.
+    """
+    cases = [
+        ("San Francisco, CA", _JD, _CV),  # non-EU, no EU-remote wording
+        ("Torino, Italy", _JD, _CV),  # nothing wrong
+        ("New York, NY", _JD + " Open to remote candidates based in the EU.", _CV),
+        ("Torino, Italy", _JD + " Richiesta votazione minima 102/110.", _CV),
+        ("Torino, Italy", _JD + " Richiesta votazione minima 90/110.", _CV),
+    ]
+    for sede, descrizione, cv in cases:
+        blocked = ss.hard_block_reason(cv, descrizione, sede)
+        out = ss.enforce_hard_requirements(
+            _analysis(), profile_markdown=cv, descrizione=descrizione, sede=sede
+        )
+        capped = out["punteggio"] < 9
+        assert capped is bool(blocked), (sede, descrizione[-40:], blocked, out["punteggio"])
+
+
 # ── geographic eligibility ───────────────────────────────────────────────────
 
 

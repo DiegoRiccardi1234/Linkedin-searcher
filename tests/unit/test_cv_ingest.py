@@ -384,3 +384,42 @@ def test_llm_summary_calls_provider_once_then_heuristic(monkeypatch) -> None:
     assert mgr.calls == 1
     assert isinstance(result, dict)
     assert result.get("experience_level")
+
+
+class _PolicyCapturingManager(_FakeProviderManager):
+    """A manager that DOES look like the real one: it has ``settings`` and
+    ``pin_kwargs``, so the CV-parsing call must state which model it wants."""
+
+    class _Settings:
+        cv_model = ""
+
+    def __init__(self) -> None:
+        super().__init__({})
+        self.settings = self._Settings()
+        self.kwargs: dict = {}
+        self.max_tokens = 0
+
+    def pin_kwargs(self, model_id, policy):  # type: ignore[no-untyped-def]
+        return {"policy_override": policy}
+
+    def complete_json(self, prompt: str, max_tokens: int = 600, **kwargs) -> dict:  # type: ignore[no-untyped-def]
+        self.kwargs = kwargs
+        self.max_tokens = max_tokens
+        return super().complete_json(prompt, max_tokens)
+
+
+def test_cv_parsing_asks_for_a_json_capable_model_and_room_to_answer() -> None:
+    """Reading a CV into JSON was the one CV call-site that stated no policy at
+    all: it ran on the global default, and a reasoning model's cut-off answer is
+    silently replaced by the keyword profile."""
+    from app.providers.model_selector import SCORING_MIN_SIZE_B
+
+    manager = _PolicyCapturingManager()
+    summarize_profile_with_llm(_JUNIOR_CV, manager)
+
+    policy = manager.kwargs.get("policy_override")
+    assert policy is not None
+    assert policy["hard_floor"] is True
+    assert policy["min_size_b"] == SCORING_MIN_SIZE_B
+    assert policy["weights"]["reasoning"] == 0
+    assert manager.max_tokens >= 1000  # the profile JSON does not fit in 600

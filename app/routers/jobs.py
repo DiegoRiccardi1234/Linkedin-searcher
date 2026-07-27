@@ -12,13 +12,18 @@ from app.models import (
     JobActionRequest,
     JobImportRequest,
     JobNoteRequest,
+    JobOutcomeRequest,
     ManualJobCreateRequest,
     ReminderRequest,
+    ScoreFeedbackRequest,
+    WatchlistActiveRequest,
+    WatchlistCompanyRequest,
 )
 from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
 from app.services.onboarding import onboarding_context
-from app.services.scanner_service import analyze_offer
+from app.services.scan.companies import WATCHLIST_SUGGESTIONS, canonical_company
+from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer
 from app.services.skill_gap import compute_skill_gap, suggest_learning
 
 if TYPE_CHECKING:
@@ -52,6 +57,7 @@ def build_router(container: AppContainer) -> APIRouter:
         search_text: str | None = Query(default=None),
         min_score: int | None = Query(default=None, ge=0, le=10),
         max_age_days: int | None = Query(default=None, ge=1, le=365),
+        applicable_only: bool = Query(default=False),
         limit: int = Query(default=200, ge=1, le=2000),
     ) -> dict[str, Any]:
         jobs = container.db.list_jobs(
@@ -64,6 +70,14 @@ def build_router(container: AppContainer) -> APIRouter:
             max_age_days=max_age_days,
             limit=limit,
         )
+        if applicable_only:
+            jobs = [job for job in jobs if not (set(job.get("flags") or []) & BLOCKING_FLAGS)]
+        # The list view renders none of these, and they are by far the heaviest
+        # columns (a full posting is ~5k chars; 200 of them is megabytes per
+        # refresh). The detail endpoint still serves them.
+        for job in jobs:
+            for heavy in ("descrizione", "analysis_json", "sources_json"):
+                job.pop(heavy, None)
         return {"jobs": jobs}
 
     @router.get("/api/jobs/{job_id}")
@@ -72,7 +86,11 @@ def build_router(container: AppContainer) -> APIRouter:
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         recruiter = container.db.get_recruiter(job_id)
-        return {"job": job, "recruiter": recruiter}
+        return {
+            "job": job,
+            "recruiter": recruiter,
+            "score_feedback": container.db.latest_score_feedback(job_id),
+        }
 
     @router.post("/api/jobs/{job_id}/cover-letter")
     def generate_cover_letter(job_id: int) -> dict[str, Any]:
@@ -130,7 +148,10 @@ def build_router(container: AppContainer) -> APIRouter:
             )
             container.db.save_cover_letter(job_id, cover_letter)
         except Exception as e:
-            cover_letter = f"Error generating cover letter: {e}"
+            # This used to return 200 with the exception text AS the letter, so
+            # a provider 401 was rendered in the UI as generated prose. The three
+            # sibling generation endpoints below all raise; so does this one now.
+            raise HTTPException(status_code=502, detail=f"Cover letter failed: {e}") from e
 
         return {"cover_letter": cover_letter}
 
@@ -349,7 +370,7 @@ def build_router(container: AppContainer) -> APIRouter:
             "titolo": fields.get("titolo") or "Imported job",
             "azienda": fields.get("azienda") or "N/A",
             "descrizione": fields.get("descrizione", ""),
-            "sede": "",
+            "sede": fields.get("sede", ""),
             "fonte": "import",
             "link": url,
             "ricerca_usata": "import",
@@ -370,6 +391,9 @@ def build_router(container: AppContainer) -> APIRouter:
             privacy=container.feature_enabled("privacy_mode", True),
             extra_context=onboarding_context(container.db),
             candidate_name=(profile.get("name") if profile else None),
+            # Without the location the geo-eligibility cap is structurally dead
+            # for imported jobs: a US posting could never be flagged.
+            sede=row["sede"],
         )
         container.db.update_job_analysis(job_id=job_id, analysis=analysis)
         return {
@@ -392,6 +416,16 @@ def build_router(container: AppContainer) -> APIRouter:
     def job_timeline(job_id: int) -> dict[str, Any]:
         """Chronological status changes + notes for a job (F3)."""
         return {"actions": container.db.list_job_actions(job_id)}
+
+    @router.post("/api/jobs/{job_id}/outcome")
+    def set_job_outcome(job_id: int, payload: JobOutcomeRequest) -> dict[str, Any]:
+        """How the application ended, which the funnel status cannot express:
+        an offer and a silent rejection are both 'applied' to the board."""
+        if not container.db.get_job(job_id):
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not container.db.set_job_outcome(job_id, payload.outcome):
+            raise HTTPException(status_code=400, detail="unknown_outcome")
+        return {"ok": True, "outcomes": list(container.db.OUTCOMES)}
 
     @router.post("/api/jobs/{job_id}/note")
     def add_job_note(job_id: int, payload: JobNoteRequest) -> dict[str, Any]:
@@ -449,13 +483,114 @@ def build_router(container: AppContainer) -> APIRouter:
         count = container.db.delete_all_jobs()
         return {"ok": True, "deleted": count}
 
+    # ── Score feedback: measuring whether the AI's scores are any good ───────
+
+    @router.post("/api/jobs/{job_id}/score-feedback")
+    def add_score_feedback(job_id: int, payload: ScoreFeedbackRequest) -> dict[str, Any]:
+        if not container.db.get_job(job_id):
+            raise HTTPException(status_code=404, detail="Job not found")
+        expected = payload.expected_score
+        if expected is not None and not 0 <= expected <= 10:
+            raise HTTPException(status_code=400, detail="expected_score_out_of_range")
+        created = container.db.add_score_feedback(
+            job_id=job_id,
+            verdict=payload.verdict,
+            expected_score=expected,
+            reason=payload.reason,
+        )
+        if not created:
+            raise HTTPException(status_code=400, detail="unknown_verdict")
+        return {"ok": True, "summary": container.db.score_feedback_summary()}
+
+    @router.delete("/api/jobs/{job_id}/score-feedback")
+    def delete_score_feedback(job_id: int) -> dict[str, Any]:
+        removed = container.db.delete_score_feedback(job_id)
+        return {"ok": True, "removed": removed}
+
+    @router.get("/api/score-feedback/summary")
+    def score_feedback_summary() -> dict[str, Any]:
+        return container.db.score_feedback_summary()
+
+    @router.get("/api/score-feedback/export")
+    def export_score_feedback() -> StreamingResponse:
+        """The judged cases as JSONL — one evaluation case per line.
+
+        JSONL rather than CSV because this is an eval set: it is meant to be read
+        back by a script, one record at a time, not opened in a spreadsheet.
+        """
+        import json as _json_export
+
+        lines = [
+            _json_export.dumps(
+                {
+                    "job_id": r["job_id"],
+                    "title": r["titolo"] or "",
+                    "company": r["azienda"] or "",
+                    "ai_score": r["ai_score"],
+                    "human_verdict": r["verdict"],
+                    "expected_score": r["expected_score"],
+                    "reason": r["reason"] or "",
+                    "analysis_v": r["analysis_v"],
+                    "model": r["model"] or "",
+                    "created_at": r["created_at"] or "",
+                },
+                ensure_ascii=False,
+            )
+            for r in container.db.list_score_feedback(limit=5000)
+        ]
+        body = "\n".join(lines) + ("\n" if lines else "")
+        filename = f"score_feedback_{datetime.now().strftime('%Y%m%d_%H%M')}.jsonl"
+        return StreamingResponse(
+            iter([body.encode("utf-8")]),
+            media_type="application/x-ndjson",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # ── Watchlist: employers followed by name ────────────────────────────────
+
+    @router.get("/api/watchlist")
+    def list_watchlist() -> dict[str, Any]:
+        companies = container.db.list_watchlist_companies()
+        # Filtered on the canonical form, here rather than in the UI: following
+        # "rws" must retire the "RWS Group" chip, which a name comparison misses.
+        followed = {str(c["canonical"]) for c in companies}
+        return {
+            "companies": companies,
+            "enabled": container.db.get_preference("watchlist_enabled", "0") in ("1", "true", "on"),
+            "suggestions": [
+                name for name in WATCHLIST_SUGGESTIONS if canonical_company(name) not in followed
+            ],
+        }
+
+    @router.post("/api/watchlist")
+    def add_watchlist(payload: WatchlistCompanyRequest) -> dict[str, Any]:
+        company_id = container.db.add_watchlist_company(payload.name, payload.note)
+        if not company_id:
+            raise HTTPException(status_code=400, detail="invalid_company_name")
+        return {"ok": True, "id": company_id, "companies": container.db.list_watchlist_companies()}
+
+    @router.post("/api/watchlist/{company_id}/active")
+    def toggle_watchlist(company_id: int, payload: WatchlistActiveRequest) -> dict[str, Any]:
+        if not container.db.set_watchlist_active(company_id, payload.active):
+            raise HTTPException(status_code=404, detail="company_not_found")
+        return {"ok": True, "companies": container.db.list_watchlist_companies()}
+
+    @router.delete("/api/watchlist/{company_id}")
+    def delete_watchlist(company_id: int) -> dict[str, Any]:
+        if not container.db.delete_watchlist_company(company_id):
+            raise HTTPException(status_code=404, detail="company_not_found")
+        return {"ok": True, "companies": container.db.list_watchlist_companies()}
+
     @router.get("/api/applications/export")
     def export_applications(format: str = "csv") -> StreamingResponse:
         cur = container.db.conn.cursor()
+        # The application metadata (when, which CV, how it ended) is the point of
+        # this export — a spreadsheet of what was sent, not of what was scraped.
         raw_rows = cur.execute(
-            "SELECT titolo, azienda, sede, status, punteggio_ai, consiglio, link, "
-            "updated_at, first_seen_at FROM jobs WHERE status IN (?, ?, ?) "
-            "ORDER BY updated_at DESC",
+            "SELECT j.titolo, j.azienda, j.sede, j.status, j.punteggio_ai, j.consiglio, j.link, "
+            "j.updated_at, j.first_seen_at, j.applied_at, p.source_name, j.outcome, j.outcome_at "
+            "FROM jobs j LEFT JOIN candidate_profiles p ON p.id = j.applied_profile_id "
+            "WHERE j.status IN (?, ?, ?) ORDER BY j.updated_at DESC",
             ("applied", "interviewing", "rejected"),
         ).fetchall()
 
@@ -470,6 +605,10 @@ def build_router(container: AppContainer) -> APIRouter:
                 "url": r[6] or "",
                 "updated_at": r[7] or "",
                 "first_seen_at": r[8] or "",
+                "applied_at": r[9] or "",
+                "cv_used": r[10] or "",
+                "outcome": r[11] or "",
+                "outcome_at": r[12] or "",
             }
             for r in raw_rows
         ]

@@ -26,6 +26,11 @@ SUPPORTED_PROVIDERS = [
     "xai",
     "glm",
     "mistral",
+    # Any OpenAI-compatible endpoint the user points at: a model running on
+    # their own machine (Ollama, LM Studio, vLLM, llama.cpp) or a gateway.
+    # Configured by base URL; the key is optional because a local server has
+    # none to give.
+    "custom",
 ]
 
 
@@ -38,14 +43,18 @@ class AppSettings:
     llm_provider_order: list[str]
     preferred_model: str | None
     # Per-context model overrides (empty/None = Auto). Pin a specific model for
-    # scan scoring / chat / CV tools; the provider is the primary.
+    # scan scoring / chat / CV tools; the provider is the primary…
     scoring_model: str | None
     chat_model: str | None
     cv_model: str | None
+    # …except when the pinned scoring model does not live on the primary. Running
+    # the scoring on a local endpoint while chat and the CV tools stay on a cloud
+    # provider is the whole point of the local-model panel, and asking OpenRouter
+    # for "gemma-4-12b" (an Ollama tag) simply 404s.
+    scoring_provider: str | None
     retention_days: int
     hours_old: int
     max_annunci: int
-    delay_tra_chiamate: float
     delay_tra_ricerche: float
     location_default: str
     location_remote_default: str
@@ -66,6 +75,10 @@ class AppSettings:
     # Optional GLM/Zhipu endpoint override (env GLM_BASE_URL). Default is the
     # international host; the China console uses open.bigmodel.cn.
     glm_base_url: str | None
+    # "custom" provider: the endpoint IS the configuration. Empty base URL =
+    # not configured. The key is optional (local servers don't have one).
+    custom_api_key: str | None
+    custom_base_url: str | None
     model_selection_policy: dict[str, Any]
     # Tesseract language list passed to ``image_to_string(lang=...)`` (``+`` joined).
     # Default covers the 5 UI locales; the bundle ships ``eng+ita+spa+fra+deu+osd``.
@@ -91,6 +104,33 @@ def _load_optional_json(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _as_int(cfg: dict[str, Any], key: str, default: int) -> int:
+    """Read a numeric setting without letting a typo take the app down.
+
+    ``settings.json`` is a user-editable file and the whole container is built at
+    import time, so ``{"max_annunci": "venti"}`` used to raise a ValueError out
+    of a module import — an unrecoverable traceback with no UI to report it. A
+    bad value now falls back to the default and says so in the log.
+    """
+    try:
+        return int(cfg.get(key, default))
+    except (TypeError, ValueError):
+        logging.getLogger(__name__).warning(
+            "Setting %r is not a number (%r); using %s", key, cfg.get(key), default
+        )
+        return default
+
+
+def _as_float(cfg: dict[str, Any], key: str, default: float) -> float:
+    try:
+        return float(cfg.get(key, default))
+    except (TypeError, ValueError):
+        logging.getLogger(__name__).warning(
+            "Setting %r is not a number (%r); using %s", key, cfg.get(key), default
+        )
+        return default
+
+
 def save_local_provider_keys(
     data_dir: Path,
     cerebras_api_key: str | None = None,
@@ -103,11 +143,14 @@ def save_local_provider_keys(
     xai_api_key: str | None = None,
     glm_api_key: str | None = None,
     mistral_api_key: str | None = None,
+    custom_api_key: str | None = None,
+    custom_base_url: str | None = None,
     primary_provider: str | None = None,
     preferred_model: str | None = None,
     scoring_model: str | None = None,
     chat_model: str | None = None,
     cv_model: str | None = None,
+    scoring_provider: str | None = None,
 ) -> dict[str, Any]:
     data_dir.mkdir(parents=True, exist_ok=True)
     secrets_path = data_dir / LOCAL_SECRETS_FILE
@@ -128,6 +171,10 @@ def save_local_provider_keys(
         "xai_api_key": xai_api_key,
         "glm_api_key": glm_api_key,
         "mistral_api_key": mistral_api_key,
+        "custom_api_key": custom_api_key,
+        # The endpoint is what configures the custom provider, so it is stored
+        # the same way a key is (and cleared the same way).
+        "custom_base_url": custom_base_url,
     }
     for field_name, raw in provider_keys.items():
         if raw is None:
@@ -153,6 +200,7 @@ def save_local_provider_keys(
         ("scoring_model", scoring_model),
         ("chat_model", chat_model),
         ("cv_model", cv_model),
+        ("scoring_provider", scoring_provider),
     ):
         if model_value is None:
             continue
@@ -164,9 +212,12 @@ def save_local_provider_keys(
 
     secrets_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
     status = {f"{p}_configured": bool(current.get(f"{p}_api_key")) for p in SUPPORTED_PROVIDERS}
+    # The custom provider is configured by its endpoint, not by a key.
+    status["custom_configured"] = bool(current.get("custom_base_url"))
     status["primary_provider"] = current.get("primary_provider", "")
     status["preferred_model"] = current.get("preferred_model", "")
     status["scoring_model"] = current.get("scoring_model", "")
+    status["scoring_provider"] = current.get("scoring_provider", "")
     status["chat_model"] = current.get("chat_model", "")
     status["cv_model"] = current.get("cv_model", "")
     return status
@@ -229,6 +280,8 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     glm_api_key = local_secrets.get("glm_api_key") or os.getenv("GLM_API_KEY")
     glm_base_url = local_secrets.get("glm_base_url") or os.getenv("GLM_BASE_URL")
     mistral_api_key = local_secrets.get("mistral_api_key") or os.getenv("MISTRAL_API_KEY")
+    custom_api_key = local_secrets.get("custom_api_key") or os.getenv("CUSTOM_API_KEY")
+    custom_base_url = local_secrets.get("custom_base_url") or os.getenv("CUSTOM_BASE_URL")
 
     provider_order = cfg.get("llm_provider_order", SUPPORTED_PROVIDERS)
     if not isinstance(provider_order, list) or not provider_order:
@@ -300,13 +353,13 @@ def load_settings(workspace_dir: Path) -> AppSettings:
             or os.getenv("LLM_MODEL")
         ),
         scoring_model=local_secrets.get("scoring_model") or None,
+        scoring_provider=local_secrets.get("scoring_provider") or None,
         chat_model=local_secrets.get("chat_model") or None,
         cv_model=local_secrets.get("cv_model") or None,
-        retention_days=int(cfg.get("retention_days", 15)),
-        hours_old=int(cfg.get("hours_old", 336)),
-        max_annunci=int(cfg.get("max_annunci", 20)),
-        delay_tra_chiamate=float(cfg.get("delay_tra_chiamate", 1.5)),
-        delay_tra_ricerche=float(cfg.get("delay_tra_ricerche", 4.0)),
+        retention_days=_as_int(cfg, "retention_days", 15),
+        hours_old=_as_int(cfg, "hours_old", 336),
+        max_annunci=_as_int(cfg, "max_annunci", 20),
+        delay_tra_ricerche=_as_float(cfg, "delay_tra_ricerche", 4.0),
         location_default=str(cfg.get("location_default", "Torino, Italy")),
         location_remote_default=str(cfg.get("location_remote_default", "Italy")),
         country_default=str(cfg.get("country_default", "italy")),
@@ -322,7 +375,9 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         glm_api_key=glm_api_key,
         mistral_api_key=mistral_api_key,
         glm_base_url=glm_base_url,
+        custom_api_key=custom_api_key,
+        custom_base_url=custom_base_url,
         model_selection_policy=merged_policy,
-        scan_concurrency=max(1, int(cfg.get("scan_concurrency", 4))),
-        scan_batch_size=max(1, int(cfg.get("scan_batch_size", 3))),
+        scan_concurrency=max(1, _as_int(cfg, "scan_concurrency", 4)),
+        scan_batch_size=max(1, _as_int(cfg, "scan_batch_size", 3)),
     )

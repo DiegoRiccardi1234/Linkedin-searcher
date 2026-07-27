@@ -25,6 +25,7 @@ from app.providers.model_selector import (
     rank_models,
 )
 from app.providers.openai_compat import (
+    CustomOpenAIProvider,
     DeepSeekProvider,
     GLMProvider,
     MistralProvider,
@@ -75,6 +76,11 @@ _MODEL_PENALTY_COOLDOWNS = {
     "timeout": 900.0,
 }
 
+# How long the usage_log-derived "unfit for scoring" set is reused before being
+# recomputed. Long enough that a scan doesn't re-query per failover attempt,
+# short enough that a model recovering shows up within the same session.
+_UNFIT_CACHE_SECONDS = 600.0
+
 
 class ProviderManager:
     def __init__(self, settings: AppSettings) -> None:
@@ -90,6 +96,9 @@ class ProviderManager:
             "xai": XAIProvider(api_key=settings.xai_api_key),
             "glm": GLMProvider(api_key=settings.glm_api_key, base_url=settings.glm_base_url),
             "mistral": MistralProvider(api_key=settings.mistral_api_key),
+            "custom": CustomOpenAIProvider(
+                api_key=settings.custom_api_key, base_url=settings.custom_base_url
+            ),
         }
         self.active_provider: LLMProvider | None = None
         self.active_provider_name: str = "none"
@@ -111,6 +120,15 @@ class ProviderManager:
         # Set by AppContainer after the DB is open; ``_record_call`` uses it
         # to persist token usage. None = no-op (unit tests, isolated usage).
         self._db: Any = None
+        # provider -> (timestamp, model ids with a bad recorded scoring record).
+        # Read from usage_log, so it survives restarts unlike _model_penalty.
+        self._unfit_cache: dict[str, tuple[float, set[str]]] = {}
+        # provider -> when a PAID model there returned 403 "key limit exceeded".
+        # One such answer says something about the ACCOUNT, not the model: every
+        # other paid model on that provider will answer the same way. Measured on
+        # the 2026-07-27 scan: 88 of 191 calls were 403s, each one a different
+        # paid OpenRouter model discovering the same missing credit.
+        self._no_credit_since: dict[str, float] = {}
 
     def initialize(self) -> None:
         """Pick first available provider from configured order and select a model."""
@@ -282,6 +300,45 @@ class ProviderManager:
                     key: val for key, val in self._model_penalty.items() if val[1] != reason
                 }
 
+    #: How long a "this account has no credit" observation is trusted. Credit
+    #: does not appear in the middle of a scan, and re-discovering it costs one
+    #: wasted call per paid model in the catalog.
+    _NO_CREDIT_TTL_SECONDS = 1800.0
+
+    def mark_no_credit(self, provider_name: str) -> None:
+        """Remember that a PAID model on this provider answered 403."""
+        with self._penalty_lock:
+            self._no_credit_since[provider_name] = _time.time()
+
+    def _has_no_credit(self, provider_name: str) -> bool:
+        with self._penalty_lock:
+            since = self._no_credit_since.get(provider_name)
+        return bool(since and _time.time() - since < self._NO_CREDIT_TTL_SECONDS)
+
+    def _policy_for(
+        self, provider_name: str, policy_override: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """The caller's model policy, adjusted for the provider it will run on.
+
+        Two things a policy cannot know on its own:
+
+        - ``:free`` is an OpenRouter naming convention, not a fact about price.
+          Everything on Cerebras, Groq and Google AI Studio is free tier and none
+          of it carries the suffix, so the "not free" penalty was de-ranking
+          exactly the models that work (measured 2026-07-27: Cerebras' gemma-4-31b,
+          8 successes out of 10, ranked below a paid gpt-4-turbo that 403s).
+        - A local endpoint holds the one or two models the user deliberately
+          downloaded and can actually run — not a catalog of three hundred to be
+          protected from. The 26B floor would rule out the only model available
+          (a 12B is what fits on a 12GB card).
+        """
+        effective = dict(policy_override or self.settings.model_selection_policy or {})
+        effective["paid_by_name"] = provider_name == "openrouter"
+        if provider_name == "custom":
+            effective["hard_floor"] = False
+            effective["min_size_b"] = 0
+        return effective
+
     def _penalized_model_ids(self, provider_name: str) -> set[str]:
         """Model ids currently penalized for ``provider_name`` (stale entries
         pruned per-reason). Fed to rank_models as ``penalized=`` to sink them
@@ -377,6 +434,31 @@ class ProviderManager:
         except Exception as exc:
             log.debug("usage record skipped: %s", exc)
 
+    def _empirically_unfit(self, provider_name: str) -> set[str]:
+        """Models with a bad recorded track record for JSON scoring on this
+        provider. Cached for the lifetime of a scan-ish window so the query
+        doesn't run per failover attempt. Never raises."""
+        db = getattr(self, "_db", None)
+        if db is None:
+            return set()
+        now = _time.time()
+        cached = self._unfit_cache.get(provider_name)
+        if cached and now - cached[0] < _UNFIT_CACHE_SECONDS:
+            return cached[1]
+        try:
+            from app.services.model_scoreboard import unfit_ids
+
+            unfit = unfit_ids(db, provider_name)
+        except Exception as exc:  # pragma: no cover - defensive
+            log.debug("scoreboard lookup skipped: %s", exc)
+            return set()
+        self._unfit_cache[provider_name] = (now, unfit)
+        if unfit:
+            log.info(
+                "%s: de-ranking %d model(s) on their recorded record", provider_name, len(unfit)
+            )
+        return unfit
+
     def _ranked_models_for(
         self,
         provider: LLMProvider,
@@ -396,6 +478,9 @@ class ProviderManager:
         unless ``ignore_penalties`` (the anti-brick last resort) is set.
         """
         penalized = set() if ignore_penalties else self._penalized_model_ids(provider.name)
+        # The caller's policy, adjusted for WHICH provider this is. Copied, never
+        # mutated: _SCORING_POLICY is a module-level dict shared by every call.
+        effective_policy = self._policy_for(provider.name, policy_override)
         models = self.get_models(provider.name).get("models") or []
         if models:
 
@@ -403,19 +488,35 @@ class ProviderManager:
                 return rank_models(
                     pool,
                     preferred_model=None if policy_override else self.settings.preferred_model,
-                    policy=policy_override or self.settings.model_selection_policy,
+                    policy=effective_policy,
                     penalized=pen,
                     limit=lim,
                 )
 
             pool = models
+            # Known to have no credit: paid models here answer 403 without being
+            # asked. Only narrow when free models remain — a provider whose whole
+            # catalog is paid still gets its normal (failing) chance rather than
+            # being silently dropped from the failover chain.
+            if effective_policy["paid_by_name"] and self._has_no_credit(provider.name):
+                free_only = [m for m in pool if m.endswith(":free")]
+                if free_only:
+                    pool = free_only
+            # What this model actually DID here, read back from usage_log: the
+            # in-memory penalty map forgets everything on restart, so a model
+            # that truncates every JSON call was re-elected on every boot. Free
+            # (no inference, no network) and persistent. Scoring calls only.
+            if not ignore_penalties and (policy_override or {}).get("hard_floor"):
+                penalized = penalized | self._empirically_unfit(provider.name)
             # OpenRouter exposes free live health stats (uptime/latency, no
             # inference). Fold models that are down RIGHT NOW into the penalized
             # set so scoring rotates off them before hitting a 429. Bounded to the
             # name-ranked shortlist so we never fetch stats for the whole catalog;
             # empty health (non-OR / network down) leaves behaviour unchanged.
             if provider.name == "openrouter":
-                shortlist = _rank(models, penalized, max(limit * 4, limit))
+                # From ``pool``, not from the full catalog: the no-credit filter
+                # above narrowed it, and re-ranking ``models`` here would undo it.
+                shortlist = _rank(pool, penalized, max(limit * 4, limit))
                 health = model_stats.get_model_health(provider, shortlist)
                 if health:
                     penalized = penalized | model_stats.unhealthy_ids(health)
@@ -423,7 +524,7 @@ class ProviderManager:
             ranked = _rank(pool, penalized, limit)
             if ranked:
                 return ranked
-        policy = policy_override or self.settings.model_selection_policy or {}
+        policy = effective_policy
         try:
             fallback = provider.select_model(preferred_model=self.settings.preferred_model)
         except Exception:
@@ -572,6 +673,11 @@ class ProviderManager:
                 reason = _classify_failure(exc)
                 if reason:
                     self.record_model_penalty(provider.name, model, reason)
+                # A 403 on a PAID model is a statement about the account, not
+                # about that model: stop offering every other paid model on this
+                # provider the same chance to discover it.
+                if reason == "forbidden" and not str(model).endswith(":free"):
+                    self.mark_no_credit(provider.name)
                 self._maybe_flag_key_invalid(provider, exc)
                 self._record_call(provider, model, endpoint, False, type(exc).__name__, elapsed_ms)
                 if idx < len(candidates) - 1:
@@ -781,10 +887,21 @@ def _call_with_timeout(fn: Callable[[], _RetryT], timeout: float) -> _RetryT:
     return box[0]
 
 
+#: A model on the user's own GPU answers in tens of seconds, not in one or two:
+#: measured on an RTX 5070, a 12B Q4 takes 45-58s to write a full scoring JSON
+#: (~1200 tokens at ~22 tok/s), and the first call of the session also loads 6 GB
+#: into VRAM. The 60s ceiling that keeps a hung cloud provider from burning a
+#: scan would cut off every single local answer.
+_LOCAL_TIMEOUT_SECONDS = 300.0
+_LOCAL_PROVIDERS = ("custom",)
+
+
 def _with_retry(fn: Callable[[], _RetryT], provider_label: str) -> _RetryT:
     max_attempts = max(1, int(_os.environ.get("LLM_MAX_RETRIES", "3")))
     base = float(_os.environ.get("LLM_RETRY_BASE_SECONDS", "1.0"))
     timeout = float(_os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "60"))
+    if provider_label in _LOCAL_PROVIDERS:
+        timeout = max(timeout, _LOCAL_TIMEOUT_SECONDS)
     last_exc: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:

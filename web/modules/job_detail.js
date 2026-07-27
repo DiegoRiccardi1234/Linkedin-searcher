@@ -5,8 +5,17 @@
 import { api, escapeHtml, setText, showToast } from "./helpers.js";
 import { t } from "./i18n.js";
 import { appState } from "./state.js";
-import { scoreCell, normalizeJobStatus, fmtDate, loadJobs } from "./job_list.js";
+import {
+  scoreCell,
+  normalizeJobStatus,
+  fmtDate,
+  loadJobs,
+  flagBadgesHtml,
+  freshnessHtml,
+} from "./job_list.js";
+import { applicationBlockHtml, wireApplicationBlock } from "./application.js";
 import { reminderEditorHtml, wireReminderEditor } from "./reminders.js";
+import { scoreFeedbackHtml, wireScoreFeedback } from "./score_feedback.js";
 import { setupGenerationButton } from "./features.js";
 
 let _deps = { pinJobToActiveSession: () => {} };
@@ -79,6 +88,50 @@ function renderMatchRadar(axes) {
       },
     },
   });
+}
+
+// Why each axis reads the way it does — derived from data the app already has,
+// so the radar stops being decorative without costing a single extra token.
+function axisReasonsHtml(analysis) {
+  const axes = (analysis && analysis.match_axes) || {};
+  const skills = (analysis && analysis.skills_match) || {};
+  const flags = new Set(analysis?.blocchi || []);
+  // The blockers are listed under "missing" too, but they are not missing
+  // SKILLS — showing "outside the EU: needs a visa" as a skill gap reads as if
+  // the candidate could go and learn it. Each blocker gets its own row below.
+  const blockerTexts = new Set(Object.values(analysis?.blocchi_dettaglio || {}));
+  const missing = (Array.isArray(skills.mancano) ? skills.mancano : [])
+    .filter((item) => !blockerTexts.has(item))
+    .slice(0, 3);
+  const rows = [];
+  if (axes.skills_match !== undefined && missing.length) {
+    rows.push([t("offcanvas.axisSkills"), missing.join(", ")]);
+  }
+  if (flags.has("geo_non_ue")) {
+    rows.push([t("offcanvas.axisRemote"), t("jobs.flag.geoLong")]);
+  }
+  if (flags.has("voto_minimo")) {
+    rows.push([
+      t("offcanvas.axisSeniority"),
+      analysis?.blocchi_dettaglio?.voto_minimo || t("jobs.flag.grade"),
+    ]);
+  }
+  if (flags.has("ral_sotto_minima")) {
+    rows.push([t("offcanvas.axisSalary"), t("jobs.flag.salaryLong")]);
+  } else if (axes.salary_match === null || axes.salary_match === undefined) {
+    rows.push([t("offcanvas.axisSalary"), t("offcanvas.axisSalaryUnknown")]);
+  }
+  if (flags.has("lavoro_a_task")) {
+    rows.push([t("offcanvas.axisContract"), t("jobs.flag.gigLong")]);
+  }
+  if (!rows.length) return "";
+  const items = rows
+    .map(
+      ([axis, why]) =>
+        `<li><strong>${escapeHtml(axis)}:</strong> ${escapeHtml(String(why))}</li>`,
+    )
+    .join("");
+  return `<ul class="axis-reasons micro">${items}</ul>`;
 }
 
 async function renderTimeline(jobId) {
@@ -246,6 +299,13 @@ export async function showJobDetail(jobId) {
     if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
       ralSpan = `<div class="info-tag"><strong>RAL:</strong> ${escapeHtml(analysis.ral_stimata)}</div>`;
     }
+    // The reasons a score is capped, as badges instead of a sentence glued to
+    // the front of the weakness line.
+    const badges = flagBadgesHtml(analysis?.blocchi) + freshnessHtml(job.last_seen_at);
+    const flagsRow = badges ? `<div class="job-flags mt-8">${badges}</div>` : "";
+    // Analyses stored before the rename still carry the old, name-bearing keys.
+    const strengths = analysis ? analysis.punti_forza || analysis.punti_forza_per_diego : null;
+    const weaknesses = analysis ? analysis.punti_deboli || analysis.punti_deboli_per_diego : null;
     // Platform task work vs employment: same list, very different decision.
     let engagementSpan = "";
     const engagement = analysis && analysis.tipo_ingaggio;
@@ -260,6 +320,9 @@ export async function showJobDetail(jobId) {
             <h4>${t("offcanvas.matchScore")}</h4>
             <div class="score-xl ${sc.cls}">${sc.text}</div>
             <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
+            <button type="button" data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn detail-fav${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
+            ${flagsRow}
+            ${scoreFeedbackHtml(payload.score_feedback)}
           </div>
           <div class="info-card">
             <h4>${t("offcanvas.positionDetails")}</h4>
@@ -275,8 +338,8 @@ export async function showJobDetail(jobId) {
         <div class="mt-16">
           <h4>${t("offcanvas.prosAndCons")}</h4>
           <ul class="pros-cons">
-            <li class="pro">✅ ${escapeHtml((analysis ? analysis.punti_forza_per_diego : null) || "N/A")}</li>
-            <li class="con">❌ ${escapeHtml((analysis ? analysis.punti_deboli_per_diego : null) || "N/A")}</li>
+            <li class="pro">✅ ${escapeHtml(strengths || "N/A")}</li>
+            <li class="con">❌ ${escapeHtml(weaknesses || "N/A")}</li>
           </ul>
         </div>
         <div class="info-card mt-8">
@@ -285,6 +348,7 @@ export async function showJobDetail(jobId) {
         <div class="mt-16 info-card">
           <h4>${t("offcanvas.breakdown")}</h4>
           <canvas id="detailMatchRadar" height="220"></canvas>
+          ${axisReasonsHtml(analysis)}
         </div>
         ${requisitiBlock}
         ${responsabilitaBlock}
@@ -295,8 +359,9 @@ export async function showJobDetail(jobId) {
         <div class="mt-16">
           <h4>${t("offcanvas.listingMeta")}</h4>
           ${sourcesBadge}
-          <p class="text-sm text-dim">${t("offcanvas.search")}: ${escapeHtml(job.ricerca_usata)} | ${t("jobs.source")}: ${escapeHtml(job.fonte || "App")} | ${t("offcanvas.found")}: ${fmtDate(job.first_seen_at)} | ${t("offcanvas.companyRep")}: ${escapeHtml((analysis ? analysis.reputazione_azienda : null) || "N/A")}</p>
+          <p class="text-sm text-dim">${t("offcanvas.search")}: ${escapeHtml(job.ricerca_usata)} | ${t("jobs.source")}: ${escapeHtml(job.fonte || "App")} | ${t("offcanvas.found")}: ${fmtDate(job.first_seen_at)}</p>
         </div>
+        ${applicationBlockHtml(job)}
         <div class="mt-16 info-card">
           <h4>${t("timeline.title")}</h4>
           <div id="detailTimeline" class="detail-timeline"></div>
@@ -320,6 +385,12 @@ export async function showJobDetail(jobId) {
 
     renderTimeline(job.id);
     wireReminderEditor(job.id);
+    wireApplicationBlock(job.id, () => renderTimeline(job.id));
+    wireScoreFeedback(job.id);
+    container.querySelector("button.detail-fav")?.addEventListener("click", (event) => {
+      const btn = event.currentTarget;
+      toggleFavorite(btn.dataset.id, btn.dataset.favorite === "1");
+    });
     const noteBtn = document.getElementById("detailNoteBtn");
     const noteInput = document.getElementById("detailNoteInput");
     if (noteBtn && noteInput) {
@@ -358,18 +429,38 @@ export async function performJobAction(jobId, action) {
 }
 
 export async function toggleFavorite(jobId, isFavorite) {
+  // Paint the star first: the confirmation used to wait for a full reload of
+  // the job list (a 250-row query plus a re-sort), so the click looked ignored
+  // — and if that reload failed, the star never moved at all.
+  paintFavorite(jobId, isFavorite);
   try {
     await api(`/api/jobs/${jobId}/favorite`, {
       method: "POST",
       body: JSON.stringify({ is_favorite: isFavorite }),
     });
-    await Promise.all([loadJobs(), loadRecommendations()]);
     const key = isFavorite ? "toast.favoriteAdded" : "toast.favoriteRemoved";
-    const fallback = isFavorite ? "Added to favorites" : "Removed from favorites";
-    showToast(t(key) || fallback, "info");
+    showToast(t(key), "info");
+    await Promise.all([loadJobs(), loadRecommendations()]);
   } catch (err) {
-    showToast(`${t("toast.jobActionFailed") || "Job action failed"}: ${err.message}`, "error");
+    paintFavorite(jobId, !isFavorite); // the write failed: put the star back
+    showToast(`${t("toast.jobActionFailed")}: ${err.message}`, "error");
   }
+}
+
+// Every surface that shows the flag for this job, updated in place.
+export function paintFavorite(jobId, isFavorite) {
+  const id = String(jobId);
+  document.querySelectorAll(`[data-favorite][data-id="${id}"]`).forEach((btn) => {
+    btn.dataset.favorite = isFavorite ? "0" : "1";
+    btn.classList.toggle("is-active", isFavorite);
+    btn.title = isFavorite ? t("jobs.unfavorite") : t("jobs.favorite");
+    btn.setAttribute("aria-label", btn.title);
+    const icon = btn.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = isFavorite ? "star" : "star_border";
+  });
+  document
+    .querySelectorAll(`.kanban-card[data-id="${id}"] .kanban-fav, .job-fav-mark[data-id="${id}"]`)
+    .forEach((mark) => mark.classList.toggle("hidden", !isFavorite));
 }
 
 function recommendationCardHtml(job) {
