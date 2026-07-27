@@ -6,11 +6,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.config import SUPPORTED_PROVIDERS, save_local_provider_keys
-from app.models import ProviderKeysRequest
+from app.models import LocalPullRequest, LocalUseRequest, ProviderKeysRequest
 from app.providers.model_selector import SCORING_MIN_SIZE_B, infer_size_b, rank_models
-from app.services import model_stats
+from app.services import local_models, model_stats
 from app.services.model_probe import penalty_reason, probe_models
 from app.services.model_scoreboard import scoreboard
 
@@ -191,5 +192,67 @@ def build_router(container: AppContainer) -> APIRouter:
         with contextlib.suppress(Exception):  # persistence is best-effort
             container.db.set_preference(f"model_probe_{name}", json.dumps(payload))
         return {"ok": True, "provider": name, **payload}
+
+    # ── Local models: what this machine can run, and what it already has ─────
+
+    @router.get("/api/local/status")
+    def local_status() -> dict[str, Any]:
+        """Hardware, the model sizes it can sustain, and what Ollama already has.
+        No inference and no downloads — this is the panel's read model."""
+        return local_models.snapshot()
+
+    @router.post("/api/local/pull")
+    def local_pull(payload: LocalPullRequest) -> StreamingResponse:
+        """Download a model through Ollama, streaming ITS progress lines.
+
+        Ollama owns quantisation, resume and disk layout; re-implementing that
+        against Hugging Face would mean shipping a download manager to save a
+        dependency the user already has.
+        """
+        model = payload.model.strip()
+        if not model:
+            raise HTTPException(status_code=400, detail="model_required")
+
+        def _events() -> Any:
+            try:
+                for event in local_models.pull_events(model):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as exc:  # a dead Ollama must not 500 mid-stream
+                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+        return StreamingResponse(_events(), media_type="text/event-stream")
+
+    @router.post("/api/local/use")
+    def local_use(payload: LocalUseRequest) -> dict[str, Any]:
+        """Point the app at a local model for scoring.
+
+        Writes the same settings the provider panel would: the custom endpoint's
+        base URL and the model to pin for scan scoring. The key stays empty —
+        Ollama does not want one.
+        """
+        model = payload.model.strip()
+        if not model:
+            raise HTTPException(status_code=400, detail="model_required")
+        base_url = payload.base_url.strip() or local_models.OLLAMA_OPENAI_BASE
+        # Ollama serves every model with a 4096-token window unless told
+        # otherwise, and a scoring prompt alone is ~2500: without a wider variant
+        # every local answer comes back truncated. Free and instant — the copy
+        # layers parameters over the same weights.
+        pinned = local_models.ensure_scoring_variant(model) if payload.for_scoring else model
+        save_local_provider_keys(
+            container.settings.data_dir,
+            custom_base_url=base_url,
+            scoring_model=pinned if payload.for_scoring else None,
+            # Pin the provider too: chat and the CV tools stay wherever they are,
+            # and an Ollama tag asked of the primary cloud provider is a 404.
+            scoring_provider="custom" if payload.for_scoring else None,
+        )
+        container.reload_providers()
+        return {
+            "ok": True,
+            "scoring_model": pinned if payload.for_scoring else "",
+            "scoring_provider": "custom" if payload.for_scoring else "",
+            "base_url": base_url,
+        }
 
     return router

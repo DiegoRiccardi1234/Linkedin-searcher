@@ -159,9 +159,7 @@ def test_reminder_404_on_missing_job(client: TestClient) -> None:
 
 def test_favorite_roundtrip(client: TestClient, tmp_path: Path) -> None:
     jid = _seed_job(tmp_path)
-    assert (
-        client.post(f"/api/jobs/{jid}/favorite", json={"is_favorite": True}).status_code == 200
-    )
+    assert client.post(f"/api/jobs/{jid}/favorite", json={"is_favorite": True}).status_code == 200
     favs = client.get("/api/jobs", params={"only_favorites": True}).json()["jobs"]
     assert [j["id"] for j in favs] == [jid]
     client.post(f"/api/jobs/{jid}/favorite", json={"is_favorite": False})
@@ -228,3 +226,92 @@ def test_export_csv_all_jobs(client: TestClient, tmp_path: Path) -> None:
     assert resp.status_code == 200
     assert "attachment" in resp.headers["content-disposition"]
     assert "AI QA Analyst" in resp.text
+
+
+# --- watchlist / outcome / score feedback (v1.7.8) ---------------------------
+
+
+def test_watchlist_round_trip(client: TestClient) -> None:
+    assert client.get("/api/watchlist").json()["companies"] == []
+
+    added = client.post("/api/watchlist", json={"name": "RWS Group", "note": "Torino"})
+    assert added.status_code == 200
+    company = added.json()["companies"][0]
+    assert company["canonical"] == "rws"
+
+    # Suggestions drop what is already followed, so the chips never re-offer it.
+    listing = client.get("/api/watchlist").json()
+    assert "RWS Group" not in listing["suggestions"]
+    assert listing["enabled"] is False  # following ≠ scanning for it
+
+    paused = client.post(f"/api/watchlist/{company['id']}/active", json={"active": False})
+    assert paused.json()["companies"][0]["active"] == 0
+
+    assert client.delete(f"/api/watchlist/{company['id']}").status_code == 200
+    assert client.get("/api/watchlist").json()["companies"] == []
+    assert client.delete(f"/api/watchlist/{company['id']}").status_code == 404
+    assert client.post("/api/watchlist", json={"name": "S.r.l."}).status_code == 400
+
+
+def test_watchlist_toggle_is_a_writable_preference(client: TestClient) -> None:
+    """The scan reads this preference; the security allowlist has to let it through."""
+    resp = client.post("/api/preferences", json={"key": "watchlist_enabled", "value": "1"})
+    assert resp.status_code == 200
+    assert client.get("/api/watchlist").json()["enabled"] is True
+
+
+def test_outcome_endpoint(client: TestClient, tmp_path: Path) -> None:
+    jid = _seed_job(tmp_path)
+    client.post(f"/api/jobs/{jid}/action", json={"action": "applied"})
+
+    assert (
+        client.post(f"/api/jobs/{jid}/outcome", json={"outcome": "no_response"}).status_code == 200
+    )
+    detail = client.get(f"/api/jobs/{jid}").json()["job"]
+    assert detail["outcome"] == "no_response"
+    assert detail["applied_at"]
+
+    assert client.post(f"/api/jobs/{jid}/outcome", json={"outcome": "ghosted"}).status_code == 400
+    assert client.post("/api/jobs/9999/outcome", json={"outcome": "offer"}).status_code == 404
+
+
+def test_score_feedback_endpoints(client: TestClient, tmp_path: Path) -> None:
+    jid = _seed_job(tmp_path, _analysis={"punteggio": 9, "scoring_v": 2})
+
+    resp = client.post(
+        f"/api/jobs/{jid}/score-feedback",
+        json={"verdict": "down", "expected_score": 3, "reason": "chiede 5 anni"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["summary"] == {
+        "total": 1,
+        "up": 0,
+        "down": 1,
+        "agreement": 0,
+        "avg_gap": 6.0,
+        "scored_cases": 1,
+    }
+
+    # The detail endpoint carries the standing verdict so the buttons render lit.
+    assert client.get(f"/api/jobs/{jid}").json()["score_feedback"]["verdict"] == "down"
+
+    export = client.get("/api/score-feedback/export")
+    assert export.status_code == 200
+    assert "attachment" in export.headers["content-disposition"]
+    first = export.text.splitlines()[0]
+    assert '"ai_score": 9' in first and '"expected_score": 3' in first
+
+    assert (
+        client.post(f"/api/jobs/{jid}/score-feedback", json={"verdict": "sideways"}).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            f"/api/jobs/{jid}/score-feedback", json={"verdict": "up", "expected_score": 42}
+        ).status_code
+        == 400
+    )
+    assert client.post("/api/jobs/9999/score-feedback", json={"verdict": "up"}).status_code == 404
+
+    assert client.delete(f"/api/jobs/{jid}/score-feedback").json()["removed"] == 1
+    assert client.get("/api/score-feedback/summary").json()["total"] == 0

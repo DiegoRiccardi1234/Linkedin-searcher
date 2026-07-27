@@ -52,6 +52,48 @@ class FavoriteRequest(BaseModel):
     is_favorite: bool = True
 
 
+class LocalPullRequest(BaseModel):
+    """An Ollama tag to download, e.g. ``gemma3:12b``."""
+
+    model: str = ""
+
+
+class LocalUseRequest(BaseModel):
+    """Point the app at a local model. ``base_url`` defaults to Ollama's
+    OpenAI-compatible endpoint; the API key stays empty by design."""
+
+    model: str = ""
+    base_url: str = ""
+    for_scoring: bool = True
+
+
+class ScoreFeedbackRequest(BaseModel):
+    """The user's verdict on an AI score. ``expected_score`` is optional: a
+    thumbs-down must cost one click, or far fewer of them get collected."""
+
+    verdict: str = "down"
+    expected_score: int | None = None
+    reason: str = ""
+
+
+class JobOutcomeRequest(BaseModel):
+    """How an application ended. Empty (or "pending") clears the outcome; the
+    accepted values are :data:`app.db.Database.OUTCOMES`."""
+
+    outcome: str = ""
+
+
+class WatchlistCompanyRequest(BaseModel):
+    """An employer to follow. ``note`` is the user's own reminder of why."""
+
+    name: str
+    note: str = ""
+
+
+class WatchlistActiveRequest(BaseModel):
+    active: bool = True
+
+
 class ManualJobCreateRequest(BaseModel):
     titolo: str
     azienda: str
@@ -85,6 +127,9 @@ class ScanRequest(BaseModel):
     job_types: list[str] = Field(default_factory=list)
     work_types: list[str] = Field(default_factory=list)
     min_salary: int | None = None
+    # Employers to search by name, on top of the keyword grid. Empty = use the
+    # followed list, and only when the user enabled it (see _watchlist_for_scan).
+    companies: list[str] = Field(default_factory=list)
 
 
 class SavedSearchCreate(BaseModel):

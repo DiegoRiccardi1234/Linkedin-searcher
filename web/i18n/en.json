@@ -794,5 +794,67 @@
     "needTwo": "Pick at least two offers to compare",
     "loading": "Loading…",
     "error": "Couldn't load the comparison"
+  },
+  "watchlist": {
+    "title": "Companies you follow",
+    "hint": "A keyword scan never finds an employer that words its postings differently. Followed companies are searched by name.",
+    "placeholder": "Company name",
+    "add": "Follow",
+    "remove": "Stop following",
+    "empty": "You are not following any company yet.",
+    "suggestionsLabel": "Suggestions:",
+    "include": "Include followed companies",
+    "added": "Now following {name}",
+    "neverSeen": "no postings seen yet",
+    "seenToday": "posting seen today",
+    "seenDays": "last posting {days} days ago"
+  },
+  "application": {
+    "title": "Application",
+    "sentOn": "Sent on",
+    "dateUnknown": "date not recorded",
+    "cvUsed": "CV used",
+    "cvUnknown": "not recorded",
+    "cvGone": "profile since deleted",
+    "outcomeLabel": "Outcome",
+    "saved": "Outcome saved",
+    "outcome": {
+      "pending": "Still open",
+      "no_response": "No response",
+      "rejected": "Rejected",
+      "offer": "Offer received",
+      "accepted": "Accepted",
+      "withdrawn": "Withdrawn"
+    }
+  },
+  "feedback": {
+    "question": "Is this score right?",
+    "agree": "The score is right",
+    "disagree": "The score is wrong",
+    "addDetail": "Add detail (optional)",
+    "expectedPlaceholder": "0-10",
+    "reasonPlaceholder": "Why? e.g. wants five years",
+    "saved": "Thanks — recorded",
+    "summaryTitle": "Scoring quality",
+    "summaryEmpty": "No judgements yet. Rate a few scores in the job detail and they land here.",
+    "agreementLabel": "agree with the AI",
+    "casesLabel": "judged offers",
+    "avgGapLabel": "average gap",
+    "export": "Export cases (JSONL)"
+  },
+  "local": {
+    "title": "Run a model on this PC",
+    "subtitle": "A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.",
+    "refresh": "Check again",
+    "noGpu": "No NVIDIA GPU detected",
+    "needOllama": "Ollama is what downloads and serves local models. Install it from",
+    "ollamaStopped": "Ollama is installed but not running: start it and check again.",
+    "noneDownloaded": "No model downloaded yet.",
+    "useForScoring": "Use for scoring",
+    "nowUsing": "Scoring now runs on {model}",
+    "couldAlsoRun": "This machine could also run:",
+    "download": "Download",
+    "pullStarting": "Starting download of {model}…",
+    "pullDone": "{model} is ready"
   }
 }

@@ -794,5 +794,67 @@
     "needTwo": "Seleziona almeno due offerte da confrontare",
     "loading": "Caricamento…",
     "error": "Impossibile caricare il confronto"
+  },
+  "watchlist": {
+    "title": "Aziende che segui",
+    "hint": "Una ricerca per parole chiave non trova mai un'azienda che scrive i suoi annunci in modo diverso. Le aziende seguite vengono cercate per nome.",
+    "placeholder": "Nome azienda",
+    "add": "Segui",
+    "remove": "Smetti di seguire",
+    "empty": "Non stai ancora seguendo nessuna azienda.",
+    "suggestionsLabel": "Suggerimenti:",
+    "include": "Includi le aziende seguite",
+    "added": "Ora segui {name}",
+    "neverSeen": "nessun annuncio ancora visto",
+    "seenToday": "annuncio visto oggi",
+    "seenDays": "ultimo annuncio {days} giorni fa"
+  },
+  "application": {
+    "title": "Candidatura",
+    "sentOn": "Inviata il",
+    "dateUnknown": "data non registrata",
+    "cvUsed": "CV usato",
+    "cvUnknown": "non registrato",
+    "cvGone": "profilo poi eliminato",
+    "outcomeLabel": "Esito",
+    "saved": "Esito salvato",
+    "outcome": {
+      "pending": "Ancora aperta",
+      "no_response": "Nessuna risposta",
+      "rejected": "Rifiutata",
+      "offer": "Offerta ricevuta",
+      "accepted": "Accettata",
+      "withdrawn": "Ritirata"
+    }
+  },
+  "feedback": {
+    "question": "Il punteggio è giusto?",
+    "agree": "Il punteggio è giusto",
+    "disagree": "Il punteggio è sbagliato",
+    "addDetail": "Aggiungi dettagli (facoltativo)",
+    "expectedPlaceholder": "0-10",
+    "reasonPlaceholder": "Perché? es. chiede cinque anni",
+    "saved": "Grazie, registrato",
+    "summaryTitle": "Qualità dello scoring",
+    "summaryEmpty": "Ancora nessun giudizio. Vota qualche punteggio nel dettaglio offerta e compaiono qui.",
+    "agreementLabel": "d'accordo con l'IA",
+    "casesLabel": "offerte giudicate",
+    "avgGapLabel": "scarto medio",
+    "export": "Esporta i casi (JSONL)"
+  },
+  "local": {
+    "title": "Usa un modello su questo PC",
+    "subtitle": "Un modello sulla tua GPU non ha quota giornaliera né limiti di frequenza, e niente esce dal computer. Quello che conta è se sta nella memoria video.",
+    "refresh": "Ricontrolla",
+    "noGpu": "Nessuna GPU NVIDIA rilevata",
+    "needOllama": "Ollama è ciò che scarica e serve i modelli locali. Installalo da",
+    "ollamaStopped": "Ollama è installato ma non è in esecuzione: avvialo e ricontrolla.",
+    "noneDownloaded": "Nessun modello ancora scaricato.",
+    "useForScoring": "Usa per lo scoring",
+    "nowUsing": "Lo scoring ora gira su {model}",
+    "couldAlsoRun": "Questo computer potrebbe anche far girare:",
+    "download": "Scarica",
+    "pullStarting": "Avvio il download di {model}…",
+    "pullDone": "{model} è pronto"
   }
 }

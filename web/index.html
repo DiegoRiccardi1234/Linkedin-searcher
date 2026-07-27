@@ -228,6 +228,10 @@
             <h4><span class="material-symbols-outlined">apartment</span> <span data-i18n="analytics.topCompanies">Top Companies</span></h4>
             <canvas id="topCompaniesChart" role="img" aria-label="Top companies chart"></canvas>
           </div>
+          <div class="analytics-card">
+            <h4><span class="material-symbols-outlined">rule</span> <span data-i18n="feedback.summaryTitle">Scoring quality</span></h4>
+            <div id="scoreFeedbackSummary" class="score-feedback-summary"></div>
+          </div>
           <div class="analytics-card" id="usageCard">
             <h4 class="usage-head">
               <span><span class="material-symbols-outlined">data_usage</span> <span data-i18n="usage.title">AI Usage</span></span>
@@ -443,6 +447,7 @@
             <label class="pill-toggle"><input type="checkbox" name="scanSites" value="linkedin" checked /><span>LinkedIn</span></label>
             <label class="pill-toggle"><input type="checkbox" name="scanSites" value="indeed" checked /><span>Indeed</span></label>
             <label class="pill-toggle"><input type="checkbox" id="remoteToggle" /><span data-i18n="settings.remoteOnly">Remote only</span></label>
+            <label class="pill-toggle" id="watchlistTogglePill" hidden><input type="checkbox" id="watchlistToggle" /><span data-i18n="watchlist.include">Include followed companies</span></label>
           </div>
 
           <details class="scan-advanced">
@@ -506,6 +511,21 @@
           <p class="micro" data-i18n="savedSearch.hint">Save the current filters as a preset and re-run them with one click.</p>
           <div id="savedSearchList" class="saved-search-list"></div>
           <p id="savedSearchEmpty" class="micro" data-i18n="savedSearch.empty" style="display:none;">No saved searches yet.</p>
+        </section>
+
+        <section class="search-section watchlist-section">
+          <header class="search-section-head">
+            <h3><span class="material-symbols-outlined">business_center</span> <span data-i18n="watchlist.title">Companies you follow</span></h3>
+          </header>
+          <p class="micro" data-i18n="watchlist.hint">A keyword scan never finds an employer that words its postings differently. Followed companies are searched by name.</p>
+          <div class="watchlist-add">
+            <input type="text" id="watchlistInput" data-i18n-placeholder="watchlist.placeholder" placeholder="Company name" />
+            <button type="button" id="watchlistAddBtn" class="ghost-btn small"><span class="material-symbols-outlined">add</span> <span data-i18n="watchlist.add">Follow</span></button>
+          </div>
+          <div id="watchlistList" class="watchlist-list"></div>
+          <p id="watchlistEmpty" class="micro" data-i18n="watchlist.empty" style="display:none;">You are not following any company yet.</p>
+          <p class="micro" data-i18n="watchlist.suggestionsLabel">Suggestions:</p>
+          <div id="watchlistSuggestions" class="watchlist-suggestions"></div>
         </section>
       </article>
     </section>
@@ -730,6 +750,16 @@
             <option value=""></option>
           </select>
           <pre id="keysStatus" class="output hidden"></pre>
+        </article>
+        <article class="card-block card-block--wide" id="localModelsCard">
+          <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>
+          <p class="micro" data-i18n="local.subtitle">A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.</p>
+          <div id="localHardware" class="local-hardware"></div>
+          <p id="localVerdict" class="local-verdict"></p>
+          <div id="localReady" class="local-ready"></div>
+          <div id="localSuggestions" class="local-suggestions"></div>
+          <p id="localProgress" class="micro local-progress" hidden></p>
+          <button type="button" id="localRefresh" class="ghost-btn small"><span class="material-symbols-outlined">refresh</span> <span data-i18n="local.refresh">Check again</span></button>
         </article>
 
         <article class="card-block card-block--wide">

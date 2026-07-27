@@ -15,7 +15,15 @@ if TYPE_CHECKING:
 # id and the scan defaults. The endpoint accepted any key/value pair, so one
 # unauthenticated POST could silently turn PII redaction off. Writable keys are
 # the ones the UI actually sets.
-_WRITABLE_PREFIX = ("feature_", "onboarding_", "autoscan_", "last_scan_", "cv_", "kanban_")
+_WRITABLE_PREFIX = (
+    "feature_",
+    "onboarding_",
+    "autoscan_",
+    "last_scan_",
+    "cv_",
+    "kanban_",
+    "watchlist_",
+)
 _WRITABLE_KEYS = frozenset(
     {
         "active_profile_id",

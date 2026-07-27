@@ -3,6 +3,7 @@ import json
 import random
 import re
 import time
+import urllib.request
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -46,6 +47,7 @@ from app.services import quota
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
+from app.services.scan.companies import canonical_company, company_matches
 from app.services.scan.hard_requirements import (
     _MATCH_AXES_KEYS,
     BLOCKING_FLAGS,
@@ -268,8 +270,55 @@ _SCORING_POLICY: dict[str, Any] = {
 # bounds the volume (and the free-tier LLM scoring time) for a multi-location run.
 _MAX_SCAN_LOCATIONS = 8
 
+# Cap on followed employers searched by name in one scan. Each one costs a
+# scrape plus the scoring of whatever it returns, on top of the keyword grid.
+_MAX_WATCHLIST_COMPANIES = 8
 
-def _scoring_max_tokens(n_offers: int) -> int:
+
+def _watchlist_for_scan(db: Database, payload: ScanRequest) -> list[dict[str, str]]:
+    """Employers to search by name in this scan, capped.
+
+    An explicit ``payload.companies`` wins (a one-off scan of one employer);
+    otherwise the followed list is used, and only when the user turned it on —
+    following a company should not silently add searches to every scan.
+    """
+    names = [str(c).strip() for c in (payload.companies or []) if str(c).strip()]
+    if names:
+        rows = [{"name": n, "canonical": canonical_company(n)} for n in names]
+    elif db.get_preference("watchlist_enabled", "0") in ("1", "true", "on"):
+        rows = [
+            {"name": str(r["name"]), "canonical": str(r["canonical"])}
+            for r in db.list_watchlist_companies(active_only=True)
+        ]
+    else:
+        rows = []
+    return [r for r in rows if r["canonical"]][:_MAX_WATCHLIST_COMPANIES]
+
+
+def _local_scoring(call_kwargs: dict[str, Any]) -> bool:
+    """True when this scoring call runs on the user's own machine."""
+    return str(call_kwargs.get("provider_name") or "") == "custom"
+
+
+def _local_server_reachable(settings: Any, timeout: float = 2.0) -> bool:
+    """Is the configured local endpoint actually answering right now?
+
+    A HEAD-weight check against the OpenAI-compatible ``/models`` list: no
+    inference, no tokens, and it distinguishes "Ollama is not running" (the
+    common case after a reboot) from "the model is slow".
+    """
+    base = str(getattr(settings, "custom_base_url", "") or "").rstrip("/")
+    if not base:
+        return False
+    try:
+        with urllib.request.urlopen(f"{base}/models", timeout=timeout) as resp:
+            return bool(resp.status == 200)
+    except Exception as exc:
+        log.debug("local endpoint %s unreachable: %s", base, exc)
+        return False
+
+
+def _scoring_max_tokens(n_offers: int, local: bool = False) -> int:
     """Completion budget for a scoring call — single offer or batch.
 
     Fixed headroom + per-offer output. The auto-selected model can be a
@@ -284,7 +333,15 @@ def _scoring_max_tokens(n_offers: int) -> int:
     penalised each of them, and landed on the keyword heuristic — while the job
     was still saved as "analysed". That path is also the batch's own fallback
     for missing/cloned slots, so a degraded batch degraded further.
+
+    ``local``: a model on the user's own GPU spends no quota and costs nothing
+    per token, and the smaller builds that fit on consumer hardware are wordier
+    than the hosted ones — a 12B wrote past this ceiling on the first real offer
+    it was given and had its JSON cut off. Being generous there is free; being
+    tight there just re-creates the truncation this budget exists to prevent.
     """
+    if local:
+        return 1200 * max(1, n_offers) + 3000
     return 500 * max(1, n_offers) + 1600
 
 
@@ -296,8 +353,24 @@ def _scoring_call_kwargs(provider_manager: ProviderManager) -> dict[str, Any]:
     settings = getattr(provider_manager, "settings", None)
     scoring_model = getattr(settings, "scoring_model", None)
     if scoring_model:
+        # The pinned model does not necessarily live on the primary provider:
+        # a local Ollama tag asked of OpenRouter is a 404. ``scoring_provider``
+        # is set by the local-models panel; without it the primary still wins.
         order = getattr(settings, "llm_provider_order", None) or []
-        return {"provider_name": order[0] if order else None, "model_name": scoring_model}
+        provider = getattr(settings, "scoring_provider", None) or (order[0] if order else None)
+        # A pin has no failover, which is the point — except when the pinned
+        # provider is a local server that simply is not running. Then every
+        # single offer would fall to the keyword estimate, one dead call at a
+        # time. The check costs nothing (no inference) and the answer is
+        # unambiguous, so fall back to the normal cloud selection instead.
+        if provider == "custom" and not _local_server_reachable(settings):
+            log.warning(
+                "Scoring pinned to a local model (%s) but the endpoint is not "
+                "answering: falling back to the usual provider selection.",
+                scoring_model,
+            )
+            return {"policy_override": _SCORING_POLICY}
+        return {"provider_name": provider, "model_name": scoring_model}
     return {"policy_override": _SCORING_POLICY}
 
 
@@ -377,11 +450,12 @@ def _analyze_offer_raw(
     if privacy:
         prompt_markdown, _ = redact_pii(profile_markdown, candidate_name)
     prompt = _analysis_prompt(prompt_markdown, titolo, azienda, descrizione, extra_context)
+    call_kwargs = _scoring_call_kwargs(provider_manager)
     try:
         result = provider_manager.complete_json(
             prompt=prompt,
-            max_tokens=_scoring_max_tokens(1),
-            **_scoring_call_kwargs(provider_manager),
+            max_tokens=_scoring_max_tokens(1, local=_local_scoring(call_kwargs)),
+            **call_kwargs,
         )
         # A non-dict, empty dict, or dict without a score is NOT an analysis:
         # persisting it would set analyzed_at with punteggio=0 and the job
@@ -471,10 +545,11 @@ def analyze_offers_batch(
             prompt = _batch_analysis_prompt(
                 prompt_markdown, [o for _, o in scorable], extra_context
             )
+            batch_kwargs = _scoring_call_kwargs(provider_manager)
             result = provider_manager.complete_json(
                 prompt=prompt,
-                max_tokens=_scoring_max_tokens(len(scorable)),
-                **_scoring_call_kwargs(provider_manager),
+                max_tokens=_scoring_max_tokens(len(scorable), local=_local_scoring(batch_kwargs)),
+                **batch_kwargs,
             )
             if isinstance(result, dict):
                 raw = (
@@ -732,6 +807,11 @@ def run_scan(
 
     augmented_terms = [_augment_search_term(t, exp_levels, work_types) for t in terms]
 
+    # Followed employers get their own search, by name, on the primary location
+    # only: a company search is about WHO is hiring, not where, and repeating it
+    # per location would multiply the cost for the same handful of postings.
+    watchlist = _watchlist_for_scan(db, payload)
+
     jobspy_job_type = _resolve_jobspy_job_type(job_types)
 
     db.set_preference("last_scan_location", primary_location)
@@ -750,7 +830,7 @@ def run_scan(
     run_id = db.begin_scan(location=primary_location, is_remote=is_remote_effective, terms=terms)
 
     started_at_ms = int(time.time() * 1000)
-    total_batches = max(1, len(terms) * len(locations_list))
+    total_batches = max(1, len(terms) * len(locations_list) + len(watchlist))
     expected_total = max(1, total_batches * max(1, settings.max_annunci))
 
     yield {
@@ -869,14 +949,24 @@ def run_scan(
 
     # Flat (location, term) pairs so the existing single-loop body stays intact;
     # batch_no drives global progress across the whole location x term grid.
-    scan_pairs = [(loc, ti, term) for loc in locations_list for ti, term in enumerate(terms)]
-    for batch_no, (location, idx, term) in enumerate(scan_pairs):
+    # A fourth slot carries the followed employer when this pass is a company
+    # search: same loop body, three decisions inside it read it (search term,
+    # relevance gate, which rows are kept).
+    scan_pairs: list[tuple[str, int, str, dict[str, str] | None]] = [
+        (loc, ti, term, None) for loc in locations_list for ti, term in enumerate(terms)
+    ]
+    scan_pairs += [(primary_location, -1, w["name"], w) for w in watchlist]
+    for batch_no, (location, idx, term, watched) in enumerate(scan_pairs):
         if cancelled():
             break
         if batch_no > 0:
             time.sleep(random.uniform(0.8, 2.4))
 
-        effective_term = augmented_terms[idx] if idx < len(augmented_terms) else term
+        # A company name takes no level/mode qualifiers: "RWS junior hybrid"
+        # searches for a posting that says all three, not for RWS.
+        effective_term = (
+            term if watched else (augmented_terms[idx] if 0 <= idx < len(augmented_terms) else term)
+        )
 
         elapsed_ms = int(time.time() * 1000) - started_at_ms
         seen = batch_no * max(1, settings.max_annunci)
@@ -972,10 +1062,21 @@ def run_scan(
 
         # Pass 1 (serial, DB-only): filter + upsert, collect jobs needing scoring.
         to_score: list[dict[str, Any]] = []
+        watch_hit = False
         for _, row in df.iterrows():
             titolo = _clean_text(row.get("title")) or "N/A"
             azienda = _clean_text(row.get("company")) or "N/A"
             descrizione = _clean_text(row.get("description"))
+
+            # A company search is a keyword search to the board: searching "RWS"
+            # returns postings that merely MENTION it (agencies reselling the
+            # role, "clients such as…"). Keep only what this employer published.
+            if watched and not company_matches(azienda, watched["canonical"]):
+                totale_scartati += 1
+                continue
+            if watched and not watch_hit:
+                watch_hit = True
+                db.touch_watchlist_seen(watched["canonical"])
             fonte = _clean_text(row.get("site"))
             link = _clean_text(row.get("job_url"))
             # LinkedIn's per-job description fetch occasionally 429s on a single
@@ -993,9 +1094,18 @@ def run_scan(
             # job, nor its missing tokens condemn a good one. Fully empty
             # descriptions stay exempt (LinkedIn 429: we read nothing — the
             # capped estimate the user can inspect beats a silent drop).
+            # A followed employer is itself the relevance signal: the user said
+            # they want to see what THIS company posts, and the vocabulary check
+            # would drop a language-data role at RWS for not sounding technical.
+            # The hard blockers (geo, degree grade, pay) still apply downstream.
             desc_sufficient = len(descrizione) >= MIN_DESCRIPTION_CHARS
             gate_text = f"{titolo} {descrizione}" if desc_sufficient else titolo
-            if descrizione and relevance_vocab and not (_tokenize(gate_text) & relevance_vocab):
+            if (
+                not watched
+                and descrizione
+                and relevance_vocab
+                and not (_tokenize(gate_text) & relevance_vocab)
+            ):
                 totale_scartati += 1
                 log.info(
                     "RELEVANCE_SKIP%s: '%s' @ %s (zero domain/skills overlap)",
@@ -1031,7 +1141,9 @@ def run_scan(
                 "sede": sede,
                 "fonte": fonte,
                 "link": link,
-                "ricerca_usata": term,
+                # Tagged so the archive says where a job came from: a keyword
+                # search or an employer the user follows.
+                "ricerca_usata": f"watchlist:{watched['name']}" if watched else term,
                 # Per-posting, not the scan-wide search flag (see _detect_work_mode).
                 "modalita": _detect_work_mode(row, descrizione, modalita),
             }

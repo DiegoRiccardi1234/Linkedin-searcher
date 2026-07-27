@@ -2785,6 +2785,68 @@ pre {
 .saved-search-sub { font-size: 0.72rem; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-search-del { flex: 0 0 auto; }
 
+/* Local models panel (hardware → what runs here → what to download). */
+.local-hardware { font-size: 0.85rem; font-weight: 600; margin-top: 0.4rem; }
+.local-verdict { font-size: 0.82rem; opacity: 0.85; margin: 0.3rem 0 0.7rem; }
+.local-verdict[data-verdict="cpu_only"] { color: var(--warning, #d08c30); }
+.local-ready, .local-suggestions { display: flex; flex-direction: column; gap: 0.4rem; }
+.local-suggestions { margin-top: 0.7rem; }
+.local-model {
+  display: flex; align-items: center; gap: 0.6rem; min-width: 0;
+  padding: 0.45rem 0.6rem;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.local-model-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.local-model-main strong { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-progress { margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+
+/* Thumbs up/down on an AI score, inside the score card of the detail drawer. */
+.score-feedback { margin-top: 0.7rem; width: 100%; text-align: center; }
+.score-feedback-q { font-size: 0.72rem; opacity: 0.75; }
+.score-feedback-btns { display: flex; justify-content: center; gap: 0.4rem; margin-top: 0.3rem; }
+.score-feedback-btns .ghost-btn.is-active { border-color: var(--primary); color: var(--primary); }
+.score-feedback-more { margin-top: 0.4rem; font-size: 0.72rem; }
+.score-feedback-more summary { cursor: pointer; opacity: 0.75; }
+.score-feedback-row { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
+.score-feedback-row input {
+  min-width: 0; padding: 0.3rem 0.45rem; font: inherit; font-size: 0.75rem; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.45rem;
+}
+.score-feedback-row input[type="number"] { flex: 0 0 5rem; }
+.score-feedback-row input[type="text"] { flex: 1; }
+.score-feedback-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+/* Application facts (sent on / CV used / outcome) inside the detail drawer. */
+.application-facts { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.82rem; }
+.application-outcome { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.7rem; font-size: 0.82rem; }
+.application-outcome select {
+  flex: 1; min-width: 0; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.82rem; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.5rem;
+}
+
+/* Followed companies (watchlist) — same visual family as saved searches. */
+.watchlist-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+.watchlist-add input {
+  flex: 1; min-width: 0; padding: 0.45rem 0.6rem; font: inherit; color: inherit;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.watchlist-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.6rem; }
+.watchlist-item {
+  display: flex; align-items: center; gap: 0.5rem; min-width: 0;
+  padding: 0.45rem 0.6rem;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.watchlist-item.is-paused { opacity: 0.55; }
+.watchlist-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.watchlist-main strong { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watchlist-sub { font-size: 0.72rem; opacity: 0.7; }
+.watchlist-suggestions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.watchlist-chip {
+  padding: 0.25rem 0.6rem; font: inherit; font-size: 0.78rem; color: inherit; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border); border-radius: 999px;
+}
+.watchlist-chip:hover { border-style: solid; border-color: var(--primary); color: var(--primary); }
+
 /* Skill-gap learning suggestions (F8) */
 .section-head-actions { display: flex; align-items: center; gap: 0.4rem; }
 .skill-gap-learning { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.9rem; }

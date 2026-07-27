@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
 from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
+from app.services.scan.companies import canonical_company
 
 logger = logging.getLogger(__name__)
 
@@ -358,11 +359,67 @@ class Database:
                 "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
                 (status_map[action], now_iso(), job_id),
             )
+        # Applying is the one event worth denormalising out of the timeline: the
+        # date and the CV that went with it are what the user asks about months
+        # later, and the active profile is only knowable NOW (it changes).
+        # COALESCE keeps the FIRST application date — re-applying to the same
+        # posting does not rewrite history.
+        if action == "applied":
+            self.conn.execute(
+                "UPDATE jobs SET applied_at = COALESCE(applied_at, ?), "
+                "applied_profile_id = COALESCE(applied_profile_id, ?) WHERE id = ?",
+                (now_iso(), self._active_profile_id(), job_id),
+            )
+        elif action == "rejected":
+            self.conn.execute(
+                "UPDATE jobs SET outcome = COALESCE(outcome, 'rejected'), "
+                "outcome_at = COALESCE(outcome_at, ?) WHERE id = ?",
+                (now_iso(), job_id),
+            )
         self.conn.execute(
             "INSERT INTO job_actions(job_id, action, notes, created_at) VALUES (?, ?, ?, ?)",
             (job_id, action, notes, now_iso()),
         )
         self.conn.commit()
+
+    def _active_profile_id(self) -> int | None:
+        """Id of the CV profile in use right now, for stamping an application."""
+        try:
+            raw = self.conn.execute(
+                "SELECT value FROM preferences WHERE key = 'active_profile_id'"
+            ).fetchone()
+            if raw and str(raw[0]).strip():
+                return int(str(raw[0]).strip())
+            row = self.conn.execute(
+                "SELECT id FROM candidate_profiles ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            return int(row[0]) if row else None
+        except (ValueError, sqlite3.Error):
+            return None
+
+    #: Endings an application can have, beyond the funnel state. "no_response" is
+    #: the common one the funnel could not express: a job left in "applied" looks
+    #: the same whether it is two days or eight months old.
+    OUTCOMES = ("pending", "no_response", "rejected", "offer", "accepted", "withdrawn")
+
+    @_synchronized
+    def set_job_outcome(self, job_id: int, outcome: str) -> bool:
+        """Record how an application ended. Empty/"pending" clears it."""
+        value = (outcome or "").strip().lower()
+        if value and value not in self.OUTCOMES:
+            return False
+        if not value or value == "pending":
+            self.conn.execute(
+                "UPDATE jobs SET outcome = NULL, outcome_at = NULL, updated_at = ? WHERE id = ?",
+                (now_iso(), job_id),
+            )
+        else:
+            self.conn.execute(
+                "UPDATE jobs SET outcome = ?, outcome_at = ?, updated_at = ? WHERE id = ?",
+                (value, now_iso(), now_iso(), job_id),
+            )
+        self.conn.commit()
+        return True
 
     @_synchronized
     def list_job_actions(self, job_id: int) -> list[dict[str, Any]]:
@@ -478,6 +535,172 @@ class Database:
         cur = self.conn.execute("DELETE FROM saved_searches WHERE id = ?", (search_id,))
         self.conn.commit()
         return cur.rowcount > 0
+
+    # ── Score feedback: is the AI's verdict any good? (migration 017) ────────
+
+    VERDICTS = ("up", "down")
+
+    @_synchronized
+    def add_score_feedback(
+        self,
+        job_id: int,
+        verdict: str,
+        expected_score: int | None = None,
+        reason: str = "",
+    ) -> int:
+        """Record what the user thinks of this job's AI score.
+
+        The job's own score, title and company are copied into the row: the
+        judgement has to stay readable after a re-score (which overwrites the
+        score) or a wipe (which deletes the job).
+        """
+        value = (verdict or "").strip().lower()
+        if value not in self.VERDICTS:
+            return 0
+        row = self.conn.execute(
+            "SELECT titolo, azienda, punteggio_ai, analysis_v, analysis_json FROM jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if not row:
+            return 0
+        model = ""
+        try:
+            model = str((json.loads(row["analysis_json"] or "{}") or {}).get("modello") or "")
+        except (json.JSONDecodeError, TypeError):
+            model = ""
+        cur = self.conn.execute(
+            "INSERT INTO score_feedback(job_id, titolo, azienda, verdict, ai_score, "
+            "expected_score, reason, analysis_v, model, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                job_id,
+                row["titolo"],
+                row["azienda"],
+                value,
+                row["punteggio_ai"],
+                expected_score,
+                (reason or "").strip(),
+                row["analysis_v"],
+                model,
+                now_iso(),
+            ),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid or 0)
+
+    def latest_score_feedback(self, job_id: int) -> dict[str, Any] | None:
+        """The most recent judgement on this job, or None. The UI shows which
+        way the user voted; the history stays in the table."""
+        row = self.conn.execute(
+            "SELECT * FROM score_feedback WHERE job_id = ? ORDER BY id DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    @_synchronized
+    def delete_score_feedback(self, job_id: int) -> int:
+        """Withdraw every judgement on a job (the user changed their mind)."""
+        cur = self.conn.execute("DELETE FROM score_feedback WHERE job_id = ?", (job_id,))
+        self.conn.commit()
+        return cur.rowcount or 0
+
+    def list_score_feedback(self, limit: int = 500) -> list[dict[str, Any]]:
+        return [
+            dict(r)
+            for r in self.conn.execute(
+                "SELECT * FROM score_feedback ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        ]
+
+    def score_feedback_summary(self) -> dict[str, Any]:
+        """How often the user agrees with the AI, and by how much when not.
+
+        Only the LATEST judgement per job counts: a mind changed after a re-score
+        is an update, not a second data point.
+        """
+        rows = self.conn.execute(
+            """
+            SELECT verdict, ai_score, expected_score FROM score_feedback
+            WHERE id IN (SELECT MAX(id) FROM score_feedback GROUP BY job_id)
+            """
+        ).fetchall()
+        up = sum(1 for r in rows if r["verdict"] == "up")
+        total = len(rows)
+        gaps = [
+            abs(int(r["ai_score"] or 0) - int(r["expected_score"]))
+            for r in rows
+            if r["expected_score"] is not None
+        ]
+        return {
+            "total": total,
+            "up": up,
+            "down": total - up,
+            "agreement": round(up * 100 / total) if total else None,
+            "avg_gap": round(sum(gaps) / len(gaps), 1) if gaps else None,
+            "scored_cases": len(gaps),
+        }
+
+    # ── Watchlist: employers followed by name (migration 015) ────────────────
+
+    @_synchronized
+    def add_watchlist_company(self, name: str, note: str = "") -> int:
+        """Follow ``name``. Re-adding a company already followed reactivates it
+        (and keeps its note) rather than failing on the unique canonical."""
+        clean = str(name or "").strip()
+        canonical = canonical_company(clean)
+        if not canonical:
+            return 0
+        cur = self.conn.execute(
+            "SELECT id FROM watchlist_companies WHERE canonical = ?", (canonical,)
+        )
+        row = cur.fetchone()
+        if row:
+            self.conn.execute(
+                "UPDATE watchlist_companies SET active = 1, name = ?, "
+                "note = COALESCE(NULLIF(?, ''), note) WHERE id = ?",
+                (clean, str(note or "").strip(), row["id"]),
+            )
+            self.conn.commit()
+            return int(row["id"])
+        cur = self.conn.execute(
+            "INSERT INTO watchlist_companies(name, canonical, note, active, added_at) "
+            "VALUES (?, ?, ?, 1, ?)",
+            (clean, canonical, str(note or "").strip(), now_iso()),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid or 0)
+
+    def list_watchlist_companies(self, active_only: bool = False) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM watchlist_companies"
+        if active_only:
+            sql += " WHERE active = 1"
+        sql += " ORDER BY name COLLATE NOCASE"
+        return [dict(r) for r in self.conn.execute(sql).fetchall()]
+
+    @_synchronized
+    def set_watchlist_active(self, company_id: int, active: bool) -> bool:
+        cur = self.conn.execute(
+            "UPDATE watchlist_companies SET active = ? WHERE id = ?",
+            (1 if active else 0, company_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    @_synchronized
+    def delete_watchlist_company(self, company_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM watchlist_companies WHERE id = ?", (company_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    @_synchronized
+    def touch_watchlist_seen(self, canonical: str) -> None:
+        """Record that a scan just matched a posting from this company, so a
+        channel that never delivers can be told apart from one that is quiet."""
+        self.conn.execute(
+            "UPDATE watchlist_companies SET last_seen_at = ? WHERE canonical = ?",
+            (now_iso(), canonical),
+        )
+        self.conn.commit()
 
     @_synchronized
     def set_favorite(self, job_id: int, is_favorite: bool) -> None:
@@ -655,6 +878,14 @@ class Database:
             data["analysis"] = json.loads(raw)
         except json.JSONDecodeError:
             data["analysis"] = {}
+        # The CV that was sent is stored as an id; the panel needs its name, and
+        # a profile deleted since then must not blank the whole application block.
+        if data.get("applied_profile_id"):
+            row = self.conn.execute(
+                "SELECT source_name FROM candidate_profiles WHERE id = ?",
+                (data["applied_profile_id"],),
+            ).fetchone()
+            data["applied_profile_name"] = str(row[0]) if row else ""
         return data
 
     @_synchronized

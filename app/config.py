@@ -43,10 +43,15 @@ class AppSettings:
     llm_provider_order: list[str]
     preferred_model: str | None
     # Per-context model overrides (empty/None = Auto). Pin a specific model for
-    # scan scoring / chat / CV tools; the provider is the primary.
+    # scan scoring / chat / CV tools; the provider is the primary…
     scoring_model: str | None
     chat_model: str | None
     cv_model: str | None
+    # …except when the pinned scoring model does not live on the primary. Running
+    # the scoring on a local endpoint while chat and the CV tools stay on a cloud
+    # provider is the whole point of the local-model panel, and asking OpenRouter
+    # for "gemma-4-12b" (an Ollama tag) simply 404s.
+    scoring_provider: str | None
     retention_days: int
     hours_old: int
     max_annunci: int
@@ -145,6 +150,7 @@ def save_local_provider_keys(
     scoring_model: str | None = None,
     chat_model: str | None = None,
     cv_model: str | None = None,
+    scoring_provider: str | None = None,
 ) -> dict[str, Any]:
     data_dir.mkdir(parents=True, exist_ok=True)
     secrets_path = data_dir / LOCAL_SECRETS_FILE
@@ -194,6 +200,7 @@ def save_local_provider_keys(
         ("scoring_model", scoring_model),
         ("chat_model", chat_model),
         ("cv_model", cv_model),
+        ("scoring_provider", scoring_provider),
     ):
         if model_value is None:
             continue
@@ -210,6 +217,7 @@ def save_local_provider_keys(
     status["primary_provider"] = current.get("primary_provider", "")
     status["preferred_model"] = current.get("preferred_model", "")
     status["scoring_model"] = current.get("scoring_model", "")
+    status["scoring_provider"] = current.get("scoring_provider", "")
     status["chat_model"] = current.get("chat_model", "")
     status["cv_model"] = current.get("cv_model", "")
     return status
@@ -345,6 +353,7 @@ def load_settings(workspace_dir: Path) -> AppSettings:
             or os.getenv("LLM_MODEL")
         ),
         scoring_model=local_secrets.get("scoring_model") or None,
+        scoring_provider=local_secrets.get("scoring_provider") or None,
         chat_model=local_secrets.get("chat_model") or None,
         cv_model=local_secrets.get("cv_model") or None,
         retention_days=_as_int(cfg, "retention_days", 15),

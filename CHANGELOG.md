@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.7.8] — 2026-07-27
+
+The search stops being only about keywords, an application stops being only a column, and the scores can finally be told they are wrong.
+
+### Added
+- **Follow a company and the scan looks for it by name** — a keyword search never finds an employer that words its postings differently, however often it hires. Followed companies get their own search each scan, only that employer's postings are kept (a search for a company name also returns agencies that merely mention it), and the relevance filter steps aside: what this employer publishes is worth seeing even when it doesn't sound technical. Each entry says whether it has ever actually delivered a posting, so a dead channel can be told from a quiet one.
+- **An application records what was sent** — the date, and the CV that went with it (the active profile is only knowable at the time), plus an outcome that the funnel could not express: an offer, a withdrawal, and above all "no response", which used to look exactly like an application still in flight. Both appear in the job detail and in the applications export.
+- **Say whether a score is right** — thumbs up or down on any AI score, optionally with the score you would have given and why. The dashboard shows how often the AI agrees with you and by how much it is off when it doesn't, and the judged cases export as JSONL — an evaluation set, not a satisfaction survey. Judgements keep the score, title and company they were about, so they survive a re-score and outlive the posting itself.
+
+- **Score jobs on your own PC** — the app reads the graphics card, says which model sizes it can actually sustain, lists what is already downloaded and offers the rest through Ollama, then points the scan at it in one click. Local scoring spends no daily quota, cannot be rate-limited, and sends nothing to a third party. Measured on a 12B model and a 12 GB card: ~20 seconds per offer in a batch of three, against ~13 on a good cloud day — and none of the fallbacks to a keyword estimate that a throttled free tier produces. Chat and the CV tools stay on whichever provider they were using, and if the local server is not running the scan quietly goes back to the cloud instead of estimating everything locally.
+
+### Fixed
+- **A pinned model can no longer overrule the scoring floor** — the model chosen in settings was hoisted to the top of every ranking, including the scan's, where a reasoning build is excluded on purpose because it truncates its JSON. A preference stated once, for the whole app, no longer overrides a per-task statement that this model cannot do this job. Chat and the CV tools set no floor, so there the pin still wins.
+- **One "no credit" answer now retires every paid model at once** — on an account without credit each paid model had to be tried, and rejected, individually: 88 of the 191 calls in a real scan were different models discovering the same missing credit. The first such answer now stands for the provider.
+- **"Free" is judged by the provider, not by the model's name** — the `:free` suffix is an OpenRouter convention, but everything on Cerebras, Groq and Google AI Studio is free tier and names nothing that way. The penalty meant for paid models was sinking exactly the models that work: measured on a real scan, the one with the best record of the day ranked below a paid model that cannot even be called.
+- **A text-to-speech model can no longer be picked to write JSON** — one was, seven times, because its id says nothing about speech. Non-text builds are now excluded from scoring outright rather than merely ranked lower.
+- **Reading a CV into a profile asks for a suitable model, and enough room** — it was the only AI call in the CV group that stated no policy at all, and its budget could not fit the profile it asks for. A cut-off answer there is silently replaced by the keyword-based profile, which then feeds every score.
+
 ## [1.7.7] — 2026-07-27
 
 Scores you can trust and act on: the scan stops quietly falling back to keyword guesses, every capped score says why, and offers can be compared side by side.

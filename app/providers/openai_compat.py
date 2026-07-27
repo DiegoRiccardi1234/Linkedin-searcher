@@ -47,6 +47,10 @@ class OpenAICompatibleProvider(LLMProvider):
 
     base_url: str = ""
     default_model: str = ""
+    #: Seconds the HTTP client waits for a reply. The SDK's own default (~10
+    #: minutes of connect+read, but 60s for a non-streaming call in practice) is
+    #: tuned for hosted models; a subclass serving a local one overrides it.
+    request_timeout: float | None = None
 
     def __init__(self, api_key: str | None, base_url: str | None = None):
         self.api_key = api_key
@@ -55,6 +59,8 @@ class OpenAICompatibleProvider(LLMProvider):
         client_kwargs: dict[str, Any] = {"api_key": api_key, "max_retries": 0}
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
+        if type(self).request_timeout:
+            client_kwargs["timeout"] = type(self).request_timeout
         self.client = OpenAI(**client_kwargs) if (api_key and OpenAI is not None) else None
         self._selected_model: str | None = None
 
@@ -203,6 +209,11 @@ class CustomOpenAIProvider(OpenAICompatibleProvider):
     name = "custom"
     base_url = ""
     default_model = ""
+    # A local model writes a full scoring JSON in 45-60s on a mid-range GPU
+    # (measured: 12B Q4 on an RTX 5070, ~1200 tokens at ~22 tok/s), and the first
+    # call of a session also loads several GB into VRAM. The default client
+    # timeout cut every one of those off as a connection error.
+    request_timeout = 300.0
 
     def __init__(self, api_key: str | None, base_url: str | None = None):
         # A local endpoint authenticates nobody: without this the provider would

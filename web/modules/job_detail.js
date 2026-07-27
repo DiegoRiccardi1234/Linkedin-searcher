@@ -13,7 +13,9 @@ import {
   flagBadgesHtml,
   freshnessHtml,
 } from "./job_list.js";
+import { applicationBlockHtml, wireApplicationBlock } from "./application.js";
 import { reminderEditorHtml, wireReminderEditor } from "./reminders.js";
+import { scoreFeedbackHtml, wireScoreFeedback } from "./score_feedback.js";
 import { setupGenerationButton } from "./features.js";
 
 let _deps = { pinJobToActiveSession: () => {} };
@@ -320,6 +322,7 @@ export async function showJobDetail(jobId) {
             <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
             <button type="button" data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn detail-fav${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
             ${flagsRow}
+            ${scoreFeedbackHtml(payload.score_feedback)}
           </div>
           <div class="info-card">
             <h4>${t("offcanvas.positionDetails")}</h4>
@@ -358,6 +361,7 @@ export async function showJobDetail(jobId) {
           ${sourcesBadge}
           <p class="text-sm text-dim">${t("offcanvas.search")}: ${escapeHtml(job.ricerca_usata)} | ${t("jobs.source")}: ${escapeHtml(job.fonte || "App")} | ${t("offcanvas.found")}: ${fmtDate(job.first_seen_at)}</p>
         </div>
+        ${applicationBlockHtml(job)}
         <div class="mt-16 info-card">
           <h4>${t("timeline.title")}</h4>
           <div id="detailTimeline" class="detail-timeline"></div>
@@ -381,6 +385,8 @@ export async function showJobDetail(jobId) {
 
     renderTimeline(job.id);
     wireReminderEditor(job.id);
+    wireApplicationBlock(job.id, () => renderTimeline(job.id));
+    wireScoreFeedback(job.id);
     container.querySelector("button.detail-fav")?.addEventListener("click", (event) => {
       const btn = event.currentTarget;
       toggleFavorite(btn.dataset.id, btn.dataset.favorite === "1");

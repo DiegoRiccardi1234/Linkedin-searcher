@@ -16,6 +16,7 @@ from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.providers.model_selector import SCORING_MIN_SIZE_B
 from app.services.pii import redact_pii, restore_contacts, restore_pii
 
 if TYPE_CHECKING:
@@ -49,6 +50,23 @@ CV_POLICY: dict[str, Any] = {
     "max_cost_tier": "high",
     "min_size_b": 70,
     "weights": {"size": 20, "family": 40, "instruct": 30, "json": 12, "reasoning": 6},
+}
+
+# Reading a CV *into JSON* is structured extraction, not writing: it wants the
+# same kind of model the scan scoring wants — a clean instruct build that starts
+# emitting JSON immediately — not the 70B+ quality bias above. CV_POLICY here
+# would elect a reasoning giant that spends the completion budget thinking and
+# returns a cut-off object, which this path swallows into the heuristic profile
+# without a word. Same floor and same hard gate as scoring, one place apart
+# because the two tasks answer to different budgets.
+CV_PARSE_POLICY: dict[str, Any] = {
+    "prefer_fast": True,
+    "prefer_quality": True,
+    "prefer_free": True,
+    "max_cost_tier": "high",
+    "min_size_b": SCORING_MIN_SIZE_B,
+    "hard_floor": True,
+    "weights": {"size": 16, "instruct": 25, "json": 12, "reasoning": 0, "small_penalty": -150},
 }
 
 # UI locale code -> language name for the optional "write in X" instruction.

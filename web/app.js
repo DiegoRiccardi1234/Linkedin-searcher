@@ -46,6 +46,8 @@ import {
   wireReminderEditor,
 } from "./modules/reminders.js";
 import { initSavedSearches, loadSavedSearches } from "./modules/saved_searches.js";
+import { initLocalModels, loadLocalModels } from "./modules/local_models.js";
+import { initWatchlist, loadWatchlist } from "./modules/watchlist.js";
 import { initJobList, initJobSorting, loadJobs } from "./modules/job_list.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
@@ -918,6 +920,8 @@ initSavedSearches({
   applyConfig: applyScanConfig,
   submitScan: () => document.getElementById("scanForm")?.requestSubmit(),
 });
+initWatchlist();
+initLocalModels();
 
 document.getElementById("refreshJobsBtn").addEventListener("click", loadJobs);
 document.getElementById("onlyNew").addEventListener("change", loadJobs);
@@ -1175,6 +1179,10 @@ async function bootstrap() {
   await loadSkillGap();
   await loadReminders();
   await loadSavedSearches();
+  await loadWatchlist();
+  // Probes the GPU and asks Ollama: slow enough to keep off the critical path,
+  // and useless until the user opens Settings anyway.
+  loadLocalModels();
   await loadSchedulerStatus();
   await loadChatPrompts();
   // i18n is ready here, so the session dropdown / empty-state get localised

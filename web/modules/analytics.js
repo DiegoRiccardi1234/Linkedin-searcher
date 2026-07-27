@@ -3,6 +3,7 @@
 // "no data yet" note instead of an empty/broken canvas when its series is empty.
 import { api } from "./helpers.js";
 import { getCurrentLang, t } from "./i18n.js";
+import { loadScoreFeedbackSummary } from "./score_feedback.js";
 
 let statusChart = null;
 let scoreChart = null;
@@ -40,6 +41,9 @@ function _hasData(obj) {
 }
 
 export async function loadAnalytics() {
+  // Not a chart and not from /api/analytics: it renders itself and must not be
+  // skipped when the charts below have nothing to draw.
+  loadScoreFeedbackSummary();
   try {
     const data = await api("/api/analytics");
 

@@ -295,3 +295,86 @@ def test_explicit_provider_is_not_failed_over(tmp_path: Any) -> None:
     with pytest.raises(Exception):
         mgr.chat(messages=[{"role": "user", "content": "hi"}], provider_name="cerebras")
     assert good.calls == 0
+
+
+# ── no-credit accounts (v1.7.8) ──────────────────────────────────────────────
+
+
+class _CatalogProvider(_StubProvider):
+    """A provider with a real catalog: free models plus paid ones."""
+
+    def __init__(self, name: str, models: list[str], **kwargs: Any) -> None:
+        super().__init__(name, **kwargs)
+        self._models = models
+
+    def list_models(self) -> list[str]:
+        return list(self._models)
+
+    def select_model(self, preferred_model: str | None = None) -> str:
+        # The real providers hand back something from their own catalog; the
+        # bare stub's "model-x" states no size and so clears every floor.
+        return self._models[0] if self._models else "model-x"
+
+
+class _Http403(Exception):
+    def __init__(self) -> None:
+        super().__init__("403 Key limit exceeded (total limit)")
+        self.status_code = 403
+
+
+def test_one_403_on_a_paid_model_retires_all_of_them(tmp_path: Any) -> None:
+    """A 403 says the ACCOUNT has no credit, not that this model is bad.
+
+    Without this, every paid model in the catalog gets its own turn to discover
+    the same thing: 88 of the 191 calls in the 2026-07-27 scan were exactly that.
+    """
+    catalog = [
+        "google/gemma-4-31b-it:free",
+        "openai/gpt-4-turbo",
+        "qwen/qwen-2.5-72b-instruct",
+        "anthropic/claude-3.5-sonnet",
+    ]
+    provider = _CatalogProvider("openrouter", catalog)
+    mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
+
+    ranked_before = mgr._ranked_models_for(provider, limit=4)
+    assert any(not m.endswith(":free") for m in ranked_before)
+
+    mgr.record_model_penalty("openrouter", "openai/gpt-4-turbo", "forbidden")
+    mgr.mark_no_credit("openrouter")
+
+    ranked_after = mgr._ranked_models_for(provider, limit=4)
+    assert ranked_after, "the free models must still be offered"
+    assert all(m.endswith(":free") for m in ranked_after)
+
+
+def test_no_credit_does_not_empty_an_all_paid_provider(tmp_path: Any) -> None:
+    """Nothing free to fall back to: keep the provider in the chain rather than
+    dropping it silently — its 403 is at least an honest error."""
+    provider = _CatalogProvider("openrouter", ["openai/gpt-4-turbo", "openai/gpt-4o"])
+    mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
+    mgr.mark_no_credit("openrouter")
+    assert mgr._ranked_models_for(provider, limit=3)
+
+
+def test_no_credit_is_per_provider(tmp_path: Any) -> None:
+    """Cerebras naming nothing ":free" must not be mistaken for a paid catalog."""
+    cerebras = _CatalogProvider("cerebras", ["gemma-4-31b", "qwen-3-235b-instruct"])
+    mgr = _mgr(tmp_path, {"cerebras": cerebras}, ["cerebras"], "cerebras")
+    mgr.mark_no_credit("openrouter")  # a different provider's problem
+    assert mgr._ranked_models_for(cerebras, limit=2)
+
+
+def test_local_endpoint_is_exempt_from_the_scoring_floor(tmp_path: Any) -> None:
+    """A 12B is what fits on a 12GB card; the 26B floor would leave nothing."""
+    from app.services.scanner_service import _SCORING_POLICY
+
+    local = _CatalogProvider("custom", ["gemma-4-12b", "qwen2.5:14b"])
+    mgr = _mgr(tmp_path, {"custom": local}, ["custom"], "custom")
+    ranked = mgr._ranked_models_for(local, limit=2, policy_override=_SCORING_POLICY)
+    assert ranked, "a local model the user installed must not be floored out"
+
+    # The same models on a remote catalog are still held to the floor.
+    remote = _CatalogProvider("openrouter", ["gemma-4-12b", "qwen2.5:14b"])
+    mgr_remote = _mgr(tmp_path, {"openrouter": remote}, ["openrouter"], "openrouter")
+    assert mgr_remote._ranked_models_for(remote, limit=2, policy_override=_SCORING_POLICY) == []
