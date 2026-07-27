@@ -162,6 +162,21 @@ _DOMAIN_VOCAB = {
     "node",
     "sql",
     "docker",
+    # Entry routes. Without these a posting titled only "Tirocinio curriculare"
+    # — no description, so the relevance gate judges the title alone — shares no
+    # word with the vocabulary and is dropped before anyone can read it.
+    "tirocinio",
+    "tirocinante",
+    "stage",
+    "stagista",
+    "internship",
+    "intern",
+    "trainee",
+    "apprendistato",
+    "apprenticeship",
+    "neolaureato",
+    "neolaureati",
+    "graduate",
 }
 
 

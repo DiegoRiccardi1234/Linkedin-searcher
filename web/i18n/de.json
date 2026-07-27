@@ -62,7 +62,9 @@
       "ralTarget": "Zielgehalt (brutto/Jahr)",
       "ralSuggest": "Gehalt mit KI vorschlagen",
       "ralSuggested": "Gehalt vorgeschlagen — prüfen und speichern",
-      "saveFailed": "Suchziele konnten nicht gespeichert werden — sieh in den Logs nach"
+      "saveFailed": "Suchziele konnten nicht gespeichert werden — sieh in den Logs nach",
+      "goalsSuggest": "Ziele mit KI vorschlagen",
+      "goalsSuggested": "Ziele vorgeschlagen — prüfen und speichern"
     },
     "features": {
       "title": "CV-Tools & Datenschutz",

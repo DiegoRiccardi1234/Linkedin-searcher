@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +25,7 @@ from app.models import (
     ProfileUpdate,
     RoleShortlistRequest,
 )
+from app.services import market_snapshot
 from app.services import roles_shortlist as roles_shortlist_svc
 from app.services.generation import CV_POLICY, generate_with_profile
 from app.services.onboarding import onboarding_context
@@ -34,6 +36,56 @@ if TYPE_CHECKING:
 # The salary prompt pins the two figures to a machine-readable first line, so
 # the UI can prefill the form; the rest of the reply stays human prose.
 _RAL_LINE_RE = re.compile(r"MIN\s*=\s*([\d.\s]+?)\s+TARGET\s*=\s*([\d.\s]+)", re.IGNORECASE)
+
+
+# The goal prompt pins its four answers to labelled first lines, for the same
+# reason the salary one does: the UI has to prefill form fields, and prose
+# cannot. Label -> the onboarding field it fills.
+_GOAL_FIELDS = {
+    "SETTORE": "sector",
+    "OBIETTIVO": "goal",
+    "SENIORITY": "seniority",
+    "MODALITA": "work_mode",
+}
+
+
+def _cached_suggestion_factory(
+    container: AppContainer,
+) -> Callable[[str, dict[str, str]], dict[str, Any]]:
+    """Read back a cached suggestion, but only for the profile it was made for."""
+
+    def _cached(preference_key: str, fields: dict[str, str]) -> dict[str, Any]:
+        empty: dict[str, Any] = dict.fromkeys(fields.values(), "")
+        empty["rationale"] = ""
+        profile = container.db.get_active_candidate_profile()
+        raw = container.db.get_preference(preference_key, "")
+        if not profile or not raw:
+            return empty
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return empty
+        if data.get("profile_id") != profile.get("id"):
+            return empty
+        return {**empty, **{k: data.get(k, "") for k in empty}}
+
+    return _cached
+
+
+def _parse_labelled_lines(content: str, fields: dict[str, str]) -> dict[str, str]:
+    out: dict[str, str] = dict.fromkeys(fields.values(), "")
+    for label, key in fields.items():
+        match = re.search(rf"^{label}\s*=\s*(.+)$", content or "", re.IGNORECASE | re.MULTILINE)
+        if match:
+            out[key] = match.group(1).strip().strip("<>").strip()
+    return out
+
+
+def _strip_labelled_lines(content: str, fields: dict[str, str]) -> str:
+    text = content or ""
+    for label in fields:
+        text = re.sub(rf"^{label}\s*=.*$", "", text, flags=re.IGNORECASE | re.MULTILINE)
+    return text.strip()
 
 
 def _parse_ral_line(content: str) -> tuple[int | None, int | None]:
@@ -56,6 +108,7 @@ def _parse_ral_line(content: str) -> tuple[int | None, int | None]:
 
 def build_router(container: AppContainer) -> APIRouter:
     router = APIRouter()
+    _cached_suggestion = _cached_suggestion_factory(container)
 
     @router.post("/api/upload-cv")
     async def upload_cv(
@@ -219,6 +272,55 @@ def build_router(container: AppContainer) -> APIRouter:
             "cv_review_cache", json.dumps({"profile_id": profile.get("id"), "text": content})
         )
         return {"cv_review": content}
+
+    @router.get("/api/profile/goals-suggest")
+    def goals_suggest_cached() -> dict[str, Any]:
+        """Last search-goal suggestion for the active profile, from cache."""
+        return _cached_suggestion("goals_suggestion_cache", _GOAL_FIELDS)
+
+    @router.post("/api/profile/goals-suggest")
+    def goals_suggest(lang: str = Query(default="")) -> dict[str, Any]:
+        """Propose the search goals (sector, aim, seniority, work mode).
+
+        Same shape as the salary suggester it is modelled on: one call on the
+        capable CV model, cached per profile, and it PREFILLS — the user still
+        decides whether to save. Grounded on the market this app has actually
+        seen in the user's own scans, not on a generic idea of the job market.
+        """
+        profile = container.db.get_active_candidate_profile()
+        if not profile:
+            raise HTTPException(status_code=404, detail="no_profile")
+        container.require_provider()
+        extra = onboarding_context(container.db)
+        market = market_snapshot.as_prompt_block(container.db)
+        if market:
+            extra += f"\n\nMercato osservato dai tuoi scan:\n{market}"
+        try:
+            content = generate_with_profile(
+                container.providers,
+                "goals_suggest",
+                profile["markdown"],
+                {},
+                extra_block=extra,
+                redact=container.feature_enabled("privacy_mode", True),
+                candidate_name=profile.get("name"),
+                language=_resolve_lang(lang),
+                **container.providers.pin_kwargs(container.settings.cv_model, CV_POLICY),
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Goal suggestion failed: {e}") from e
+
+        values = _parse_labelled_lines(content, _GOAL_FIELDS)
+        if not any(values.values()):
+            # The four fields ARE the deliverable: prose alone cannot prefill a
+            # form, so a reply without them is a failed generation.
+            raise HTTPException(status_code=502, detail="Goal suggestion unparseable")
+        rationale = _strip_labelled_lines(content, _GOAL_FIELDS)
+        container.db.set_preference(
+            "goals_suggestion_cache",
+            json.dumps({"profile_id": profile.get("id"), **values, "rationale": rationale}),
+        )
+        return {**values, "rationale": rationale}
 
     @router.get("/api/profile/ral-suggest")
     def ral_suggest_cached() -> dict[str, Any]:

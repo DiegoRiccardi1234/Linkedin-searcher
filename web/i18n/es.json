@@ -62,7 +62,9 @@
       "ralTarget": "Salario objetivo (bruto/año)",
       "ralSuggest": "Sugerir salario con IA",
       "ralSuggested": "Salario sugerido: revísalo y guárdalo",
-      "saveFailed": "No se pudieron guardar tus objetivos de búsqueda: revisa los registros"
+      "saveFailed": "No se pudieron guardar tus objetivos de búsqueda: revisa los registros",
+      "goalsSuggest": "Sugerir objetivos con IA",
+      "goalsSuggested": "Objetivos propuestos: revísalos y guarda"
     },
     "features": {
       "title": "Herramientas de CV y privacidad",

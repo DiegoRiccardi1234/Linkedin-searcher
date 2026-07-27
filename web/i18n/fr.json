@@ -62,7 +62,9 @@
       "ralTarget": "Salaire cible (brut/an)",
       "ralSuggest": "Proposer un salaire avec l'IA",
       "ralSuggested": "Salaire proposé — vérifiez et enregistrez",
-      "saveFailed": "Impossible d'enregistrer tes objectifs — consulte les journaux"
+      "saveFailed": "Impossible d'enregistrer tes objectifs — consulte les journaux",
+      "goalsSuggest": "Proposer des objectifs avec l'IA",
+      "goalsSuggested": "Objectifs proposés — vérifie, puis enregistre"
     },
     "features": {
       "title": "Outils CV et confidentialité",

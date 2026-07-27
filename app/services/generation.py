@@ -34,6 +34,8 @@ MAX_TOKENS = {
     "recruiter_outreach": 450,
     # Two numbers plus a short rationale — no need for a long budget.
     "ral_suggest": 500,
+    # Four short fields plus a short rationale.
+    "goals_suggest": 600,
 }
 
 # Quality-biased policy for the CV tools (review + improve): these are done

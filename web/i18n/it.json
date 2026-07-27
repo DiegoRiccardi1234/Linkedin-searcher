@@ -62,7 +62,9 @@
       "ralTarget": "RAL target (lordi/anno)",
       "ralSuggest": "Suggerisci RAL con l'IA",
       "ralSuggested": "RAL suggerita — controlla e salva",
-      "saveFailed": "Impossibile salvare gli obiettivi di ricerca — controlla i log dell'app"
+      "saveFailed": "Impossibile salvare gli obiettivi di ricerca — controlla i log dell'app",
+      "goalsSuggest": "Suggerisci obiettivi con l'IA",
+      "goalsSuggested": "Obiettivi proposti — controllali, poi salva"
     },
     "features": {
       "title": "Strumenti CV e privacy",

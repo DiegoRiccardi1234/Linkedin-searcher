@@ -62,7 +62,9 @@
       "ralTarget": "Target salary (gross/year)",
       "ralSuggest": "Suggest salary with AI",
       "ralSuggested": "Salary suggested — review and save",
-      "saveFailed": "Couldn't save your search goals — check the app logs"
+      "saveFailed": "Couldn't save your search goals — check the app logs",
+      "goalsSuggest": "Suggest goals with AI",
+      "goalsSuggested": "Goals proposed — review them, then save"
     },
     "features": {
       "title": "CV tools & privacy",

@@ -405,6 +405,48 @@ async function _suggestRal() {
   }
 }
 
+// Same contract as the salary suggestion: prefill, never save. What you tell
+// the app you are looking for is your call — the AI just proposes a starting
+// point from your CV and from the market the scans actually found.
+function _applyGoalsSuggestion(data) {
+  const note = document.getElementById("goalsSuggestNote");
+  const fields = [
+    ["obSector", data?.sector],
+    ["obGoal", data?.goal],
+    ["obSeniority", data?.seniority],
+    ["obWorkMode", data?.work_mode],
+  ];
+  const filled = fields.filter(([, value]) => value);
+  if (!filled.length) {
+    if (note) note.hidden = true;
+    return false;
+  }
+  for (const [id, value] of filled) {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  }
+  if (note) {
+    note.textContent = data.rationale || "";
+    note.hidden = !data.rationale;
+  }
+  return true;
+}
+
+async function _suggestGoals() {
+  const btn = document.getElementById("goalsSuggestBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const data = await api("/api/profile/goals-suggest", { method: "POST" });
+    if (_applyGoalsSuggestion(data)) {
+      showToast(t("profile.onboarding.goalsSuggested"), "info");
+    }
+  } catch (err) {
+    showToast(`${t("toast.genError")}: ${err.message}`, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function _prefillOnboarding() {
   try {
     const health = await api("/api/health");
@@ -413,12 +455,18 @@ async function _prefillOnboarding() {
       const el = document.getElementById(id);
       if (el && prefs[key]) el.value = prefs[key];
     }
-    // Rehydrate the last salary rationale from cache — no tokens spent.
+    // Rehydrate the last rationales from cache — no tokens spent.
     const cached = await api("/api/profile/ral-suggest");
     const note = document.getElementById("ralSuggestNote");
     if (note && cached && cached.rationale) {
       note.textContent = cached.rationale;
       note.hidden = false;
+    }
+    const cachedGoals = await api("/api/profile/goals-suggest");
+    const goalsNote = document.getElementById("goalsSuggestNote");
+    if (goalsNote && cachedGoals && cachedGoals.rationale) {
+      goalsNote.textContent = cachedGoals.rationale;
+      goalsNote.hidden = false;
     }
   } catch {
     /* best-effort prefill */
@@ -643,5 +691,6 @@ export function bindProfileEvents() {
     });
   }
   document.getElementById("ralSuggestBtn")?.addEventListener("click", _suggestRal);
+  document.getElementById("goalsSuggestBtn")?.addEventListener("click", _suggestGoals);
   _prefillOnboarding();
 }

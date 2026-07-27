@@ -9,6 +9,7 @@ from typing import Any
 from app.db import Database
 from app.log import get_logger
 from app.providers.factory import ProviderManager
+from app.services import market_snapshot
 from app.services.chat.context import (
     build_preferences_context,
     build_profile_context,
@@ -229,6 +230,13 @@ def handle_chat_message(
         summary = load_session_summary(db, session_id)
         summary_block = f"\n\n=== Conversation summary so far ===\n{summary}" if summary else ""
 
+        # What the market looked like in the postings this app actually read.
+        # The coach was being asked market questions ("which roles fit me?", "is
+        # this pay normal?") with no market data at all — only the CV and a few
+        # job rows. Free: it is the user's own scan results, read back.
+        market = market_snapshot.as_prompt_block(db)
+        market_block = f"\n\n=== Mercato osservato dai tuoi scan ===\n{market}" if market else ""
+
         # Recent turns as their own messages so the model has real conversation
         # context (the rolling summary only kicks in for very long chats). The
         # just-saved current user message is dropped to avoid duplicating it.
@@ -250,6 +258,7 @@ def handle_chat_message(
                     f"=== Candidate Profile ===\n{build_profile_context(db)}\n\n"
                     f"=== Preferences ===\n{build_preferences_context(db)}\n\n"
                     f"=== Top Job Listings ===\n{jobs_context(db, session_id=session_id)}"
+                    f"{market_block}"
                     f"{summary_block}\n\n"
                     f"=== User Message ===\n{message}"
                 ),

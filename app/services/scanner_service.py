@@ -106,6 +106,7 @@ from app.services.scan.scraping import (
     _indeed_country_for,
     _resolve_jobspy_job_type,
 )
+from app.services.scan.synonyms import expand_terms
 from app.services.scan.vocab import (
     _DOMAIN_VOCAB,
     BLACKLIST,
@@ -555,6 +556,33 @@ class _ScanCancelled(Exception):
     """Raised on a worker that was about to call the model after a stop."""
 
 
+# The onboarding answers are free text ("junior", "da remoto", "hybrid"). These
+# read them loosely enough to be useful as scan defaults and strictly enough to
+# stay quiet when the user wrote something else entirely.
+_GOAL_LEVELS = {
+    "internship": ("tirocinio", "stage", "internship", "tirocinante"),
+    "entry": ("entry", "neolaureat", "graduate", "primo impiego"),
+    "junior": ("junior", "1-2 anni", "1-3 anni"),
+    "mid": ("mid", "intermedio", "3-5 anni"),
+    "senior": ("senior", "esperto", "5+"),
+}
+_GOAL_WORK_MODES = {
+    "remote": ("remot", "da casa", "smart working", "full remote"),
+    "hybrid": ("ibrid", "hybrid", "misto"),
+    "onsite": ("sede", "ufficio", "presenza", "on-site", "onsite"),
+}
+
+
+def _levels_from_goal(raw: str) -> list[str]:
+    text = str(raw or "").lower()
+    return [level for level, markers in _GOAL_LEVELS.items() if any(m in text for m in markers)]
+
+
+def _work_types_from_goal(raw: str) -> list[str]:
+    text = str(raw or "").lower()
+    return [mode for mode, markers in _GOAL_WORK_MODES.items() if any(m in text for m in markers)]
+
+
 #: Conservative context ceilings (prompt + completion) per provider, used to
 #: size a batch. Cerebras' free tier caps context at 8K — a batch of three long
 #: descriptions plus the CV and the schema goes straight past it and the call
@@ -669,10 +697,20 @@ def run_scan(
         or f"auto → {provider_manager.preview_scoring_model(_SCORING_POLICY)}",
     )
 
-    terms = payload.search_terms or settings.default_search_terms
+    # The same job is advertised under different words: an Italian searching
+    # "tirocinio" never sees the postings titled "stage" or "internship", which
+    # is most of them. Each alternative is a separate search, because the boards
+    # rank on all the words in a query together.
+    terms = expand_terms(list(payload.search_terms or settings.default_search_terms))
     exp_levels = list(payload.experience_levels or [])
     job_types = list(payload.job_types or [])
     work_types = list(payload.work_types or [])
+    # The search goals are not decoration: what the user said they want is the
+    # default for the filters they did not set on this particular scan.
+    if not exp_levels:
+        exp_levels = _levels_from_goal(db.get_preference("onboarding_seniority", ""))
+    if not work_types:
+        work_types = _work_types_from_goal(db.get_preference("onboarding_work_mode", ""))
     min_salary = int(payload.min_salary or 0)
 
     is_remote_effective = payload.is_remote or ("remote" in work_types)
