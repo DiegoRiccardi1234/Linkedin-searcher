@@ -83,6 +83,8 @@ def build_router(container: AppContainer) -> APIRouter:
             xai_api_key=payload.xai_api_key,
             glm_api_key=payload.glm_api_key,
             mistral_api_key=payload.mistral_api_key,
+            custom_api_key=payload.custom_api_key,
+            custom_base_url=payload.custom_base_url,
             primary_provider=payload.primary_provider,
             preferred_model=payload.preferred_model,
             scoring_model=payload.scoring_model,

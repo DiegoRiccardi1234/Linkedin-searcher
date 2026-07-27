@@ -313,7 +313,12 @@
       "probeConfirm": "Confirmar los mejores (usa IA)",
       "probeConfirmDone": "Mejores confirmados",
       "scoreboardTitle": "Historial real (del registro de uso)",
-      "scoreboardCalls": "llamadas"
+      "scoreboardCalls": "llamadas",
+      "freeBadge": "Gratis",
+      "getKey": "Consigue una clave gratis",
+      "endpoint": "Endpoint (URL base)",
+      "apiKeyOptional": "Clave API (opcional)",
+      "showHide": "Mostrar / ocultar"
     },
     "features": {
       "title": "Automatización",

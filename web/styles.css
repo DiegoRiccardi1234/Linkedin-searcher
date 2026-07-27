@@ -2947,3 +2947,19 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 .usage-quota-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
 .usage-quota-track { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; }
 .usage-quota-fill { height: 100%; background: var(--accent); }
+
+/* Provider cards: what a provider costs, and where to get a key */
+.provider-free-badge {
+  background: rgba(0, 135, 90, 0.14); color: var(--success);
+  border: 1px solid rgba(0, 135, 90, 0.3); border-radius: 999px;
+  padding: 1px 8px; margin-left: auto; margin-right: var(--space-2);
+}
+.provider-hint { color: var(--text-muted); margin: 0 0 var(--space-2); }
+.provider-signup { display: inline-block; margin-top: 4px; }
+.provider-endpoint-row { display: flex; flex-direction: column; gap: 4px; }
+.provider-endpoint-input {
+  width: 100%; padding: 0.4rem 0.55rem; border: 1px solid var(--border);
+  border-radius: 0.5rem; background: inherit; color: inherit; font-size: var(--fs-sm);
+}
+.provider-presets { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.provider-preset-btn { font-size: var(--fs-xs); padding: 2px 8px; }

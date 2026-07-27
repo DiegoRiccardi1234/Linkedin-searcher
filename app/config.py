@@ -26,6 +26,11 @@ SUPPORTED_PROVIDERS = [
     "xai",
     "glm",
     "mistral",
+    # Any OpenAI-compatible endpoint the user points at: a model running on
+    # their own machine (Ollama, LM Studio, vLLM, llama.cpp) or a gateway.
+    # Configured by base URL; the key is optional because a local server has
+    # none to give.
+    "custom",
 ]
 
 
@@ -65,6 +70,10 @@ class AppSettings:
     # Optional GLM/Zhipu endpoint override (env GLM_BASE_URL). Default is the
     # international host; the China console uses open.bigmodel.cn.
     glm_base_url: str | None
+    # "custom" provider: the endpoint IS the configuration. Empty base URL =
+    # not configured. The key is optional (local servers don't have one).
+    custom_api_key: str | None
+    custom_base_url: str | None
     model_selection_policy: dict[str, Any]
     # Tesseract language list passed to ``image_to_string(lang=...)`` (``+`` joined).
     # Default covers the 5 UI locales; the bundle ships ``eng+ita+spa+fra+deu+osd``.
@@ -129,6 +138,8 @@ def save_local_provider_keys(
     xai_api_key: str | None = None,
     glm_api_key: str | None = None,
     mistral_api_key: str | None = None,
+    custom_api_key: str | None = None,
+    custom_base_url: str | None = None,
     primary_provider: str | None = None,
     preferred_model: str | None = None,
     scoring_model: str | None = None,
@@ -154,6 +165,10 @@ def save_local_provider_keys(
         "xai_api_key": xai_api_key,
         "glm_api_key": glm_api_key,
         "mistral_api_key": mistral_api_key,
+        "custom_api_key": custom_api_key,
+        # The endpoint is what configures the custom provider, so it is stored
+        # the same way a key is (and cleared the same way).
+        "custom_base_url": custom_base_url,
     }
     for field_name, raw in provider_keys.items():
         if raw is None:
@@ -190,6 +205,8 @@ def save_local_provider_keys(
 
     secrets_path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
     status = {f"{p}_configured": bool(current.get(f"{p}_api_key")) for p in SUPPORTED_PROVIDERS}
+    # The custom provider is configured by its endpoint, not by a key.
+    status["custom_configured"] = bool(current.get("custom_base_url"))
     status["primary_provider"] = current.get("primary_provider", "")
     status["preferred_model"] = current.get("preferred_model", "")
     status["scoring_model"] = current.get("scoring_model", "")
@@ -255,6 +272,8 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     glm_api_key = local_secrets.get("glm_api_key") or os.getenv("GLM_API_KEY")
     glm_base_url = local_secrets.get("glm_base_url") or os.getenv("GLM_BASE_URL")
     mistral_api_key = local_secrets.get("mistral_api_key") or os.getenv("MISTRAL_API_KEY")
+    custom_api_key = local_secrets.get("custom_api_key") or os.getenv("CUSTOM_API_KEY")
+    custom_base_url = local_secrets.get("custom_base_url") or os.getenv("CUSTOM_BASE_URL")
 
     provider_order = cfg.get("llm_provider_order", SUPPORTED_PROVIDERS)
     if not isinstance(provider_order, list) or not provider_order:
@@ -347,6 +366,8 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         glm_api_key=glm_api_key,
         mistral_api_key=mistral_api_key,
         glm_base_url=glm_base_url,
+        custom_api_key=custom_api_key,
+        custom_base_url=custom_base_url,
         model_selection_policy=merged_policy,
         scan_concurrency=max(1, _as_int(cfg, "scan_concurrency", 4)),
         scan_batch_size=max(1, _as_int(cfg, "scan_batch_size", 3)),

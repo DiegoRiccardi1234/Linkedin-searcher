@@ -628,10 +628,19 @@ function cvSummaryText(payload) {
         await onRemoveProviderKey(name);
         return;
       }
+      if (target.classList.contains("provider-preset-btn")) {
+        const endpoint = card.querySelector(".provider-endpoint-input");
+        if (endpoint) endpoint.value = target.dataset.url || "";
+        return;
+      }
       if (target.classList.contains("provider-save-btn")) {
         const input = card.querySelector(".provider-key-input");
         const value = input ? input.value.trim() : "";
-        if (!value) {
+        // A local model server authenticates nobody: for the custom provider
+        // the endpoint is what has to be filled in, not the key.
+        const endpointEl = card.querySelector(".provider-endpoint-input");
+        const endpoint = endpointEl ? endpointEl.value.trim() : "";
+        if (!value && !endpoint) {
           showToast(t("toast.enterKeyOrProvider"), "info");
           return;
         }

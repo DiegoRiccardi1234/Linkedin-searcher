@@ -313,7 +313,12 @@
       "probeConfirm": "Beste bestätigen (nutzt KI)",
       "probeConfirmDone": "Beste bestätigt",
       "scoreboardTitle": "Bisherige Ergebnisse (aus dem Nutzungsprotokoll)",
-      "scoreboardCalls": "Aufrufe"
+      "scoreboardCalls": "Aufrufe",
+      "freeBadge": "Kostenlos",
+      "getKey": "Kostenlosen Schlüssel holen",
+      "endpoint": "Endpunkt (Basis-URL)",
+      "apiKeyOptional": "API-Schlüssel (optional)",
+      "showHide": "Anzeigen / verbergen"
     },
     "features": {
       "title": "Automatisierung",

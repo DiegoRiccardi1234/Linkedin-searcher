@@ -18,17 +18,76 @@ export function setProviderDeps(d) {
 
 const PROVIDER_KEY_IDS = ["cerebrasKey", "groqKey", "openaiKey", "anthropicKey", "googleKey", "openrouterKey", "deepseekKey", "xaiKey", "glmKey", "mistralKey"];
 
+// `free`/`signup`/`hint` exist because the card said nothing about what a
+// provider costs or where to get a key: a new user saw ten identical boxes and
+// no reason to pick any of them. Limits verified 2026-07-27; they change, so
+// the hint says what you get, not a promise.
 const PROVIDER_CATALOG = [
-  { name: "cerebras", label: "Cerebras", icon: "bolt", placeholder: "sk-..." },
-  { name: "groq", label: "Groq", icon: "memory", placeholder: "gsk_..." },
+  {
+    name: "google",
+    label: "Google AI Studio",
+    icon: "language",
+    placeholder: "AI...",
+    free: true,
+    signup: "https://aistudio.google.com/apikey",
+    hint: "1500 req/day · Gemini Flash · no card",
+  },
+  {
+    name: "groq",
+    label: "Groq",
+    icon: "memory",
+    placeholder: "gsk_...",
+    free: true,
+    signup: "https://console.groq.com/keys",
+    hint: "30 req/min · very fast · no card",
+  },
+  {
+    name: "cerebras",
+    label: "Cerebras",
+    icon: "bolt",
+    placeholder: "sk-...",
+    free: true,
+    signup: "https://cloud.cerebras.ai",
+    hint: "1M tokens/day · 8K context on free · no card",
+  },
+  {
+    name: "openrouter",
+    label: "OpenRouter",
+    icon: "hub",
+    placeholder: "sk-or-v1-...",
+    free: true,
+    signup: "https://openrouter.ai/keys",
+    hint: "many :free models · ~200 req/day · one key, many models",
+  },
+  {
+    name: "mistral",
+    label: "Mistral",
+    icon: "air",
+    placeholder: "...",
+    free: true,
+    signup: "https://console.mistral.ai/api-keys",
+    hint: "free Experiment tier · rate-limited · no card",
+  },
+  {
+    name: "custom",
+    label: "Local / custom endpoint",
+    icon: "dns",
+    placeholder: "optional",
+    free: true,
+    endpoint: true,
+    hint: "Ollama, LM Studio, vLLM or any OpenAI-compatible gateway",
+  },
+  { name: "deepseek", label: "DeepSeek", icon: "psychology", placeholder: "sk-..." },
   { name: "openai", label: "OpenAI", icon: "neurology", placeholder: "sk-..." },
   { name: "anthropic", label: "Anthropic", icon: "auto_awesome", placeholder: "sk-ant-..." },
-  { name: "google", label: "Google", icon: "language", placeholder: "AI..." },
-  { name: "openrouter", label: "OpenRouter", icon: "hub", placeholder: "sk-or-v1-..." },
-  { name: "deepseek", label: "DeepSeek", icon: "psychology", placeholder: "sk-..." },
   { name: "xai", label: "xAI (Grok)", icon: "rocket_launch", placeholder: "xai-..." },
   { name: "glm", label: "Zhipu GLM", icon: "token", placeholder: "..." },
-  { name: "mistral", label: "Mistral", icon: "air", placeholder: "..." },
+];
+
+// Presets for the custom endpoint: the two local runners people actually use.
+export const LOCAL_PRESETS = [
+  { id: "ollama", label: "Ollama", url: "http://localhost:11434/v1" },
+  { id: "lmstudio", label: "LM Studio", url: "http://localhost:1234/v1" },
 ];
 
 const _providerCardModelCache = {};
@@ -300,21 +359,33 @@ function renderProviderCards(keys, providerMeta) {
         <header class="provider-card-head">
           <span class="material-symbols-outlined provider-card-icon">${p.icon}</span>
           <h4 class="provider-card-title">${p.label}</h4>
+          ${p.free ? `<span class="provider-free-badge micro">${t("settings.providers.freeBadge")}</span>` : ""}
           <label class="provider-primary-radio" title="${t("settings.providers.setPrimary")}">
             <input type="radio" name="primaryProviderRadio" value="${p.name}" ${isPrimary ? "checked" : ""} ${configured ? "" : "disabled"} />
             <span class="micro" data-i18n="settings.providers.setPrimary">Set as primary</span>
           </label>
         </header>
         <div class="provider-card-body">
+          ${p.hint ? `<p class="micro provider-hint">${escapeHtml(p.hint)}</p>` : ""}
+          ${
+            p.endpoint
+              ? `<label class="field-label provider-endpoint-row">
+            <span class="micro">${t("settings.providers.endpoint")}</span>
+            <input type="text" class="provider-endpoint-input" placeholder="http://localhost:11434/v1" autocomplete="off" value="${escapeHtml(keys?.custom_base_url || "")}" />
+            <span class="provider-presets">${LOCAL_PRESETS.map((preset) => `<button type="button" class="ghost-btn small provider-preset-btn" data-url="${preset.url}">${preset.label}</button>`).join("")}</span>
+          </label>`
+              : ""
+          }
           <label class="field-label provider-key-row">
-            <span class="micro" data-i18n="settings.providers.apiKey">API Key</span>
+            <span class="micro">${p.endpoint ? t("settings.providers.apiKeyOptional") : t("settings.providers.apiKey")}</span>
             <div class="key-input-row">
               <input type="password" class="provider-key-input" placeholder="${p.placeholder}" autocomplete="off" />
-              <button type="button" class="ghost-btn provider-toggle-visibility" title="Show/Hide">
+              <button type="button" class="ghost-btn provider-toggle-visibility" title="${t("settings.providers.showHide")}">
                 <span class="material-symbols-outlined">visibility</span>
               </button>
             </div>
           </label>
+          ${p.signup && !configured ? `<a class="micro provider-signup" href="${p.signup}" target="_blank" rel="noopener">${t("settings.providers.getKey")} ↗</a>` : ""}
           <button type="button" class="secondary provider-save-btn" data-i18n="settings.providers.saveAndFetch">Save &amp; fetch models</button>
           <label class="field-label provider-model-row">
             <span class="micro" data-i18n="settings.providers.model">Model</span>
@@ -676,6 +747,11 @@ async function onSaveProviderKey(name, keyValue) {
   try {
     const payload = {};
     payload[`${name}_api_key`] = keyValue;
+    // The custom provider is configured by its endpoint: a local model server
+    // has no key, so the URL is the thing that must be saved.
+    if (name === "custom") {
+      payload.custom_base_url = (card.querySelector(".provider-endpoint-input")?.value || "").trim();
+    }
     await api("/api/providers/keys", {
       method: "POST",
       body: JSON.stringify(payload),

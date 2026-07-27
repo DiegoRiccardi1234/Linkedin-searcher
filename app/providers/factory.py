@@ -25,6 +25,7 @@ from app.providers.model_selector import (
     rank_models,
 )
 from app.providers.openai_compat import (
+    CustomOpenAIProvider,
     DeepSeekProvider,
     GLMProvider,
     MistralProvider,
@@ -95,6 +96,9 @@ class ProviderManager:
             "xai": XAIProvider(api_key=settings.xai_api_key),
             "glm": GLMProvider(api_key=settings.glm_api_key, base_url=settings.glm_base_url),
             "mistral": MistralProvider(api_key=settings.mistral_api_key),
+            "custom": CustomOpenAIProvider(
+                api_key=settings.custom_api_key, base_url=settings.custom_base_url
+            ),
         }
         self.active_provider: LLMProvider | None = None
         self.active_provider_name: str = "none"

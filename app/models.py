@@ -175,6 +175,10 @@ class ProviderKeysRequest(BaseModel):
     xai_api_key: str | None = None
     glm_api_key: str | None = None
     mistral_api_key: str | None = None
+    # "custom" = any OpenAI-compatible endpoint (local model server or gateway).
+    # The base URL is the configuration; the key is optional.
+    custom_api_key: str | None = None
+    custom_base_url: str | None = None
     primary_provider: str | None = None
     preferred_model: str | None = None
     scoring_model: str | None = None

@@ -313,7 +313,12 @@
       "probeConfirm": "Confirm top models (uses AI)",
       "probeConfirmDone": "Top models confirmed",
       "scoreboardTitle": "Track record (from your usage log)",
-      "scoreboardCalls": "calls"
+      "scoreboardCalls": "calls",
+      "freeBadge": "Free",
+      "getKey": "Get a free key",
+      "endpoint": "Endpoint (base URL)",
+      "apiKeyOptional": "API key (optional)",
+      "showHide": "Show / hide"
     },
     "features": {
       "title": "Automation",

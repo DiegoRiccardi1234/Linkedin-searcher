@@ -183,3 +183,31 @@ class MistralProvider(OpenAICompatibleProvider):
     name = "mistral"
     base_url = "https://api.mistral.ai/v1"
     default_model = "mistral-large-latest"
+
+
+class CustomOpenAIProvider(OpenAICompatibleProvider):
+    """Any OpenAI-compatible endpoint the user points at: a gateway, a
+    self-hosted server, or a model running on their own machine.
+
+    One base URL covers cases the app would otherwise each need code for:
+    Ollama (``http://localhost:11434/v1``), LM Studio
+    (``http://localhost:1234/v1``), vLLM, llama.cpp, or an aggregating gateway
+    such as OmniRoute. Rather than reimplementing multi-provider routing, the
+    app can simply talk to one.
+
+    The key is OPTIONAL — that is the whole difference from its siblings. A
+    local server has no key to give, and requiring one made every local setup
+    unusable; the SDK still wants a non-empty string, so a placeholder is sent.
+    """
+
+    name = "custom"
+    base_url = ""
+    default_model = ""
+
+    def __init__(self, api_key: str | None, base_url: str | None = None):
+        # A local endpoint authenticates nobody: without this the provider would
+        # report itself unavailable and never appear in the failover chain.
+        super().__init__(api_key or ("local" if base_url else None), base_url)
+
+    def is_available(self) -> bool:
+        return bool(self.base_url) and self.client is not None and not self.key_invalid
