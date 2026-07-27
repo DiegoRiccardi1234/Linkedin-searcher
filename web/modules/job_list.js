@@ -100,11 +100,11 @@ export async function loadJobs() {
     tr.innerHTML = `
       <td><span class="${sc.cls}">${sc.text}</span> ${newBadge}</td>
       <td>${statusPillHtml(job.status)}</td>
-      <td>${truncate(job.titolo || "")}</td>
-      <td>${truncate(job.azienda || "")}</td>
-      <td>${truncate(job.sede || "")}</td>
-      <td>${truncate(job.fonte || "")}</td>
-      <td>${truncate(job.consiglio || "")}</td>
+      <td>${escapeHtml(truncate(job.titolo || ""))}</td>
+      <td>${escapeHtml(truncate(job.azienda || ""))}</td>
+      <td>${escapeHtml(truncate(job.sede || ""))}</td>
+      <td>${escapeHtml(truncate(job.fonte || ""))}</td>
+      <td>${escapeHtml(truncate(job.consiglio || ""))}</td>
       <td>
         <button data-detail-id="${job.id}" class="secondary">${t("jobs.details")}</button>
         ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" style="margin-left: 8px;" title="${t("jobs.openPosting")}" aria-label="${t("jobs.openPosting")}">🔗</a>` : ""}

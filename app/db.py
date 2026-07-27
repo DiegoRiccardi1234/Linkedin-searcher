@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
+from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
+
 logger = logging.getLogger(__name__)
 
 _P = ParamSpec("_P")
@@ -291,16 +293,26 @@ class Database:
     def update_job_analysis(self, job_id: int, analysis: dict[str, Any]) -> None:
         score = int(analysis.get("punteggio", 0) or 0)
         consiglio = str(analysis.get("consiglio", ""))
+        # NULL for a heuristic/fallback analysis (the scorer leaves the version
+        # out) so the job is re-scored next time instead of being frozen at a
+        # keyword score — see app.scoring_schema.
+        raw_version = analysis.get(ANALYSIS_VERSION_KEY)
+        try:
+            version = int(raw_version) if raw_version is not None else None
+        except (TypeError, ValueError):
+            version = None
         self.conn.execute(
             """
             UPDATE jobs
-            SET analysis_json = ?, punteggio_ai = ?, consiglio = ?, analyzed_at = ?, updated_at = ?
+            SET analysis_json = ?, punteggio_ai = ?, consiglio = ?, analysis_v = ?,
+                analyzed_at = ?, updated_at = ?
             WHERE id = ?
             """,
             (
                 json.dumps(analysis, ensure_ascii=False),
                 score,
                 consiglio,
+                version,
                 now_iso(),
                 now_iso(),
                 job_id,
@@ -576,16 +588,20 @@ class Database:
         """Whether a job already carries a CURRENT AI analysis — cheaper than
         get_job() when the scan loop only needs to decide skip-vs-rescore.
 
-        Analyses predating the eligibility-aware schema (marker key
-        ``eleggibilita_geografica``) count as absent: they can hide a hard
-        blocker (a US-based job scored 8 for a candidate with no visa, a posting
-        demanding 102/110 scored 10 for a 95/110 CV), so a re-appearing job gets
-        re-scored once and self-heals. Bumping this marker is the intended way to
-        force a one-off mass re-score after a scoring-schema change."""
+        "Current" means: written by a model (not the local heuristic) against
+        the schema version the app runs today. Anything older, or anything the
+        heuristic produced, counts as absent so the job is re-scored once and
+        self-heals — analyses from before the deterministic checks could hide a
+        hard blocker (a US-based job scored 8 for a candidate with no visa, a
+        posting demanding 102/110 scored 10 for a 95/110 CV).
+
+        Bumping :data:`app.scoring_schema.CURRENT_ANALYSIS_VERSION` is the
+        intended way to force a one-off mass re-score after a schema change.
+        """
         cur = self.conn.execute(
             "SELECT 1 FROM jobs WHERE id = ? AND analysis_json IS NOT NULL "
-            "AND analysis_json != '' AND analysis_json LIKE '%eleggibilita_geografica%'",
-            (int(job_id),),
+            "AND analysis_json != '' AND analysis_v >= ?",
+            (int(job_id), CURRENT_ANALYSIS_VERSION),
         )
         return cur.fetchone() is not None
 

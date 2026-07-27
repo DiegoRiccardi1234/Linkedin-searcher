@@ -117,6 +117,55 @@ def test_maybe_run_respects_enabled_and_interval(tmp_path: Path) -> None:
         db.close()
 
 
+def _failing_run_scan(db, settings, provider_manager, payload, cancel_check=None):
+    raise RuntimeError("scraper exploded")
+    yield  # pragma: no cover - generator marker
+
+
+def test_failed_run_still_stamps_the_attempt(tmp_path: Path) -> None:
+    """A failing scan must not re-fire on the next 60s tick.
+
+    ``autoscan_last_run_ts`` used to be written only on the success path, so
+    "time since last run" stayed satisfied and the scheduler relaunched a full
+    scan — LLM scoring included — every tick, forever.
+    """
+    db = Database(tmp_path / "s.db")
+    try:
+        now = [100_000.0]
+        sched = AutoScanScheduler(
+            FakeContainer(db), run_scan_fn=_failing_run_scan, clock=lambda: now[0]
+        )
+        db.set_preference("autoscan_enabled", "1")
+        assert sched.run_once()["status"] == "error"
+        assert sched.status()["last_run_ts"] == 100_000.0
+
+        # Next tick: still inside the interval -> no second attempt.
+        calls: list[int] = []
+        sched._run_scan = lambda *a, **k: calls.append(1) or iter(())  # type: ignore[assignment]
+        now[0] += 60.0
+        sched._maybe_run()
+        assert calls == []
+    finally:
+        db.close()
+
+
+def test_build_payload_keeps_every_saved_location(tmp_path: Path) -> None:
+    """A multi-location saved search must not shrink to its first location."""
+    db = Database(tmp_path / "s.db")
+    try:
+        db.set_preference("last_scan_terms", '["AI QA"]')
+        db.set_preference("last_scan_location", "Torino, Italy")
+        db.set_preference(
+            "last_scan_locations", '["Torino, Italy", "Milano, Italy", "European Union"]'
+        )
+        db.set_preference("last_scan_country", "italy")
+        payload = AutoScanScheduler(FakeContainer(db))._build_payload()
+        assert payload.locations == ["Torino, Italy", "Milano, Italy", "European Union"]
+        assert payload.country == "italy"
+    finally:
+        db.close()
+
+
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch) -> TestClient:
     (tmp_path / "web").mkdir(exist_ok=True)

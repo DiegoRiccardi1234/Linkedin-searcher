@@ -137,11 +137,23 @@ class AutoScanScheduler:
             filters = json.loads(filters_raw) if filters_raw else {}
         except (ValueError, TypeError):
             filters = {}
+        # run_scan persists BOTH the primary location and the full list; reading
+        # only the singular key silently reduced a multi-location saved search to
+        # its first location on every scheduled run.
+        locations_raw = self._db.get_preference("last_scan_locations", "")
+        try:
+            locations = [str(x) for x in json.loads(locations_raw)] if locations_raw else []
+        except (ValueError, TypeError):
+            locations = []
+        locations = [loc for loc in locations if loc.strip()]
         location = self._db.get_preference("last_scan_location", "") or None
+        country = self._db.get_preference("last_scan_country", "") or None
         is_remote = self._db.get_preference("last_scan_is_remote", "0") == "1"
         return ScanRequest(
             search_terms=[str(t) for t in terms if str(t).strip()],
             location=location,
+            locations=locations,
+            country=country,
             is_remote=is_remote,
             sites=["linkedin", "indeed"],
             experience_levels=list(filters.get("experience_levels") or []),
@@ -194,6 +206,11 @@ class AutoScanScheduler:
                 # Never let an exception escape — run_once is invoked from a bare
                 # daemon thread (manual run-now) where it would be lost silently.
                 log.warning("autoscan run failed: %s", exc)
+                # Stamp the attempt even on failure. Without this the "time since
+                # last run" test in _maybe_run stays satisfied and the scheduler
+                # re-launches a full scan (LLM scoring included) on the very next
+                # 60s tick, forever.
+                self._db.set_preference("autoscan_last_run_ts", str(self._clock()))
                 return {"status": "error", "error": str(exc)}
         finally:
             self._container.scan_control.end()

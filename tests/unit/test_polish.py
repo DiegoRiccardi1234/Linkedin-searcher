@@ -6,6 +6,7 @@ from collections import deque
 from pathlib import Path
 
 from app.db import Database
+from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
 
 
 def test_rate_limit_sweeps_stale_buckets() -> None:
@@ -24,17 +25,26 @@ def test_job_has_analysis(tmp_path: Path) -> None:
     try:
         job_id, _, _ = db.upsert_job({"titolo": "X", "azienda": "Y", "link": "l1"})
         assert db.job_has_analysis(job_id) is False
-        # Legacy shape (pre eligibility-aware schema) counts as absent -> re-scored.
+        # Unversioned shapes (every analysis written before v1.7.7, whatever keys
+        # they carry) count as absent -> re-scored once.
         db.update_job_analysis(job_id=job_id, analysis={"punteggio": 7})
-        assert db.job_has_analysis(job_id) is False
-        db.update_job_analysis(
-            job_id=job_id, analysis={"punteggio": 7, "titolo_studio_richiesto": "Triennale"}
-        )
         assert db.job_has_analysis(job_id) is False
         db.update_job_analysis(
             job_id=job_id, analysis={"punteggio": 7, "eleggibilita_geografica": "Italia/UE"}
         )
+        assert db.job_has_analysis(job_id) is False
+        db.update_job_analysis(
+            job_id=job_id,
+            analysis={"punteggio": 7, ANALYSIS_VERSION_KEY: CURRENT_ANALYSIS_VERSION},
+        )
         assert db.job_has_analysis(job_id) is True
+        # An older version is stale again — that is how a schema change forces a
+        # one-off mass re-score.
+        db.update_job_analysis(
+            job_id=job_id,
+            analysis={"punteggio": 7, ANALYSIS_VERSION_KEY: CURRENT_ANALYSIS_VERSION - 1},
+        )
+        assert db.job_has_analysis(job_id) is False
     finally:
         db.close()
 

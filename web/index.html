@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Job Finder — AI Job Search</title>
   <link rel="icon" type="image/svg+xml" href="/web/favicon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400" rel="stylesheet" />
+  <!-- Everything below is served from the bundle. A desktop app that needs a CDN
+       to draw its charts and icons is broken offline: the match radar vanished
+       and every icon button rendered its ligature text ("delete", "restart_alt").
+       Body/mono fonts fall back to the system stack (see --font-sans/--font-mono). -->
+  <link rel="stylesheet" href="/web/vendor/material-symbols.css?v={{VERSION}}" />
   <link rel="stylesheet" href="/web/styles.css?v={{VERSION}}" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/web/vendor/chart.umd.min.js?v={{VERSION}}"></script>
 </head>
 <body>
   <div id="updateBanner" class="update-banner hidden" role="status">

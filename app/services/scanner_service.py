@@ -233,7 +233,13 @@ from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
-from app.services.onboarding import RAL_MIN_LABEL, onboarding_context
+from app.scoring_schema import (
+    ANALYSIS_SOURCE_KEY,
+    ANALYSIS_VERSION_KEY,
+    CURRENT_ANALYSIS_VERSION,
+    HEURISTIC_SOURCE,
+)
+from app.services.onboarding import RAL_MIN_LABEL, onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
 
@@ -817,6 +823,10 @@ def _heuristic_analysis(
         weakness_text = "Richiesto PhD/dottorato. " + weakness_text
 
     return {
+        # No model ever saw this offer: the score comes from keyword overlap.
+        # The marker keeps it out of "already analysed" (see app.scoring_schema)
+        # so the job is re-scored properly the next time it shows up.
+        ANALYSIS_SOURCE_KEY: HEURISTIC_SOURCE,
         "punteggio": score,
         "programmazione_richiesta": _estimate_programming_demand(offer_text),
         "smart_working": _estimate_smart_working(offer_text),
@@ -1035,6 +1045,50 @@ def _apply_salary_expectation(analysis: dict[str, Any], ral_min: int | None) -> 
             axes["salary_match"] = max(int(axes.get("salary_match") or 0), 7)
 
 
+#: jobspy pay figures come with an ``interval``; normalise everything to a year.
+_PAY_PERIODS_PER_YEAR = {"yearly": 1.0, "monthly": 12.0, "weekly": 52.0, "daily": 220.0}
+
+
+def _annual_amount(value: Any, interval: str = "") -> float | None:
+    """A posting's pay figure normalised to EUR/year, or None if unusable."""
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0 or amount != amount:  # NaN
+        return None
+    factor = _PAY_PERIODS_PER_YEAR.get(str(interval or "").strip().lower())
+    if factor:
+        return amount * factor
+    if str(interval or "").strip().lower() == "hourly":
+        return amount * 1720.0  # ~40h x 43 weeks, deliberately conservative
+    # No interval declared: only trust a figure that can only be a yearly one.
+    return amount if amount >= 10_000 else None
+
+
+def _salary_axis(low: float | None, high: float | None, ral_min: int | None) -> int | None:
+    """0-10 salary axis from the posting's declared pay vs the user's floor.
+
+    None whenever the comparison cannot be made — the posting says nothing, or
+    the user declared no minimum. A number nobody computed is worse than a
+    missing axis: the radar draws a confident 5 and the user reads it as
+    "average pay" when it means "no idea".
+    """
+    top = high or low
+    if not top or not ral_min:
+        return None
+    ratio = top / float(ral_min)
+    if ratio < 0.8:
+        return 1
+    if ratio < 1.0:
+        return 3
+    if ratio < 1.2:
+        return 6
+    if ratio < 1.5:
+        return 8
+    return 10
+
+
 def _has_salary_signal(analysis: dict[str, Any]) -> bool:
     """True when SOMETHING real is known about this offer's pay."""
     if any(_parse_ral(analysis.get(key)) != (None, None) for key in ("ral_stimata",)):
@@ -1214,6 +1268,18 @@ def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
     ):
         if not isinstance(out.get(key), str) or not out.get(key):
             out[key] = default
+
+    # Provenance and schema version (see app.scoring_schema). A heuristic result
+    # is a legitimate thing to show the user, but never a reason to skip
+    # re-scoring the job later: it keeps its source marker and carries NO
+    # version, so the scan loop treats it as "not analysed yet". Previously the
+    # marker was one of the keys injected right above, which every analysis got
+    # — heuristics included — freezing keyword scores forever.
+    if str(out.get(ANALYSIS_SOURCE_KEY, "")) == HEURISTIC_SOURCE:
+        out.pop(ANALYSIS_VERSION_KEY, None)
+    else:
+        out.pop(ANALYSIS_SOURCE_KEY, None)
+        out[ANALYSIS_VERSION_KEY] = CURRENT_ANALYSIS_VERSION
     return out
 
 
@@ -1242,6 +1308,25 @@ def enforce_hard_requirements(
     if engagement:
         out["tipo_ingaggio"] = engagement
     return out
+
+
+def _scoring_max_tokens(n_offers: int) -> int:
+    """Completion budget for a scoring call — single offer or batch.
+
+    Fixed headroom + per-offer output. The auto-selected model can be a
+    REASONING build that spends completion tokens thinking BEFORE emitting the
+    JSON, so a tight budget is eaten by the reasoning alone and the completion
+    comes back empty or cut off (verified live: 3 offers returned a full valid
+    array at ~3k tokens, empty at ~1k).
+
+    The single-offer path passed a flat ``max_tokens=200`` from v1.7.0 to
+    v1.7.6, which cannot fit the schema under ANY model: every single-offer call
+    truncated (``finish_reason="length"``), failed over through every candidate,
+    penalised each of them, and landed on the keyword heuristic — while the job
+    was still saved as "analysed". That path is also the batch's own fallback
+    for missing/cloned slots, so a degraded batch degraded further.
+    """
+    return 500 * max(1, n_offers) + 1600
 
 
 def _scoring_call_kwargs(provider_manager: ProviderManager) -> dict[str, Any]:
@@ -1335,7 +1420,9 @@ def _analyze_offer_raw(
     prompt = _analysis_prompt(prompt_markdown, titolo, azienda, descrizione, extra_context)
     try:
         result = provider_manager.complete_json(
-            prompt=prompt, max_tokens=200, **_scoring_call_kwargs(provider_manager)
+            prompt=prompt,
+            max_tokens=_scoring_max_tokens(1),
+            **_scoring_call_kwargs(provider_manager),
         )
         # A non-dict, empty dict, or dict without a score is NOT an analysis:
         # persisting it would set analyzed_at with punteggio=0 and the job
@@ -1425,16 +1512,9 @@ def analyze_offers_batch(
             prompt = _batch_analysis_prompt(
                 prompt_markdown, [o for _, o in scorable], extra_context
             )
-            # Token budget = fixed reasoning headroom + per-offer output. The
-            # scoring target is gpt-oss-120b, a REASONING model that spends
-            # completion tokens thinking BEFORE emitting the array — a tight
-            # budget (e.g. 1k for 3 offers) is fully consumed by reasoning,
-            # leaving an empty completion and voiding the batch. ~1600 base +
-            # 500/offer survives it (verified live: 3 offers returned a full
-            # valid array at ~3k tokens, empty at ~1k).
             result = provider_manager.complete_json(
                 prompt=prompt,
-                max_tokens=500 * len(scorable) + 1600,
+                max_tokens=_scoring_max_tokens(len(scorable)),
                 **_scoring_call_kwargs(provider_manager),
             )
             if isinstance(result, dict):
@@ -1559,6 +1639,9 @@ def run_scan(
     # scan. feature_privacy_mode mirrors container.feature_enabled semantics.
     privacy = db.get_preference("feature_privacy_mode", "1") not in ("0", "false", "off", "")
     onboarding = onboarding_context(db)
+    # Read straight from the preferences instead of re-parsing the rendered
+    # label: the worker threads need the figure, not the prompt text.
+    ral_min, _ral_target = onboarding_ral(db)
     candidate_name = profile.get("name") if profile else None
     log.info(
         "Scan scoring model: %s",
@@ -1642,15 +1725,21 @@ def run_scan(
         analysis = dict(analysis)
         analysis["stipendio_min"] = row.get("min_amount") or "N/D"
         analysis["stipendio_max"] = row.get("max_amount") or "N/D"
-        # The salary axis was set to None upstream when nothing was known; the
-        # posting's own figures arrive only here, so re-enable it if they exist.
+        # The posting's own pay arrives only here — AFTER the model's answer went
+        # through enforce_hard_requirements, which is why the salary axis could
+        # only ever see the model's guess. Compare the real figures against the
+        # user's declared floor now; leave the axis null when either side is
+        # unknown (it used to be re-enabled with a flat, invented 5).
+        interval = str(row.get("interval") or "")
+        low = _annual_amount(row.get("min_amount"), interval)
+        high = _annual_amount(row.get("max_amount"), interval)
         axes = analysis.get("match_axes")
-        if (
-            isinstance(axes, dict)
-            and axes.get("salary_match") is None
-            and _has_salary_signal(analysis)
-        ):
-            axes["salary_match"] = 5
+        if isinstance(axes, dict) and axes.get("salary_match") is None:
+            axis = _salary_axis(low, high, ral_min)
+            if axis is not None:
+                axes["salary_match"] = axis
+        if ral_min and high and high < ral_min:
+            _add_missing(analysis, f"RAL dichiarata fino a {int(high)} EUR, sotto la tua minima")
         raw_score = analysis.get("punteggio", 0)
         try:
             analysis["punteggio"] = int(raw_score)
