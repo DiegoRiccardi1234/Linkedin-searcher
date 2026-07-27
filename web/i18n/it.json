@@ -290,7 +290,9 @@
       "probeError": "Test fallito",
       "probeEmpty": "Nessun modello da testare",
       "probeConfirm": "Conferma i migliori (usa IA)",
-      "probeConfirmDone": "Migliori confermati"
+      "probeConfirmDone": "Migliori confermati",
+      "scoreboardTitle": "Storico reale (dal registro d'uso)",
+      "scoreboardCalls": "chiamate"
     },
     "features": {
       "title": "Automazione",

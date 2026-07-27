@@ -290,7 +290,9 @@
       "probeError": "Échec du test",
       "probeEmpty": "Aucun modèle à tester",
       "probeConfirm": "Confirmer les meilleurs (utilise l'IA)",
-      "probeConfirmDone": "Meilleurs confirmés"
+      "probeConfirmDone": "Meilleurs confirmés",
+      "scoreboardTitle": "Historique réel (d'après le journal d'utilisation)",
+      "scoreboardCalls": "appels"
     },
     "features": {
       "title": "Automatisation",

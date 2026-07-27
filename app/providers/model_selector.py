@@ -59,7 +59,11 @@ def score_model_name(model_name: str, policy: dict[str, Any] | None = None) -> i
     name = model_name.lower()
     score = 0
 
-    if "instruct" in name:
+    # "-it" is Google's instruction-tuned suffix (gemma-3-27b-it) and "-instruct"
+    # is everyone else's. Recognising only the literal word "instruct" cost the
+    # instruction-tuned Gemmas ~30 points — the exact models that survive a
+    # high-volume JSON workload best.
+    if "instruct" in name or name.endswith("-it") or "-it:" in name or "-it-" in name:
         score += _weight(policy, "instruct", 30)
     if "chat" in name:
         score += _weight(policy, "chat", 15)
@@ -70,6 +74,11 @@ def score_model_name(model_name: str, policy: dict[str, Any] | None = None) -> i
         score += _weight(policy, "family", 40) - 5
     elif "llama-3" in name or "llama3" in name:
         score += _weight(policy, "family", 40) - 15
+    elif "gemma" in name:
+        # Absent from this ladder until v1.7.7, so it scored as an unknown family
+        # (0 points) while every rival got 34-46 — and gemma is the mid-size
+        # family that emits clean JSON without a hidden reasoning phase.
+        score += _weight(policy, "family", 40)
     elif "qwen" in name:
         score += _weight(policy, "family", 40) - 2
     elif "gpt-4.1" in name or "gpt-4o" in name:
@@ -91,8 +100,14 @@ def score_model_name(model_name: str, policy: dict[str, Any] | None = None) -> i
         score += _weight(policy, "family", 40) - 2
     elif "kimi" in name:
         score += _weight(policy, "family", 40) - 4
-    elif "command-r" in name or "command" in name:
+    elif "phi" in name or "command-r" in name or "command" in name:
+        # Small-but-decent instruct families: known, ranked below the leaders.
         score += _weight(policy, "family", 40) - 6
+    elif "nemotron" in name or "hunyuan" in name or "minimax" in name:
+        # Known families, but the builds that reach a free tier are reasoning
+        # ones that truncate JSON. Ranked below the mid-size instruct models
+        # rather than treated as unknown.
+        score += _weight(policy, "family", 40) - 20
 
     size_b = infer_size_b(name)
     base_size_weight = _weight(policy, "size", 20)

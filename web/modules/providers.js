@@ -496,8 +496,10 @@ function _renderProbeResults(results, best, mode) {
           `<span class="micro">${_fmtNum(r.lat_ms, " ms")}</span>` +
           `<span class="micro">${_fmtNum(r.tput, " t/s")}</span>`;
       } else {
-        // Confirm micro-probe: did the model return valid JSON for our schema.
-        icon = r.json_ok ? "✅" : r.ok ? "⚠️" : "❌";
+        // Confirm probe: the model answered the REAL scoring prompt — ✅ means
+        // the reply carried the fields the app needs, ⚠️ means it replied but
+        // the answer was unusable (truncated, missing keys).
+        icon = r.schema_ok ? "✅" : r.ok ? "⚠️" : "❌";
         const detail = r.ok ? `${r.latency_ms} ms` : r.error || "error";
         cols = `<span class="micro">${escapeHtml(String(detail))}</span>`;
       }
@@ -505,6 +507,30 @@ function _renderProbeResults(results, best, mode) {
     })
     .join("");
   return `<div class="probe-list">${rows}</div>`;
+}
+
+// Track record of the models that actually ran, from the usage log: free, and
+// unlike the live health report it says whether the answers were USABLE.
+function _renderScoreboard(records) {
+  if (!Array.isArray(records) || !records.length) return "";
+  const rows = records
+    .slice(0, 8)
+    .map((r) => {
+      const icon = r.unfit ? "❌" : r.success_rate >= 0.8 ? "✅" : "⚠️";
+      const pct = `${Math.round((r.success_rate || 0) * 100)}%`;
+      const trunc = r.truncated ? ` · ${r.truncated} ✂` : "";
+      return (
+        `<div class="probe-row"><span class="probe-model">${icon} ${escapeHtml(r.model)}</span>` +
+        `<span class="micro">${pct} · ${r.calls} ${t("settings.providers.scoreboardCalls")}${trunc}</span>` +
+        `<span class="micro">${r.median_ms ? `${r.median_ms} ms` : "—"}</span></div>`
+      );
+    })
+    .join("");
+  return (
+    `<div class="probe-scoreboard"><div class="micro probe-scoreboard-title">` +
+    `${t("settings.providers.scoreboardTitle")}</div>` +
+    `<div class="probe-list">${rows}</div></div>`
+  );
 }
 
 // Report a provider's models. Default = a FREE health report from OpenRouter's
@@ -538,7 +564,10 @@ export async function probeProviderModels(name, { confirm = false } = {}) {
     const data = await res.json();
     const results = Array.isArray(data.results) ? data.results : [];
     const mode = data.mode || (confirm ? "probe" : "stats");
-    if (out) out.innerHTML = _renderProbeResults(results, data.best, mode);
+    if (out) {
+      out.innerHTML =
+        _renderProbeResults(results, data.best, mode) + _renderScoreboard(data.scoreboard);
+    }
     const doneKey = confirm ? "settings.providers.probeConfirmDone" : "settings.providers.probeDone";
     _setProviderStatusText(name, t(doneKey), "ok");
   } catch (err) {

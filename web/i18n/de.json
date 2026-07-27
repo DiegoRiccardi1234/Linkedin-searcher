@@ -290,7 +290,9 @@
       "probeError": "Test fehlgeschlagen",
       "probeEmpty": "Keine Modelle zum Testen",
       "probeConfirm": "Beste bestätigen (nutzt KI)",
-      "probeConfirmDone": "Beste bestätigt"
+      "probeConfirmDone": "Beste bestätigt",
+      "scoreboardTitle": "Bisherige Ergebnisse (aus dem Nutzungsprotokoll)",
+      "scoreboardCalls": "Aufrufe"
     },
     "features": {
       "title": "Automatisierung",

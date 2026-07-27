@@ -290,7 +290,9 @@
       "probeError": "Test failed",
       "probeEmpty": "No models to test",
       "probeConfirm": "Confirm top models (uses AI)",
-      "probeConfirmDone": "Top models confirmed"
+      "probeConfirmDone": "Top models confirmed",
+      "scoreboardTitle": "Track record (from your usage log)",
+      "scoreboardCalls": "calls"
     },
     "features": {
       "title": "Automation",

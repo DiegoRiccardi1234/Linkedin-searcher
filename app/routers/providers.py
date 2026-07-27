@@ -12,6 +12,7 @@ from app.models import ProviderKeysRequest
 from app.providers.model_selector import SCORING_MIN_SIZE_B, infer_size_b, rank_models
 from app.services import model_stats
 from app.services.model_probe import penalty_reason, probe_models
+from app.services.model_scoreboard import scoreboard
 
 if TYPE_CHECKING:
     from app.container import AppContainer
@@ -163,14 +164,17 @@ def build_router(container: AppContainer) -> APIRouter:
             mode = "stats"
         else:
             top_models = candidates[: max(1, min(top, 5))]
-            probe_results = probe_models(provider, top_models)
+            # The real scoring prompt on a fixed sample offer, not {"ok": true}:
+            # passing a two-field toy object says nothing about emitting the
+            # app's schema over a full posting, which is the load that truncates.
+            probe_results = probe_models(provider, top_models, scoring=True, timeout=60.0)
             # Feed empirical signals back into auto-selection immediately.
             for res in probe_results:
                 reason = penalty_reason(res)
                 if reason:
                     container.providers.record_model_penalty(name, res["model"], reason)
             results = probe_results
-            best = next((r["model"] for r in probe_results if r["json_ok"]), None)
+            best = next((r["model"] for r in probe_results if r.get("schema_ok")), None)
             mode = "probe"
 
         payload = {
@@ -178,6 +182,9 @@ def build_router(container: AppContainer) -> APIRouter:
             "mode": mode,
             "results": results,
             "best": best,
+            # What each model actually did on real calls, from usage_log: free,
+            # and unlike the in-memory penalties it survives a restart.
+            "scoreboard": [r.as_dict() for r in scoreboard(container.db)[:12]],
         }
         with contextlib.suppress(Exception):  # persistence is best-effort
             container.db.set_preference(f"model_probe_{name}", json.dumps(payload))

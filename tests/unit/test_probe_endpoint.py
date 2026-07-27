@@ -85,15 +85,17 @@ def test_probe_confirm_micro_probes_top_three(
 
     monkeypatch.setattr(model_stats, "get_model_health", lambda prov, ids: {})
 
-    seen: dict[str, list[str]] = {}
+    seen: dict[str, Any] = {}
 
-    def fake_probe(provider: Any, model_ids: list[str]) -> list[dict[str, Any]]:
+    def fake_probe(provider: Any, model_ids: list[str], **kwargs: Any) -> list[dict[str, Any]]:
         seen["ids"] = list(model_ids)
+        seen["kwargs"] = kwargs
         return [
             {
                 "model": m,
                 "ok": True,
                 "json_ok": True,
+                "schema_ok": True,
                 "latency_ms": 90,
                 "empty": False,
                 "error": None,
@@ -108,8 +110,12 @@ def test_probe_confirm_micro_probes_top_three(
     body = res.json()
     assert body["mode"] == "probe"
     assert len(seen["ids"]) <= 3  # only the top few get a real inference call
+    # The probe must exercise the REAL scoring prompt: a model that answers
+    # {"ok": true} has proven nothing about emitting the app's schema.
+    assert seen["kwargs"].get("scoring") is True
     assert body["results"]
     assert all(r["json_ok"] for r in body["results"])
+    assert "scoreboard" in body
 
 
 def test_probe_best_respects_quality_floor(

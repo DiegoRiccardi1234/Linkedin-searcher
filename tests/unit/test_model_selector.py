@@ -25,6 +25,39 @@ def test_scoring_policy_quality_floor_is_26() -> None:
     assert s26 - s24 == 150
 
 
+def test_instruction_tuned_suffix_counts_as_instruct() -> None:
+    """Google writes "-it" where everyone else writes "-instruct"; matching only
+    the literal word cost the Gemmas the whole instruct bonus."""
+    assert score_model_name("google/gemma-3-27b-it:free") > score_model_name("google/gemma-3-27b")
+    assert score_model_name("google/gemma-3-27b-it") == score_model_name(
+        "google/gemma-3-27b-instruct"
+    )
+
+
+def test_gemma_is_a_known_family() -> None:
+    """Gemma was missing from the family ladder entirely: it scored as an
+    unknown family (0) while every rival got 34-46, so the mid-size model that
+    emits the cleanest JSON kept losing to giants that truncate it."""
+    from app.services.scanner_service import _SCORING_POLICY
+
+    gemma = score_model_name("google/gemma-3-27b-it:free", policy=_SCORING_POLICY)
+    qwen = score_model_name("qwen/qwen-2.5-32b-instruct:free", policy=_SCORING_POLICY)
+    assert gemma > 0
+    assert abs(gemma - qwen) <= 15  # comparable, not a write-off
+
+
+def test_reasoning_families_rank_below_clean_instruct_models() -> None:
+    from app.services.scanner_service import _SCORING_POLICY
+
+    gemma = score_model_name("google/gemma-3-27b-it:free", policy=_SCORING_POLICY)
+    for slug in (
+        "nvidia/llama-3.3-nemotron-super-49b:free",
+        "tencent/hunyuan-a13b-instruct:free",
+        "minimax/minimax-m1:free",
+    ):
+        assert score_model_name(slug, policy=_SCORING_POLICY) < gemma, slug
+
+
 def test_pick_default_returns_none_for_empty_list() -> None:
     assert pick_default_model("openai", []) is None
 

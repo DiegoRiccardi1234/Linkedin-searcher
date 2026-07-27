@@ -75,6 +75,11 @@ _MODEL_PENALTY_COOLDOWNS = {
     "timeout": 900.0,
 }
 
+# How long the usage_log-derived "unfit for scoring" set is reused before being
+# recomputed. Long enough that a scan doesn't re-query per failover attempt,
+# short enough that a model recovering shows up within the same session.
+_UNFIT_CACHE_SECONDS = 600.0
+
 
 class ProviderManager:
     def __init__(self, settings: AppSettings) -> None:
@@ -111,6 +116,9 @@ class ProviderManager:
         # Set by AppContainer after the DB is open; ``_record_call`` uses it
         # to persist token usage. None = no-op (unit tests, isolated usage).
         self._db: Any = None
+        # provider -> (timestamp, model ids with a bad recorded scoring record).
+        # Read from usage_log, so it survives restarts unlike _model_penalty.
+        self._unfit_cache: dict[str, tuple[float, set[str]]] = {}
 
     def initialize(self) -> None:
         """Pick first available provider from configured order and select a model."""
@@ -377,6 +385,31 @@ class ProviderManager:
         except Exception as exc:
             log.debug("usage record skipped: %s", exc)
 
+    def _empirically_unfit(self, provider_name: str) -> set[str]:
+        """Models with a bad recorded track record for JSON scoring on this
+        provider. Cached for the lifetime of a scan-ish window so the query
+        doesn't run per failover attempt. Never raises."""
+        db = getattr(self, "_db", None)
+        if db is None:
+            return set()
+        now = _time.time()
+        cached = self._unfit_cache.get(provider_name)
+        if cached and now - cached[0] < _UNFIT_CACHE_SECONDS:
+            return cached[1]
+        try:
+            from app.services.model_scoreboard import unfit_ids
+
+            unfit = unfit_ids(db, provider_name)
+        except Exception as exc:  # pragma: no cover - defensive
+            log.debug("scoreboard lookup skipped: %s", exc)
+            return set()
+        self._unfit_cache[provider_name] = (now, unfit)
+        if unfit:
+            log.info(
+                "%s: de-ranking %d model(s) on their recorded record", provider_name, len(unfit)
+            )
+        return unfit
+
     def _ranked_models_for(
         self,
         provider: LLMProvider,
@@ -409,6 +442,12 @@ class ProviderManager:
                 )
 
             pool = models
+            # What this model actually DID here, read back from usage_log: the
+            # in-memory penalty map forgets everything on restart, so a model
+            # that truncates every JSON call was re-elected on every boot. Free
+            # (no inference, no network) and persistent. Scoring calls only.
+            if not ignore_penalties and (policy_override or {}).get("hard_floor"):
+                penalized = penalized | self._empirically_unfit(provider.name)
             # OpenRouter exposes free live health stats (uptime/latency, no
             # inference). Fold models that are down RIGHT NOW into the penalized
             # set so scoring rotates off them before hitting a 429. Bounded to the
