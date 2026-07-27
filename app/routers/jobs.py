@@ -349,7 +349,7 @@ def build_router(container: AppContainer) -> APIRouter:
             "titolo": fields.get("titolo") or "Imported job",
             "azienda": fields.get("azienda") or "N/A",
             "descrizione": fields.get("descrizione", ""),
-            "sede": "",
+            "sede": fields.get("sede", ""),
             "fonte": "import",
             "link": url,
             "ricerca_usata": "import",
@@ -370,6 +370,9 @@ def build_router(container: AppContainer) -> APIRouter:
             privacy=container.feature_enabled("privacy_mode", True),
             extra_context=onboarding_context(container.db),
             candidate_name=(profile.get("name") if profile else None),
+            # Without the location the geo-eligibility cap is structurally dead
+            # for imported jobs: a US posting could never be flagged.
+            sede=row["sede"],
         )
         container.db.update_job_analysis(job_id=job_id, analysis=analysis)
         return {

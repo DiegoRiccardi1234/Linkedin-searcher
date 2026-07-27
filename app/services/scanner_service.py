@@ -575,40 +575,47 @@ def pre_filtro(titolo: str, descrizione: str) -> tuple[bool, str]:
 # prompt so both stay identical (job_detail.js depends on this exact shape:
 # radar match_axes, skills_match, requisiti…). Plain string with literal braces
 # — inserted by concatenation, so no f-string escaping.
+#
+# Field order is deliberate: the EVIDENCE comes first and the verdict last.
+# ``punteggio`` used to be the first key, so the model committed to a number
+# before it had written a single requirement or skill — the worst possible
+# ordering for a small model, which cannot revise what it already emitted.
+#
+# Fields the app computes deterministically are NOT asked for (the model's
+# answer was overwritten anyway): ``voto_minimo_richiesto`` and
+# ``eleggibilita_geografica`` come from the hard-requirement checks. Fields
+# nothing ever read were dropped outright (``junior_friendly``, duplicate of
+# ``adatta_neolaureati``; ``note_azienda``; ``reputazione_azienda``, which the
+# model had no way of knowing and invented). 24 keys -> 19.
 _PER_OFFER_SCHEMA = """{
-  "punteggio": <1-10>,
-  "programmazione_richiesta": "Bassa|Media|Alta",
-  "smart_working": "Sì|No|Non specificato",
-  "contratto": "Dipendente|Apprendistato|Stage|Partita IVA|Non specificato",
-  "junior_friendly": "Sì|No|Non specificato",
-  "anni_esperienza_richiesti": "0|1|2|3+|Non specificato",
-  "titolo_studio_richiesto": "Nessuno|Diploma|Triennale|Magistrale|PhD|Non specificato",
-  "voto_minimo_richiesto": "<es. 102/110 se l'annuncio lo chiede>|Non specificato",
-  "eleggibilita_geografica": "Italia/UE|Fuori UE: non candidabile|Fuori UE, ma l'annuncio cita apertura remota UE|Non specificato",
-  "tipo_ingaggio": "Dipendente|Gig a task|Freelance P.IVA|Stage|Non specificato",
-  "punti_forza_per_diego": "1 frase",
-  "punti_deboli_per_diego": "1 frase",
-  "riassunto": "2 righe max",
-  "consiglio": "Candidati subito|Valutabile|Salta",
-  "ral_stimata": "XX.000€-YY.000€|Non stimabile",
-  "reputazione_azienda": "Ottima|Buona|Nella media|Scarsa|Sconosciuta",
-  "adatta_neolaureati": "Sì|No|Non specificato",
-  "note_azienda": "1 frase",
   "requisiti": ["max 5 requisiti chiave dell'offerta, brevi"],
   "responsabilita": ["max 5 responsabilità principali, brevi"],
   "benefit": ["max 5 benefit menzionati, brevi"],
+  "titolo_studio_richiesto": "Nessuno|Diploma|Triennale|Magistrale|PhD|Non specificato",
+  "anni_esperienza_richiesti": "0|1|2|3+|Non specificato",
+  "livello_richiesto": "internship|entry|junior|mid|senior|lead",
+  "contratto": "Dipendente|Apprendistato|Stage|Partita IVA|Non specificato",
+  "tipo_ingaggio": "Dipendente|Gig a task|Freelance P.IVA|Stage|Non specificato",
+  "smart_working": "Sì|No|Non specificato",
+  "programmazione_richiesta": "Bassa|Media|Alta",
+  "adatta_neolaureati": "Sì|No|Non specificato",
+  "ral_stimata": "XX.000€-YY.000€|Non stimabile",
   "skills_match": {
     "hai": ["skills che il candidato ha e l'offerta richiede"],
     "mancano": ["skills richieste che il candidato non ha"]
   },
-  "livello_richiesto": "internship|entry|junior|mid|senior|lead",
   "match_axes": {
     "skills_match": <0-10>,
     "seniority_match": <0-10>,
     "remote_match": <0-10>,
     "salary_match": <0-10>,
     "contract_match": <0-10>
-  }
+  },
+  "punti_forza": "1 frase",
+  "punti_deboli": "1 frase",
+  "riassunto": "2 righe max",
+  "punteggio": <1-10>,
+  "consiglio": "Candidati subito|Valutabile|Salta"
 }"""
 
 
@@ -618,6 +625,17 @@ _PER_OFFER_SCHEMA = """{
 # make any mismatch VISIBLE (lower score + listed in "mancano").
 _SCORING_RULES = (
     "REGOLE DI VALUTAZIONE:\n"
+    "- Compila i campi NELL'ORDINE dello schema: prima le prove (requisiti, "
+    'skills_match, match_axes), poi "punteggio" e "consiglio". Il voto deve '
+    "seguire quello che hai scritto, non precederlo.\n"
+    "- Scala del punteggio (usala alla lettera, non a sensazione):\n"
+    "  9-10 = requisiti soddisfatti, nessun blocco, ruolo in linea con l'obiettivo;\n"
+    "  7-8  = buon match, manca qualche dettaglio o UNA skill recuperabile;\n"
+    "  5-6  = match parziale: mancano requisiti importanti o la seniority non torna;\n"
+    "  3-4  = requisiti chiave assenti, oppure ruolo lontano dall'obiettivo;\n"
+    "  1-2  = non candidabile o del tutto fuori target.\n"
+    '- "consiglio" segue il punteggio: >=8 "Candidati subito", 6-7 "Valutabile", '
+    '<=5 "Salta".\n'
     "- Confronta i REQUISITI dell'offerta con il CV: titolo di studio, voto minimo, "
     "anni di esperienza, livello di lingua.\n"
     "- Se l'offerta richiede un titolo di studio superiore a quello del candidato "
@@ -831,21 +849,16 @@ def _heuristic_analysis(
         "programmazione_richiesta": _estimate_programming_demand(offer_text),
         "smart_working": _estimate_smart_working(offer_text),
         "contratto": _estimate_contract_type(offer_text),
-        "junior_friendly": "Sì"
-        if any(token in offer_text for token in ["junior", "entry", "stage", "intern"])
-        else "Non specificato",
         "anni_esperienza_richiesti": _estimate_experience_band(offer_text),
         "titolo_studio_richiesto": edu_required,
-        "punti_forza_per_diego": f"Match su: {overlap_preview}.",
-        "punti_deboli_per_diego": weakness_text,
+        "punti_forza": f"Match su: {overlap_preview}.",
+        "punti_deboli": weakness_text,
         "riassunto": f"Analisi euristica usata (IA non disponibile). Match stimato {score}/10.",
         "consiglio": advice,
         "ral_stimata": "Non stimabile",
-        "reputazione_azienda": "Sconosciuta",
         "adatta_neolaureati": "Sì"
         if any(token in offer_text for token in ["junior", "stage", "intern", "entry"])
         else "Non specificato",
-        "note_azienda": f"Valutazione automatica fallback per {azienda}.",
         "match_axes": {
             "skills_match": max(0, min(10, score + min(2, len(overlap) // 2))),
             "seniority_match": 8
@@ -888,14 +901,14 @@ def _insufficient_description_analysis(
         result["riassunto"] = (
             "Descrizione troppo breve — stima dal titolo. Apri l'annuncio per valutare."
         )
-        result["punti_deboli_per_diego"] = (
+        result["punti_deboli"] = (
             "Descrizione quasi assente: requisiti ed esperienza richiesta non verificati."
         )
     else:
         result["riassunto"] = (
             "Descrizione non disponibile — stima dal titolo. Apri l'annuncio per valutare."
         )
-        result["punti_deboli_per_diego"] = (
+        result["punti_deboli"] = (
             "Descrizione non recuperata: requisiti ed esperienza richiesta non verificati."
         )
     return result
@@ -971,6 +984,33 @@ def _profile_grade(profile_markdown: str) -> int | None:
     return grades[0] if grades else None
 
 
+def _geo_status(sede: str, descrizione: str) -> tuple[str, str | None]:
+    """``(eligibility label, blocking reason or None)`` for a posting's location.
+
+    Single source of truth for "can the candidate legally take this job": it is
+    read BEFORE the LLM call (to skip it) and again AFTER (to cap whatever the
+    model answered). Those were two separate implementations of the same
+    condition that had to be kept in sync by hand.
+    """
+    if not _is_non_eu_location(sede):
+        return ("Italia/UE" if sede.strip() else "Non specificato"), None
+    if _EU_REMOTE_OK_RE.search(descrizione or ""):
+        return "Fuori UE, ma l'annuncio cita apertura remota UE", None
+    return "Fuori UE: non candidabile", f"Sede fuori UE ({sede}): richiede visto/relocation"
+
+
+def _grade_status(profile_markdown: str, descrizione: str) -> tuple[str, str | None]:
+    """``(required grade label, blocking reason or None)``. See :func:`_geo_status`."""
+    required = _extract_min_grade(descrizione)
+    if required is None:
+        return "Non specificato", None
+    label = f"{required}/110"
+    candidate = _profile_grade(profile_markdown)
+    if candidate is None or candidate >= required:
+        return label, None
+    return label, f"Voto minimo {required}/110 (CV: {candidate}/110)"
+
+
 def hard_block_reason(profile_markdown: str, descrizione: str, sede: str) -> str | None:
     """Why this offer is a non-starter for the candidate, or None.
 
@@ -978,13 +1018,7 @@ def hard_block_reason(profile_markdown: str, descrizione: str, sede: str) -> str
     LLM entirely instead of paying a call and capping the answer afterwards
     (measured on a real scan: 12 offers out of 44 — ~27% of the scoring quota).
     """
-    if _is_non_eu_location(sede) and not _EU_REMOTE_OK_RE.search(descrizione or ""):
-        return f"Sede fuori UE ({sede}): richiede visto/relocation"
-    required = _extract_min_grade(descrizione)
-    candidate = _profile_grade(profile_markdown)
-    if required is not None and candidate is not None and candidate < required:
-        return f"Voto minimo {required}/110 (CV: {candidate}/110)"
-    return None
+    return _geo_status(sede, descrizione)[1] or _grade_status(profile_markdown, descrizione)[1]
 
 
 # ── declared salary vs the candidate's floor ─────────────────────────────────
@@ -1032,8 +1066,8 @@ def _apply_salary_expectation(analysis: dict[str, Any], ral_min: int | None) -> 
     low, high = _parse_ral(analysis.get("ral_stimata"))
     if ral_min and high and high < ral_min:
         _add_missing(analysis, f"RAL dichiarata fino a {high} EUR, sotto la tua minima ({ral_min})")
-        previous = str(analysis.get("punti_deboli_per_diego") or "").strip()
-        analysis["punti_deboli_per_diego"] = (
+        previous = str(analysis.get("punti_deboli") or "").strip()
+        analysis["punti_deboli"] = (
             f"Retribuzione sotto la RAL minima dichiarata ({ral_min} EUR). {previous}".strip()
         )
         axes = analysis.get("match_axes")
@@ -1161,21 +1195,18 @@ def _cap_score(analysis: dict[str, Any], cap: int, weakness: str) -> None:
         current = 0
     analysis["punteggio"] = min(current, cap) if current else cap
     analysis["consiglio"] = "Salta"
-    previous = str(analysis.get("punti_deboli_per_diego") or "").strip()
-    analysis["punti_deboli_per_diego"] = f"{weakness} {previous}".strip()
+    previous = str(analysis.get("punti_deboli") or "").strip()
+    analysis["punti_deboli"] = f"{weakness} {previous}".strip()
 
 
 def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str) -> None:
     """Cap offers the candidate legally can't take (no visa, no relocation)."""
-    if not _is_non_eu_location(sede):
-        if sede.strip():
-            analysis["eleggibilita_geografica"] = "Italia/UE"
+    label, reason = _geo_status(sede, descrizione)
+    if label != "Non specificato" or not analysis.get("eleggibilita_geografica"):
+        analysis["eleggibilita_geografica"] = label
+    if not reason:
         return
-    if _EU_REMOTE_OK_RE.search(descrizione or ""):
-        analysis["eleggibilita_geografica"] = "Fuori UE, ma l'annuncio cita apertura remota UE"
-        return
-    analysis["eleggibilita_geografica"] = "Fuori UE: non candidabile"
-    _add_missing(analysis, f"Sede fuori UE ({sede}): richiede visto/relocation")
+    _add_missing(analysis, reason)
     _cap_score(analysis, _GEO_INELIGIBLE_CAP, "Sede fuori UE: non candidabile senza visto.")
 
 
@@ -1183,19 +1214,16 @@ def _apply_grade_requirement(
     analysis: dict[str, Any], profile_markdown: str, descrizione: str
 ) -> None:
     """Cap offers whose stated minimum degree grade is above the candidate's."""
-    required = _extract_min_grade(descrizione)
-    if required is None:
-        analysis.setdefault("voto_minimo_richiesto", "Non specificato")
+    label, reason = _grade_status(profile_markdown, descrizione)
+    analysis["voto_minimo_richiesto"] = label
+    if not reason:
         return
-    analysis["voto_minimo_richiesto"] = f"{required}/110"
+    _add_missing(analysis, reason)
     candidate = _profile_grade(profile_markdown)
-    if candidate is None or candidate >= required:
-        return
-    _add_missing(analysis, f"Voto minimo {required}/110 (CV: {candidate}/110)")
     _cap_score(
         analysis,
         _GRADE_INELIGIBLE_CAP,
-        f"Voto minimo richiesto {required}/110, il CV ne dichiara {candidate}/110.",
+        f"Voto minimo richiesto {label}, il CV ne dichiara {candidate}/110.",
     )
 
 
@@ -1212,9 +1240,24 @@ _MATCH_AXES_KEYS = (
 )
 
 
+#: Old key -> current key. The strengths/weaknesses fields carried the
+#: developer's first name in the public schema (and in every user's CSV export);
+#: a model given a proper noun in a key also tends to hunt for that name in the
+#: CV. Stored analyses written before the rename are mapped on read.
+_LEGACY_KEYS = {
+    "punti_forza_per_diego": "punti_forza",
+    "punti_deboli_per_diego": "punti_deboli",
+}
+
+
 def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
     """Return ``analysis`` with every documented key present and well-typed."""
     out = dict(analysis)
+
+    for old, new in _LEGACY_KEYS.items():
+        value = out.pop(old, None)
+        if value and not out.get(new):
+            out[new] = value
 
     # The model sometimes emits a top-level "mancano" instead of nesting it.
     stray_missing = out.pop("mancano", None)
@@ -1261,8 +1304,8 @@ def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
         ("eleggibilita_geografica", "Non specificato"),
         ("tipo_ingaggio", "Non specificato"),
         ("ral_stimata", "Non stimabile"),
-        ("punti_forza_per_diego", ""),
-        ("punti_deboli_per_diego", ""),
+        ("punti_forza", ""),
+        ("punti_deboli", ""),
         ("riassunto", ""),
         ("consiglio", "Valutabile"),
     ):

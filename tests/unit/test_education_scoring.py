@@ -50,7 +50,7 @@ def test_fallback_penalizes_masters_requirement() -> None:
     )
     assert masters["punteggio"] < plain["punteggio"]
     assert masters["titolo_studio_richiesto"] == "Magistrale"
-    assert "magistrale" in masters["punti_deboli_per_diego"].lower()
+    assert "magistrale" in masters["punti_deboli"].lower()
 
 
 def test_fallback_penalizes_phd_requirement() -> None:

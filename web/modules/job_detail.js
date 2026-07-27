@@ -246,6 +246,9 @@ export async function showJobDetail(jobId) {
     if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
       ralSpan = `<div class="info-tag"><strong>RAL:</strong> ${escapeHtml(analysis.ral_stimata)}</div>`;
     }
+    // Analyses stored before the rename still carry the old, name-bearing keys.
+    const strengths = analysis ? analysis.punti_forza || analysis.punti_forza_per_diego : null;
+    const weaknesses = analysis ? analysis.punti_deboli || analysis.punti_deboli_per_diego : null;
     // Platform task work vs employment: same list, very different decision.
     let engagementSpan = "";
     const engagement = analysis && analysis.tipo_ingaggio;
@@ -275,8 +278,8 @@ export async function showJobDetail(jobId) {
         <div class="mt-16">
           <h4>${t("offcanvas.prosAndCons")}</h4>
           <ul class="pros-cons">
-            <li class="pro">✅ ${escapeHtml((analysis ? analysis.punti_forza_per_diego : null) || "N/A")}</li>
-            <li class="con">❌ ${escapeHtml((analysis ? analysis.punti_deboli_per_diego : null) || "N/A")}</li>
+            <li class="pro">✅ ${escapeHtml(strengths || "N/A")}</li>
+            <li class="con">❌ ${escapeHtml(weaknesses || "N/A")}</li>
           </ul>
         </div>
         <div class="info-card mt-8">
@@ -295,7 +298,7 @@ export async function showJobDetail(jobId) {
         <div class="mt-16">
           <h4>${t("offcanvas.listingMeta")}</h4>
           ${sourcesBadge}
-          <p class="text-sm text-dim">${t("offcanvas.search")}: ${escapeHtml(job.ricerca_usata)} | ${t("jobs.source")}: ${escapeHtml(job.fonte || "App")} | ${t("offcanvas.found")}: ${fmtDate(job.first_seen_at)} | ${t("offcanvas.companyRep")}: ${escapeHtml((analysis ? analysis.reputazione_azienda : null) || "N/A")}</p>
+          <p class="text-sm text-dim">${t("offcanvas.search")}: ${escapeHtml(job.ricerca_usata)} | ${t("jobs.source")}: ${escapeHtml(job.fonte || "App")} | ${t("offcanvas.found")}: ${fmtDate(job.first_seen_at)}</p>
         </div>
         <div class="mt-16 info-card">
           <h4>${t("timeline.title")}</h4>

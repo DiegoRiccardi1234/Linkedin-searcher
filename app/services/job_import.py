@@ -67,7 +67,11 @@ def fetch_page_text(url: str, timeout: float = 6.0) -> str | None:
 
 
 def extract_job_fields(provider_manager: ProviderManager, raw_text: str) -> dict[str, str]:
-    """LLM-extract ``{titolo, azienda, descrizione}`` from raw posting text.
+    """LLM-extract ``{titolo, azienda, sede, descrizione}`` from raw posting text.
+
+    ``sede`` matters beyond display: the deterministic eligibility check reads
+    the location, so an imported posting without one could never be geo-capped
+    (a US-based job imported by URL scored like any other).
 
     Returns empty strings for any field the model can't find. Raises whatever
     ``complete_json`` raises (no provider / network) so the caller surfaces it.
@@ -78,6 +82,7 @@ def extract_job_fields(provider_manager: ProviderManager, raw_text: str) -> dict
         "Extract the core fields and reply ONLY with valid JSON, no extra text, with keys:\n"
         '- "titolo": the job title\n'
         '- "azienda": the hiring company name\n'
+        '- "sede": the work location as written (city and country, or "Remote")\n'
         '- "descrizione": a concise 3-6 sentence summary of the role, key '
         "responsibilities and requirements\n"
         "Use an empty string for any field you cannot determine.\n\n"
@@ -85,9 +90,10 @@ def extract_job_fields(provider_manager: ProviderManager, raw_text: str) -> dict
     )
     result = provider_manager.complete_json(prompt=prompt, max_tokens=700)
     if not isinstance(result, dict):
-        return {"titolo": "", "azienda": "", "descrizione": ""}
+        return {"titolo": "", "azienda": "", "sede": "", "descrizione": ""}
     return {
         "titolo": str(result.get("titolo") or "").strip(),
         "azienda": str(result.get("azienda") or "").strip(),
+        "sede": str(result.get("sede") or "").strip(),
         "descrizione": str(result.get("descrizione") or "").strip(),
     }
