@@ -9,7 +9,7 @@ from typing import Any
 from app.db import Database
 from app.log import get_logger
 from app.providers.factory import ProviderManager
-from app.services import market_snapshot
+from app.services import market_snapshot, market_web
 from app.services.chat.context import (
     build_preferences_context,
     build_profile_context,
@@ -236,6 +236,21 @@ def handle_chat_message(
         # job rows. Free: it is the user's own scan results, read back.
         market = market_snapshot.as_prompt_block(db)
         market_block = f"\n\n=== Mercato osservato dai tuoi scan ===\n{market}" if market else ""
+
+        # For a question that is actually about the market, the model's training
+        # cutoff is the problem: it answers confidently from memory. If the user
+        # has a Google key, Gemini's Search grounding is free (1500/day) and
+        # gives a current, sourced answer. No key, no network, no match on the
+        # question -> nothing happens and the local snapshot still applies.
+        if market_web.looks_like_market_question(message):
+            grounded = market_web.ask(
+                db,
+                getattr(provider_manager.settings, "google_api_key", None),
+                message,
+                language=str(ui_lang or "it"),
+            )
+            if grounded:
+                market_block += f"\n\n=== Dal web, verificato ora ===\n{grounded}"
 
         # Recent turns as their own messages so the model has real conversation
         # context (the rolling summary only kicks in for very long chats). The
