@@ -283,46 +283,138 @@ def _title_tokens(titolo: str) -> set[str]:
     return {token.strip(".-") for token in _TITLE_TOKEN_RE.findall(titolo.lower())}
 
 
-def title_off_topic(titolo: str, skill_tokens: set[str] | None = None) -> bool:
-    """True when the title names no trade the candidate practises.
+#: Role words that name no trade: they sit in payroll, sales and partnership
+#: titles just as happily as in a technical one. Dropped from the vocabulary
+#: built below, or searching "AI Specialist" would teach the gate that
+#: "PAYROLL SPECIALIST" is on topic.
+_VAGUE_ROLE_WORDS = {
+    "specialist",
+    "specialista",
+    "consultant",
+    "consulente",
+    "analyst",
+    "analista",
+    "manager",
+    "coordinator",
+    "coordinatore",
+    "operator",
+    "operatore",
+    "assistant",
+    "assistente",
+    "junior",
+    "senior",
+    "lead",
+    "expert",
+    "esperto",
+    "addetto",
+    "responsabile",
+    "impiegato",
+    "profilo",
+    "figura",
+    "role",
+    "ruolo",
+    "remote",
+    "remoto",
+    "full",
+    "time",
+    "part",
+}
+
+
+def title_vocabulary(
+    *,
+    search_terms: list[str] | None = None,
+    skills: list[str] | None = None,
+    roles: list[str] | None = None,
+) -> set[str]:
+    """The words that, FOR THIS USER, mean "this is my trade".
+
+    Built from what the user actually asked for — the terms of this scan, the
+    skills on their CV, the roles they said they want — rather than from a fixed
+    list. A fixed list would work only for the trade it was written for: someone
+    searching "infermiere pediatrico" would have every posting dropped by a gate
+    that only recognises AI and software words.
+
+    :data:`_TITLE_DOMAIN` remains as the fallback for an empty profile, which is
+    what a first scan on a fresh install looks like.
+    """
+    tokens: set[str] = set()
+    for source in (search_terms, skills, roles):
+        for item in source or []:
+            tokens |= {
+                token for token in _title_tokens(str(item)) if token not in _VAGUE_ROLE_WORDS
+            }
+    return (tokens | _TITLE_ENTRY_ROUTES) if tokens else set()
+
+
+def default_title_vocabulary() -> set[str]:
+    """The fallback for an empty profile — a first scan on a fresh install.
+
+    Kept apart from :func:`title_vocabulary` because the two are used
+    differently: this list is broad enough to gate a title on, but too broad to
+    RESCUE one with. It contains "software" and "data", which every corporate ad
+    repeats, so counting them in a description would wave everything through —
+    precisely the hole the old gate had.
+    """
+    return _TITLE_DOMAIN | _TITLE_ENTRY_ROUTES
+
+
+def title_off_topic(titolo: str, allowed_tokens: set[str] | None = None) -> bool:
+    """True when the title names no trade in ``allowed_tokens``.
 
     The relevance gate used to read title+description and fire only on ZERO
     overlap, which no corporate posting ever reaches. Reading the title alone,
-    against a narrow list, is what actually separates "this is my job" from
-    "this ad contains words I know".
+    against the user's own vocabulary, is what actually separates "this is my
+    job" from "this ad contains words I know".
     """
     tokens = _title_tokens(titolo)
     if not tokens:
         return False  # nothing to judge: keep it and let the rest decide
-    allowed = _TITLE_DOMAIN | _TITLE_ENTRY_ROUTES | (skill_tokens or set())
+    allowed = allowed_tokens or default_title_vocabulary()
     return not (tokens & allowed)
 
 
-# The rescue for a title that hides the trade behind an acronym. Real case:
-# "RAI Specialist" at Accenture is a RESPONSIBLE AI role — a genuine match the
-# title gate would have thrown away, since "RAI" is also a television network.
-#
-# Deliberately narrow: no "dati", no "software", no "cloud". Those are in every
-# corporate ad, which is precisely why the old description gate never fired. And
-# it takes SEVERAL distinct markers, not one: measured on 47 real postings, the
-# Responsible AI role hit 5 of these, while every off-domain posting hit at most
-# 2 — one stray "AI" in a company boilerplate paragraph is not a subject.
-_STRONG_DOMAIN_RE = re.compile(
-    r"\b(a\.?i\.?|ml|nlp|llm|genai|machine learning|deep learning|intelligenza artificiale"
-    r"|artificial intelligence|responsible ai|prompt|annotation|annotazione|labeling|dataset"
-    r"|qa|quality assurance|testing|test automation|automation|automazione"
-    r"|valutazione dei modelli|model evaluation|hallucination|generative ai|gen ai)\b",
-    re.IGNORECASE,
-)
-
-#: How many DISTINCT strong markers a description needs to overrule the title.
-MIN_STRONG_DOMAIN_HITS = 3
+#: How often the user's own words must appear in a posting for it to overrule a
+#: title that says nothing. Measured on 47 real postings with a real profile:
+#: the Responsible AI role hidden behind "RAI Specialist" scored 27, a frontend
+#: role matching the candidate's own React/TypeScript scored 8, and every
+#: off-domain ad scored 4 or less. A single stray mention rescues nothing.
+MIN_DESCRIPTION_MATCHES = 6
 
 
-def description_on_topic(descrizione: str, min_hits: int = MIN_STRONG_DOMAIN_HITS) -> bool:
-    """True when the posting is about this trade for more than one stray word."""
-    hits = {match.group(0).lower() for match in _STRONG_DOMAIN_RE.finditer(descrizione or "")}
-    return len(hits) >= min_hits
+def description_on_topic(
+    descrizione: str,
+    allowed_tokens: set[str] | None = None,
+    min_matches: int = MIN_DESCRIPTION_MATCHES,
+) -> bool:
+    """True when the posting talks about this trade throughout, not in passing.
+
+    The rescue for a title that hides the trade behind an acronym. Real case:
+    "RAI Specialist" at Accenture is a RESPONSIBLE AI role — a genuine match the
+    title gate would have thrown away, since "RAI" is also a television network.
+
+    Short tokens are matched case-SENSITIVELY: "ai" is an everyday Italian
+    preposition ("ai clienti", "ai dati") and would score dozens of hits in any
+    ad whatsoever, while "AI" is the acronym that actually means something.
+    """
+    text = descrizione or ""
+    # No text, or no idea what this user is after: nothing to rescue WITH. The
+    # broad fallback list is deliberately not used here (see
+    # :func:`default_title_vocabulary`).
+    if not text or not allowed_tokens:
+        return False
+    allowed = allowed_tokens
+    total = 0
+    for token in allowed:
+        if len(token) < 2:
+            continue
+        if len(token) <= 3:
+            total += len(re.findall(rf"\b{re.escape(token.upper())}\b", text))
+        else:
+            total += len(re.findall(rf"\b{re.escape(token)}\b", text, re.IGNORECASE))
+        if total >= min_matches:
+            return True
+    return False
 
 
 def pre_filtro(titolo: str, descrizione: str) -> tuple[bool, str]:

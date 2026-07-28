@@ -20,7 +20,15 @@ from app.db import Database
 from app.models import ScanRequest
 from app.services import scanner_service as ss
 
-_SKILLS = {"python", "java", "typescript", "react", "postgresql", "git"}
+# The vocabulary is the USER's, not the app's: built from the terms they search,
+# the skills on their CV and the roles they said they want. These are the real
+# ones from the 2026-07-27 scan.
+_VOCAB = ss.title_vocabulary(
+    search_terms=["LLM Evaluation", "AI QA", "AI Specialist"],
+    skills=["Python", "Java", "TypeScript", "React", "PostgreSQL", "Git", "Quarkus"],
+    roles=["AI QA / LLM Evaluation", "AI Specialist", "QA Engineer", "Prompt Engineer"],
+)
+_SKILLS = _VOCAB
 
 # Real titles from the 2026-07-27 scan, with the score they were given.
 _OFF_TOPIC = [
@@ -44,8 +52,7 @@ _ON_TOPIC = [
     "ML Engineer – Generative AI",
     "Junior AI & Digital Automation Specialist",
     "Prompt Engineer",
-    "Linguistic Annotator",
-    "Software Developer",
+    "React Developer",  # the CV's own skills count as the trade too
 ]
 
 
@@ -63,19 +70,55 @@ def test_two_letter_trades_are_visible() -> None:
     """``_tokenize`` needs three characters, so a gate built on it would have
     missed "AI", "QA" and "ML" — the very words that matter here."""
     for titolo in ("AI Specialist", "QA Engineer", "ML Ops"):
-        assert ss.title_off_topic(titolo, set()) is False
+        assert ss.title_off_topic(titolo, ss.default_title_vocabulary()) is False
 
 
 def test_entry_routes_survive_without_naming_the_trade() -> None:
     """"Tirocinio curriculare" names no trade, and dropping it would cut exactly
     the openings a recent graduate is looking for."""
     for titolo in ("Tirocinio curriculare", "Graduate Program 2026", "Stage in azienda"):
-        assert ss.title_off_topic(titolo, set()) is False
+        assert ss.title_off_topic(titolo, _VOCAB) is False
 
 
 def test_candidate_skills_widen_the_gate() -> None:
-    assert ss.title_off_topic("Quarkus Consultant", set()) is True
-    assert ss.title_off_topic("Quarkus Consultant", {"quarkus"}) is False
+    assert ss.title_off_topic("Quarkus Consultant", ss.default_title_vocabulary()) is True
+    assert ss.title_off_topic("Quarkus Consultant", _VOCAB) is False
+
+
+def test_the_broad_default_never_rescues_a_description() -> None:
+    """It contains "software" and "data", which every corporate ad repeats: used
+    as a rescue it would wave everything through, which is the hole the old gate
+    had. With no profile, the title decides alone."""
+    boilerplate = "Gestione dei dati e dei software aziendali. " * 5
+    assert ss.description_on_topic(boilerplate, ss.default_title_vocabulary()) is True
+    assert ss.description_on_topic(boilerplate, set()) is False  # no profile, no rescue
+
+
+# --- the vocabulary belongs to the user, not to this app ---------------------
+
+
+def test_the_gate_works_for_a_trade_this_app_never_heard_of() -> None:
+    """A nurse searching "infermiere pediatrico" must not have every posting
+    dropped by a gate that only knows AI and software words. The vocabulary is
+    built from what THEY asked for."""
+    nurse = ss.title_vocabulary(
+        search_terms=["Infermiere pediatrico", "OSS"],
+        skills=["Assistenza pediatrica", "Triage"],
+        roles=["Infermiere"],
+    )
+    assert ss.title_off_topic("Infermiere pediatrico - reparto", nurse) is False
+    assert ss.title_off_topic("Operatore socio sanitario (OSS)", nurse) is False
+    assert ss.title_off_topic("AI QA Engineer", nurse) is True  # not their trade
+    # And the AI-shaped default no longer decides for them.
+    assert ss.title_off_topic("PAYROLL SPECIALIST", nurse) is True
+
+
+def test_a_bare_role_word_in_a_search_term_teaches_the_gate_nothing() -> None:
+    """Searching "AI Specialist" must not make "PAYROLL SPECIALIST" on-topic."""
+    vocab = ss.title_vocabulary(search_terms=["AI Specialist"])
+    assert "specialist" not in vocab
+    assert ss.title_off_topic("PAYROLL SPECIALIST", vocab) is True
+    assert ss.title_off_topic("AI Specialist", vocab) is False
 
 
 # --- the rescue: a title that hides the trade behind an acronym ---------------
@@ -83,7 +126,9 @@ def test_candidate_skills_widen_the_gate() -> None:
 # Shortened from the real Accenture posting for "RAI Specialist".
 _RESPONSIBLE_AI_JD = (
     "Come Responsible AI Specialist contribuirai alla progettazione di architetture AI "
-    "affidabili, al testing dei modelli e alla valutazione dei prompt in ambito GenAI."
+    "affidabili. Lavorerai su AI governance, sul testing dei sistemi AI e sulla "
+    "valutazione dei prompt in ambito GenAI, con il team QA di prodotto. Richiesta "
+    "esperienza con Python e con framework di AI evaluation."
 )
 
 # Shortened from the real "PAYROLL SPECIALIST" and "Application Specialist" ads:
@@ -96,14 +141,25 @@ _BOILERPLATE_JD = (
 
 def test_a_domain_rich_description_overrules_a_silent_title() -> None:
     """"RAI Specialist" is a Responsible AI role: the title says nothing, the ad
-    says it five times over. Losing it would be the gate's worst failure."""
-    assert ss.title_off_topic("RAI Specialist", set()) is True
-    assert ss.description_on_topic(_RESPONSIBLE_AI_JD) is True
+    says it over and over. Losing it would be the gate's worst failure."""
+    assert ss.title_off_topic("RAI Specialist", _VOCAB) is True
+    assert ss.description_on_topic(_RESPONSIBLE_AI_JD, _VOCAB) is True
 
 
 def test_one_stray_mention_does_not_rescue_a_payroll_ad() -> None:
     """The old gate fired on zero overlap, so a single "AI" saved anything."""
-    assert ss.description_on_topic(_BOILERPLATE_JD) is False
+    assert ss.description_on_topic(_BOILERPLATE_JD, _VOCAB) is False
+
+
+def test_the_italian_preposition_ai_is_not_the_acronym_AI() -> None:
+    """"ai clienti", "ai dati", "ai processi": counting those case-insensitively
+    would rescue every Italian posting ever written."""
+    italian = (
+        "Ti occuperai di fornire supporto ai clienti, di rispondere ai loro quesiti "
+        "amministrativi e di dare seguito ai processi interni, affiancando i colleghi "
+        "ai vari livelli e partecipando ai progetti di miglioramento continuo."
+    )
+    assert ss.description_on_topic(italian, _VOCAB) is False
 
 
 # --- bait postings and aggregators -------------------------------------------

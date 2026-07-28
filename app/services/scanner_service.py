@@ -122,9 +122,11 @@ from app.services.scan.vocab import (
     STOPWORDS,
     TECH_KEYWORDS,
     _tokenize,
+    default_title_vocabulary,
     description_on_topic,
     pre_filtro,
     title_off_topic,
+    title_vocabulary,
 )
 
 # This module stays the front door of the scan pipeline: the internals now live
@@ -194,6 +196,7 @@ __all__ = [
     "pre_filtro",
     "run_scan",
     "title_off_topic",
+    "title_vocabulary",
 ]
 
 log = get_logger(__name__)
@@ -838,6 +841,26 @@ def run_scan(
         work_types = _work_types_from_goal(db.get_preference("onboarding_work_mode", ""))
     min_salary = int(payload.min_salary or 0)
 
+    # The words that mean "this is my trade" — for THIS user, not for the trade
+    # this app was first written for. Built from what they asked for (the terms
+    # of this scan), what they can do (CV skills) and what they said they want
+    # (preferred roles + the onboarding goal). A fixed list would work only for
+    # one profile: someone searching "infermiere pediatrico" would have every
+    # posting dropped by a gate that only recognises AI and software words.
+    user_vocab = title_vocabulary(
+        search_terms=terms,
+        skills=[str(s) for s in _skills] if isinstance(_skills, list) else [],
+        roles=[
+            db.get_preference("preferred_roles", ""),
+            db.get_preference("onboarding_goal", ""),
+            db.get_preference("onboarding_sector", ""),
+        ],
+    )
+    # With no profile at all (a first scan on a fresh install) the broad default
+    # gates the title — but it never rescues one, or every ad saying "software"
+    # would come back through.
+    gate_vocab = user_vocab or default_title_vocabulary()
+
     is_remote_effective = payload.is_remote or ("remote" in work_types)
 
     # Multi-location: scrape each location. Fall back to the single location (or
@@ -1185,8 +1208,8 @@ def run_scan(
             # its text against at most two for any off-domain posting.
             if (
                 not watched
-                and title_off_topic(titolo, skill_tokens)
-                and not description_on_topic(descrizione)
+                and title_off_topic(titolo, gate_vocab)
+                and not description_on_topic(descrizione, user_vocab)
             ):
                 totale_scartati += 1
                 scartati_per_titolo += 1
