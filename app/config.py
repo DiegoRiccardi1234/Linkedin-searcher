@@ -5,13 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+# Two domain tokens each, never a bare role word. Measured on a real scan:
+# "AI Specialist" alone returned 27 of 47 postings and nearly all the noise —
+# job boards match "Specialist" against payroll, sales and partnership roles —
+# while "AI QA" returned 15 with one strong hit and "LLM Evaluation" 5 with two.
+# A narrow term fishes less and better, and it costs nothing to fix here.
 DEFAULT_SEARCH_TERMS = [
-    "Analista Funzionale Junior",
-    "Junior QA Tester",
-    "Junior Cybersecurity Analyst",
-    "Junior Data Analyst",
-    "Junior IT Consultant",
-    "Junior AI Consultant",
+    "AI QA",
+    "LLM Evaluation",
+    "AI Automation",
+    "Prompt Engineering",
+    "Data Annotation",
+    "QA Engineer",
 ]
 
 LOCAL_SECRETS_FILE = "local_secrets.json"

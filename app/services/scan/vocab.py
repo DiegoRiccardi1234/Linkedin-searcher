@@ -180,6 +180,124 @@ _DOMAIN_VOCAB = {
 }
 
 
+# What the TITLE has to say for the posting to be worth reading. Narrower than
+# ``_DOMAIN_VOCAB`` on purpose: that list is matched against title+description,
+# where words like "data", "software" and "cloud" appear in every corporate ad —
+# which is why the gate below dropped nothing. A title names the trade, and a
+# trade this candidate does not practise is not worth an LLM call.
+#
+# Measured on 47 real postings: this keeps 21 and drops 26, and every dropped
+# posting that had scored >=7 was a false positive (Application Specialist,
+# Security Associate Specialist, PAYROLL SPECIALIST, RAI Specialist…).
+_TITLE_DOMAIN = {
+    # AI / data / language
+    "ai",
+    "a.i",
+    "ia",
+    "ml",
+    "nlp",
+    "llm",
+    "genai",
+    "data",
+    "dati",
+    "dataset",
+    "annotation",
+    "annotator",
+    "annotazione",
+    "annotatore",
+    "labeling",
+    "prompt",
+    "machine",
+    "learning",
+    "deep",
+    "artificial",
+    "artificiale",
+    "intelligence",
+    "intelligenza",
+    "linguistic",
+    "linguistica",
+    "linguistico",
+    "linguist",
+    "computational",
+    "computazionale",
+    # quality / testing / automation
+    "qa",
+    "test",
+    "tester",
+    "testing",
+    "quality",
+    "automation",
+    "automazione",
+    "evaluation",
+    "valutazione",
+    # software
+    "software",
+    "developer",
+    "sviluppatore",
+    "sviluppatrice",
+    "sviluppo",
+    "engineer",
+    "engineering",
+    "programmatore",
+    "informatico",
+    "informatica",
+    "backend",
+    "frontend",
+    "fullstack",
+    "full-stack",
+    "devops",
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "react",
+    "sql",
+}
+
+#: Entry-level routes never name the trade in the title ("Tirocinio curriculare",
+#: "Graduate Program"), and dropping them would cut exactly the openings a recent
+#: graduate is looking for.
+_TITLE_ENTRY_ROUTES = {
+    "tirocinio",
+    "tirocinante",
+    "stage",
+    "stagista",
+    "internship",
+    "intern",
+    "trainee",
+    "apprendistato",
+    "apprenticeship",
+    "neolaureato",
+    "neolaureati",
+    "graduate",
+}
+
+#: Two-letter trades ("AI", "QA", "ML") are invisible to :func:`_tokenize`, whose
+#: pattern needs three characters — so a title gate built on it would have missed
+#: "AI QA Engineer" and kept "PAYROLL SPECIALIST".
+_TITLE_TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+#.\-]+")
+
+
+def _title_tokens(titolo: str) -> set[str]:
+    """Words of a job title, down to two letters."""
+    return {token.strip(".-") for token in _TITLE_TOKEN_RE.findall(titolo.lower())}
+
+
+def title_off_topic(titolo: str, skill_tokens: set[str] | None = None) -> bool:
+    """True when the title names no trade the candidate practises.
+
+    The relevance gate used to read title+description and fire only on ZERO
+    overlap, which no corporate posting ever reaches. Reading the title alone,
+    against a narrow list, is what actually separates "this is my job" from
+    "this ad contains words I know".
+    """
+    tokens = _title_tokens(titolo)
+    if not tokens:
+        return False  # nothing to judge: keep it and let the rest decide
+    allowed = _TITLE_DOMAIN | _TITLE_ENTRY_ROUTES | (skill_tokens or set())
+    return not (tokens & allowed)
+
+
 def pre_filtro(titolo: str, descrizione: str) -> tuple[bool, str]:
     testo = (titolo + " " + descrizione).lower()
     for frase in BLACKLIST:

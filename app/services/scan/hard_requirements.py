@@ -272,6 +272,42 @@ _GIG_TEXT_RE = re.compile(
 _PIVA_RE = re.compile(r"partita iva|\bp\.?\s?iva\b|contratto di collaborazione", re.IGNORECASE)
 
 
+# Not a position: a form. "Candidatura Spontanea in Joinrs | RAL 22K-27K" scored
+# 8/10 on a real scan — there is no role, no requirements and nothing to apply
+# to, only an invitation to leave your details.
+_BAIT_TITLE_RE = re.compile(
+    r"candidatura spontanea|autocandidatura|spontaneous application|talent (?:pool|community)"
+    r"|entra nella community|iscriviti alla community|open application|general application",
+    re.IGNORECASE,
+)
+
+#: Job boards that republish other employers' ads under their own name. Unlike
+#: the bait titles above these sometimes carry a real role, so they are flagged
+#: rather than dropped: the company shown is not the one doing the hiring.
+_AGGREGATOR_COMPANIES = (
+    "joinrs",
+    "jobbydoo",
+    "jooble",
+    "talent.com",
+    "neuvoo",
+    "trovit",
+    "careerjet",
+    "adzuna",
+    "jobrapido",
+    "whatjobs",
+)
+
+
+def is_bait_posting(titolo: str) -> bool:
+    """True when the 'offer' is a lead-capture form rather than a position."""
+    return bool(_BAIT_TITLE_RE.search(titolo or ""))
+
+
+def _is_aggregator(azienda: str) -> bool:
+    company = (azienda or "").lower()
+    return any(name in company for name in _AGGREGATOR_COMPANIES)
+
+
 def _detect_engagement(azienda: str, offer_text: str) -> str | None:
     """Engagement type when the posting makes it unambiguous, else None."""
     company = (azienda or "").lower()
@@ -294,6 +330,7 @@ FLAG_HEURISTIC = "analisi_locale"  # no model saw this: keyword score
 FLAG_GIG = "lavoro_a_task"  # platform/gig work, not employment
 FLAG_SALARY_BELOW = "ral_sotto_minima"  # declared pay under the user's floor
 FLAG_NOT_EVALUATED = "non_valutato"  # no model judged this: there is no score
+FLAG_AGGREGATOR = "annuncio_aggregatore"  # a job board reposting someone else's ad
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
@@ -534,4 +571,10 @@ def enforce_hard_requirements(
         out["tipo_ingaggio"] = engagement
     if str(out.get("tipo_ingaggio", "")) in ("Gig a task", "Freelance P.IVA"):
         _add_flag(out, FLAG_GIG)
+    if _is_aggregator(azienda):
+        _add_flag(
+            out,
+            FLAG_AGGREGATOR,
+            "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume.",
+        )
     return out

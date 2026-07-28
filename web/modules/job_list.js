@@ -61,6 +61,7 @@ const FLAG_BADGES = [
   { code: "voto_minimo", cls: "flag-block", icon: "school", key: "jobs.flag.grade" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
   { code: "ral_sotto_minima", cls: "flag-warn", icon: "payments", key: "jobs.flag.salary" },
+  { code: "annuncio_aggregatore", cls: "flag-warn", icon: "content_copy", key: "jobs.flag.aggregator" },
   { code: "descrizione_breve", cls: "flag-info", icon: "notes", key: "jobs.flag.shortDesc" },
   { code: "analisi_locale", cls: "flag-info", icon: "psychology_alt", key: "jobs.flag.heuristic" },
 ];

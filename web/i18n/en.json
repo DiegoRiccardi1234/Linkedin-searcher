@@ -233,7 +233,9 @@
       "salaryLong": "The declared pay is below the minimum you set",
       "shortDesc": "Short description",
       "heuristic": "Local estimate",
-      "notEvaluated": "Not evaluated"
+      "notEvaluated": "Not evaluated",
+      "aggregator": "Aggregator",
+      "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
@@ -487,7 +489,8 @@
     },
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
     "volumeWarning": "Large scan ({n} searches) — this may take a while.",
-    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings."
+    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings.",
+    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a domain word, e.g. “AI QA”."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",

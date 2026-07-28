@@ -233,7 +233,9 @@
       "salaryLong": "El salario declarado está por debajo del mínimo que fijaste",
       "shortDesc": "Descripción breve",
       "heuristic": "Estimación local",
-      "notEvaluated": "Sin evaluar"
+      "notEvaluated": "Sin evaluar",
+      "aggregator": "Agregador",
+      "aggregatorLong": "Republicado por un agregador: la empresa mostrada no es la que contrata"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
@@ -487,7 +489,8 @@
     },
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
     "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
-    "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes."
+    "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes.",
+    "vagueTermWarning": "«{terms}»: un rol genérico solo devuelve de todo (nóminas, ventas, alianzas). Añade una palabra de dominio, p. ej. «AI QA»."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",

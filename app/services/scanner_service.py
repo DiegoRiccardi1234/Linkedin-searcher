@@ -52,6 +52,7 @@ from app.services.scan.companies import canonical_company, company_matches
 from app.services.scan.hard_requirements import (
     _MATCH_AXES_KEYS,
     BLOCKING_FLAGS,
+    FLAG_AGGREGATOR,
     FLAG_GEO_BLOCKED,
     FLAG_GIG,
     FLAG_GRADE_BLOCKED,
@@ -78,6 +79,7 @@ from app.services.scan.hard_requirements import (
     _salary_axis,
     enforce_hard_requirements,
     hard_block_reason,
+    is_bait_posting,
     is_unevaluated,
 )
 from app.services.scan.heuristics import (
@@ -115,11 +117,13 @@ from app.services.scan.scraping import (
 from app.services.scan.synonyms import expand_terms
 from app.services.scan.vocab import (
     _DOMAIN_VOCAB,
+    _TITLE_DOMAIN,
     BLACKLIST,
     STOPWORDS,
     TECH_KEYWORDS,
     _tokenize,
     pre_filtro,
+    title_off_topic,
 )
 
 # This module stays the front door of the scan pipeline: the internals now live
@@ -130,6 +134,7 @@ from app.services.scan.vocab import (
 __all__ = [
     "BLACKLIST",
     "BLOCKING_FLAGS",
+    "FLAG_AGGREGATOR",
     "FLAG_GEO_BLOCKED",
     "FLAG_GIG",
     "FLAG_GRADE_BLOCKED",
@@ -143,6 +148,7 @@ __all__ = [
     "_MATCH_AXES_KEYS",
     "_PER_OFFER_SCHEMA",
     "_SCORING_RULES",
+    "_TITLE_DOMAIN",
     "_analysis_prompt",
     "_apply_geo_eligibility",
     "_apply_grade_requirement",
@@ -181,9 +187,11 @@ __all__ = [
     "analyze_offers_batch",
     "enforce_hard_requirements",
     "hard_block_reason",
+    "is_bait_posting",
     "is_unevaluated",
     "pre_filtro",
     "run_scan",
+    "title_off_topic",
 ]
 
 log = get_logger(__name__)
@@ -783,9 +791,10 @@ def run_scan(
     # wastes an LLM scoring call. Conservative: zero-overlap only.
     _summary = profile.get("summary_json") if profile else None
     _skills = _summary.get("skills") if isinstance(_summary, dict) else None
-    relevance_vocab = _DOMAIN_VOCAB | (
+    skill_tokens = (
         _tokenize(" ".join(str(s) for s in _skills)) if isinstance(_skills, list) else set()
     )
+    relevance_vocab = _DOMAIN_VOCAB | skill_tokens
 
     linkedin_url = db.get_preference("linkedin_url", "")
     if linkedin_url:
@@ -890,6 +899,9 @@ def run_scan(
     # completely different actions from the user.
     motivi_non_valutati: dict[str, int] = {}
     totale_scartati = 0
+    # Counted separately so a new filter can be judged on its own: how much it
+    # cut, and (from the log lines it writes) what exactly it cut.
+    scartati_per_titolo = 0
     new_flags_cleared = False
 
     def _finalize_scored(item: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
@@ -1146,6 +1158,26 @@ def run_scan(
             # they want to see what THIS company posts, and the vocabulary check
             # would drop a language-data role at RWS for not sounding technical.
             # The hard blockers (geo, degree grade, pay) still apply downstream.
+            # Not a job at all — a lead-capture form. Dropped before anything
+            # else: there is no role to judge, and one of these scored 8/10.
+            if is_bait_posting(titolo):
+                totale_scartati += 1
+                log.info("BAIT_SKIP: '%s' @ %s (not a position)", titolo, azienda)
+                continue
+
+            # First gate: does the TITLE name a trade the candidate practises?
+            # The description gate below only ever fired on zero overlap, which
+            # no corporate ad reaches — "data", "software" and "cloud" are in
+            # every one of them. Measured on a real scan: 26 of 47 postings were
+            # off-domain from the title alone, and 11 of those still scored >=6.
+            if not watched and title_off_topic(titolo, skill_tokens):
+                totale_scartati += 1
+                scartati_per_titolo += 1
+                # Logged with the title: a new filter has to be auditable, or a
+                # false negative is invisible by construction.
+                log.info("RELEVANCE_SKIP (title): '%s' @ %s", titolo, azienda)
+                continue
+
             desc_sufficient = len(descrizione) >= MIN_DESCRIPTION_CHARS
             gate_text = f"{titolo} {descrizione}" if desc_sufficient else titolo
             if (
@@ -1347,6 +1379,7 @@ def run_scan(
             max(motivi_non_valutati.items(), key=lambda kv: kv[1])[0] if motivi_non_valutati else ""
         ),
         "totale_scartati": totale_scartati,
+        "scartati_per_titolo": scartati_per_titolo,
         "archiviati": archiviati,
         "duration_ms": duration_ms,
         "percent": 100,

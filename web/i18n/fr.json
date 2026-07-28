@@ -233,7 +233,9 @@
       "salaryLong": "La rémunération annoncée est inférieure à ton minimum",
       "shortDesc": "Description courte",
       "heuristic": "Estimation locale",
-      "notEvaluated": "Non évaluée"
+      "notEvaluated": "Non évaluée",
+      "aggregator": "Agrégateur",
+      "aggregatorLong": "Republiée par un agrégateur : l'entreprise affichée n'est pas celle qui recrute"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
@@ -487,7 +489,8 @@
     },
     "postScanRenderFailed": "Scan terminé (résumé non affichable).",
     "volumeWarning": "Grande recherche ({n} requêtes) — cela peut prendre du temps.",
-    "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages."
+    "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages.",
+    "vagueTermWarning": "« {terms} » : un intitulé générique ramène de tout (paie, ventes, partenariats). Ajoutez un mot de domaine, par ex. « AI QA »."
   },
   "toast": {
     "enterKeyOrProvider": "Entrez au moins une clé ou choisissez un fournisseur principal.",

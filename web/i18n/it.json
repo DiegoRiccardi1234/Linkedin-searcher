@@ -233,7 +233,9 @@
       "salaryLong": "La retribuzione dichiarata è sotto la minima che hai impostato",
       "shortDesc": "Descrizione breve",
       "heuristic": "Stima locale",
-      "notEvaluated": "Da valutare"
+      "notEvaluated": "Da valutare",
+      "aggregator": "Aggregatore",
+      "aggregatorLong": "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",
@@ -487,7 +489,8 @@
     },
     "postScanRenderFailed": "Scansione completata (riepilogo non mostrabile).",
     "volumeWarning": "Scan ampio ({n} ricerche) — potrebbe richiedere un po'.",
-    "quotaReached": "Il budget di richieste di oggi è esaurito — lo scan si fermerebbe a metà. Si azzera a mezzanotte UTC, oppure alza il limite nelle Impostazioni."
+    "quotaReached": "Il budget di richieste di oggi è esaurito — lo scan si fermerebbe a metà. Si azzera a mezzanotte UTC, oppure alza il limite nelle Impostazioni.",
+    "vagueTermWarning": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola di dominio, es. «AI QA»."
   },
   "toast": {
     "enterKeyOrProvider": "Inserisci almeno una chiave o scegli un provider primario.",

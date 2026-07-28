@@ -233,7 +233,9 @@
       "salaryLong": "Die angegebene Vergütung liegt unter deinem Minimum",
       "shortDesc": "Kurze Beschreibung",
       "heuristic": "Lokale Schätzung",
-      "notEvaluated": "Nicht bewertet"
+      "notEvaluated": "Nicht bewertet",
+      "aggregator": "Aggregator",
+      "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
@@ -487,7 +489,8 @@
     },
     "postScanRenderFailed": "Scan fertig (Zusammenfassung nicht darstellbar).",
     "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern.",
-    "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen."
+    "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen.",
+    "vagueTermWarning": "„{terms}“: Ein bloßes Rollenwort trifft auf alles zu (Payroll, Vertrieb, Partnerschaften). Ergänze ein Fachwort, z. B. „AI QA“."
   },
   "toast": {
     "enterKeyOrProvider": "Gib mindestens einen Schlüssel ein oder wähle einen primären Anbieter.",

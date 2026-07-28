@@ -106,6 +106,25 @@ export function applyScanConfig(cfg) {
   if (sal) sal.value = cfg.min_salary ? String(cfg.min_salary) : "";
 }
 
+// Role words that match anything on a job board. "AI Specialist" alone returned
+// 27 of 47 postings on a real scan and nearly all of its noise, because
+// "Specialist" also names payroll, sales and partnership roles. The scan runs
+// anyway — this is a lesson, not a gate, and it belongs where the mistake is made.
+const _VAGUE_TERMS = new Set([
+  "specialist", "consultant", "consulente", "analyst", "analista", "engineer",
+  "ingegnere", "developer", "sviluppatore", "manager", "coordinator", "coordinatore",
+  "operatore", "operator", "assistant", "assistente", "junior", "senior", "stage",
+  "tirocinio", "internship",
+]);
+
+function warnAboutVagueTerms(tags) {
+  const vague = (tags || []).filter((tag) => {
+    const words = String(tag).trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return words.length === 1 && _VAGUE_TERMS.has(words[0]);
+  });
+  if (vague.length) showToast(t("scan.vagueTermWarning", { terms: vague.join(", ") }), "info");
+}
+
 async function _onScanSubmit(event) {
   event.preventDefault();
 
@@ -119,6 +138,7 @@ async function _onScanSubmit(event) {
 
   // Add any pending typed text that wasn't entered
   const kwInputRaw = document.getElementById("keywordsInput").value.trim();
+  // (see warnAboutVagueTerms below — a bare role word is where the noise starts)
   if (kwInputRaw) {
     getKeywords.addMultiple([kwInputRaw]);
     document.getElementById("keywordsInput").value = '';
@@ -130,6 +150,7 @@ async function _onScanSubmit(event) {
   }
 
   const termsText = getKeywords.getTags().join(", ");
+  warnAboutVagueTerms(getKeywords.getTags());
   const siteCheckboxes = document.querySelectorAll('input[name="scanSites"]:checked');
   const selectedSites = Array.from(siteCheckboxes).map(cb => cb.value);
   const isRemote = document.getElementById("remoteToggle")?.checked || false;
