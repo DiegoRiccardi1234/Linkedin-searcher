@@ -1331,6 +1331,12 @@ pre {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* Icon + name + "Free" badge + "Set as primary" do not fit a ~280px card in
+     Italian or German. Without wrapping, the name is the item that gives way:
+     it has flex-basis 0, and the card's global `min-width: 0` +
+     `overflow-wrap: anywhere` (styles/chat.css) then break it one letter per
+     line instead of overflowing visibly. */
+  flex-wrap: wrap;
 }
 .provider-card-icon {
   font-size: 1.4rem;
@@ -1338,7 +1344,12 @@ pre {
 }
 .provider-card-title {
   margin: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1rem;
   font-weight: 600;
 }
@@ -1346,6 +1357,8 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 0.75rem;
   cursor: pointer;
   color: var(--text-muted);
@@ -2697,18 +2710,22 @@ pre {
 .model-picker-pop {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
   display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.4fr);
+  /* Constrain the row track, or it is sized on max-content: with a provider
+     exposing hundreds of models the track is thousands of px tall, max-height
+     clips it and the list inside never overflows itself — so it never scrolls. */
+  grid-template-rows: minmax(0, 1fr); grid-auto-rows: minmax(0, 1fr);
   width: min(30rem, 92vw); max-height: 22rem; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-md); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 .model-picker-pop.hidden { display: none; }
-.mp-col { display: flex; flex-direction: column; min-height: 0; }
+.mp-col { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .mp-col + .mp-col { border-left: 1px solid var(--border); }
 .mp-col-title {
   padding: 0.5rem 0.7rem; font-size: var(--fs-xs); font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.55;
 }
-.mp-list { overflow-y: auto; padding: 0 0.3rem 0.4rem; }
+.mp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0.3rem 0.4rem; }
 .mp-row {
   display: flex; align-items: center; gap: 0.4rem; width: 100%;
   padding: 0.4rem 0.55rem; border: none; background: none; color: var(--text);
@@ -3015,6 +3032,8 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
   background: rgba(0, 135, 90, 0.14); color: var(--success);
   border: 1px solid rgba(0, 135, 90, 0.3); border-radius: 999px;
   padding: 1px 8px; margin-left: auto; margin-right: var(--space-2);
+  /* Same guard as .status-pill: a pill that shrinks is a circle with a broken word. */
+  flex: 0 0 auto; white-space: nowrap;
 }
 .provider-hint { color: var(--text-muted); margin: 0 0 var(--space-2); }
 .provider-signup { display: inline-block; margin-top: 4px; }
