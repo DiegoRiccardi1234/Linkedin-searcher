@@ -32,14 +32,24 @@ LIMIT_PREFERENCE = "daily_request_limit"
 MIN_HEADROOM = 20
 
 
+#: Providers whose calls do NOT count against the daily budget. The ceiling
+#: models a shared, throttled free tier; a model running on the user's own
+#: machine (Ollama, LM Studio, a self-hosted gateway — all of them reach the app
+#: as the ``custom`` provider) has no such cap. Counting those calls would let a
+#: local scan, which costs nothing and leaves the machine at no point, exhaust a
+#: budget that exists to protect a cloud account.
+_UNMETERED_PROVIDERS = ("custom",)
+
+
 def requests_today(db: Any) -> int:
-    """LLM requests recorded since midnight UTC. 0 when the log is unreadable."""
+    """Metered LLM requests since midnight UTC. 0 when the log is unreadable."""
     try:
         conn = db._get_connection() if hasattr(db, "_get_connection") else db.conn
         floor = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        placeholders = ", ".join("?" for _ in _UNMETERED_PROVIDERS)
         row = conn.execute(
-            "SELECT COUNT(*) FROM usage_log WHERE ts >= ?",
-            (floor.isoformat(timespec="seconds"),),
+            f"SELECT COUNT(*) FROM usage_log WHERE ts >= ? AND provider NOT IN ({placeholders})",
+            (floor.isoformat(timespec="seconds"), *_UNMETERED_PROVIDERS),
         ).fetchone()
         return int(row[0] if row else 0)
     except Exception as exc:  # pragma: no cover - defensive
@@ -87,6 +97,10 @@ def blocks_scan(db: Any) -> str | None:
     used = requests_today(db)
     if used >= limit:
         return f"daily_limit_reached:{used}/{limit}"
-    if limit - used < MIN_HEADROOM:
+    # The headroom check only makes sense above the headroom itself: with a
+    # ceiling of 10 the "not worth starting" rule would fire on an untouched
+    # budget and no scan could ever run. Now that the ceiling is editable from
+    # the UI, someone will set a small one.
+    if limit > MIN_HEADROOM and limit - used < MIN_HEADROOM:
         return f"daily_limit_near:{used}/{limit}"
     return None

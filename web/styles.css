@@ -3026,6 +3026,23 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 .usage-quota-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
 .usage-quota-track { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; }
 .usage-quota-fill { height: 100%; background: var(--accent); }
+.usage-quota-edit {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap;
+}
+.usage-quota-edit input {
+  width: 6rem; padding: 0.2rem 0.4rem; border: 1px solid var(--border);
+  border-radius: 0.4rem; background: inherit; color: inherit; font-size: var(--fs-sm);
+}
+
+/* Provider track record, from usage_log: free, and it survives a restart */
+.provider-health { margin-bottom: var(--space-3); }
+.provider-health-title { font-weight: 600; opacity: 0.7; margin-bottom: 4px; }
+.provider-health-row {
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  padding: 2px 0; font-size: var(--fs-sm);
+}
+.provider-health-row > span:last-child { color: var(--text-muted); text-align: right; }
 
 /* Provider cards: what a provider costs, and where to get a key */
 .provider-free-badge {

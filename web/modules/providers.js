@@ -16,6 +16,39 @@ export function setProviderDeps(d) {
   _deps = { ..._deps, ...d };
 }
 
+// Track record per provider, read from usage_log — free, no inference, and it
+// survives a restart. Without it a provider that fails every scoring call looks
+// exactly like one that works: the only clue was a scan full of unscored jobs.
+export async function loadProviderHealth() {
+  const box = document.getElementById("providerHealth");
+  if (!box) return;
+  let providers = [];
+  try {
+    ({ providers = [] } = await api("/api/providers/health"));
+  } catch {
+    box.innerHTML = "";
+    return; // a diagnostics panel must never be the thing that breaks the page
+  }
+  if (!providers.length) {
+    box.innerHTML = "";
+    return;
+  }
+  const rows = providers
+    .map((p) => {
+      const rate = Math.round((p.success_rate || 0) * 100);
+      const icon = rate >= 80 ? "✅" : rate >= 40 ? "⚠️" : "❌";
+      const worst = (p.models || []).find((m) => m.unfit);
+      const note = worst ? ` · ${escapeHtml(truncate(worst.model, 28))} ${t("settings.providers.healthUnfit")}` : "";
+      return (
+        `<div class="provider-health-row"><span>${icon} ${escapeHtml(p.provider)}</span>` +
+        `<span class="micro">${rate}% · ${p.calls} ${t("settings.providers.scoreboardCalls")}${note}</span></div>`
+      );
+    })
+    .join("");
+  box.innerHTML =
+    `<div class="micro provider-health-title">${t("settings.providers.healthTitle")}</div>${rows}`;
+}
+
 const PROVIDER_KEY_IDS = ["cerebrasKey", "groqKey", "openaiKey", "anthropicKey", "googleKey", "openrouterKey", "deepseekKey", "xaiKey", "glmKey", "mistralKey"];
 
 // `free`/`signup`/`hint` exist because the card said nothing about what a

@@ -261,6 +261,13 @@ async function _onScanSubmit(event) {
         const line = t("scan.analyzed", { title: j.titolo || "?", company: j.azienda || "?", score: label });
         setProgress(pct, eta ? `${line} · ${t("scan.progress.eta") || "ETA"} ${eta}` : line);
         appendFeed(unscored ? "help" : "check_circle", t("scan.feedAnalyzed", { title: escHtml(j.titolo || "?"), company: escHtml(j.azienda || "?") }), { label, cls });
+      } else if (data.status === "warning") {
+        // Something is wrong NOW: the provider is down, throttled or out of
+        // budget. Said mid-run, it is still actionable.
+        const why = t(`postScan.unscoredWhy.${data.reason || ""}`) || "";
+        const msg = `${t("scan.unscoredWarning", { count: data.count || 0 })} ${why}`.trim();
+        appendFeed("warning", escHtml(msg));
+        showToast(msg, "info");
       } else if (data.status === "complete") {
         setProgress(100, t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));
         appendFeed("task_alt", t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));

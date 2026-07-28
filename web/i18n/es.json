@@ -325,7 +325,9 @@
       "getKey": "Consigue una clave gratis",
       "endpoint": "Endpoint (URL base)",
       "apiKeyOptional": "Clave API (opcional)",
-      "showHide": "Mostrar / ocultar"
+      "showHide": "Mostrar / ocultar",
+      "healthTitle": "Cómo van (últimos 14 días)",
+      "healthUnfit": "poco fiable"
     },
     "features": {
       "title": "Automatización",
@@ -369,6 +371,10 @@
       "densityNormal": "Normal",
       "densityCompact": "Compacta",
       "densitySaved": "Densidad actualizada"
+    },
+    "usage": {
+      "limitLabel": "Límite de peticiones al día (0 = sin límite)",
+      "limitSaved": "Límite diario actualizado."
     }
   },
   "coach": {
@@ -490,7 +496,8 @@
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
     "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
     "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes.",
-    "vagueTermWarning": "«{terms}»: un rol genérico solo devuelve de todo (nóminas, ventas, alianzas). Añade una palabra de dominio, p. ej. «AI QA»."
+    "vagueTermWarning": "«{terms}»: un rol genérico solo devuelve de todo (nóminas, ventas, alianzas). Añade una palabra de dominio, p. ej. «AI QA».",
+    "unscoredWarning": "{count} ofertas sin evaluar hasta ahora."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",

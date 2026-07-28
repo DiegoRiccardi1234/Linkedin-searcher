@@ -325,7 +325,9 @@
       "getKey": "Prendi una chiave gratis",
       "endpoint": "Endpoint (base URL)",
       "apiKeyOptional": "Chiave API (facoltativa)",
-      "showHide": "Mostra / nascondi"
+      "showHide": "Mostra / nascondi",
+      "healthTitle": "Come stanno andando (ultimi 14 giorni)",
+      "healthUnfit": "non affidabile"
     },
     "features": {
       "title": "Automazione",
@@ -369,6 +371,10 @@
       "densityNormal": "Normale",
       "densityCompact": "Compatta",
       "densitySaved": "Densità aggiornata"
+    },
+    "usage": {
+      "limitLabel": "Limite richieste al giorno (0 = nessun limite)",
+      "limitSaved": "Limite giornaliero aggiornato."
     }
   },
   "coach": {
@@ -490,7 +496,8 @@
     "postScanRenderFailed": "Scansione completata (riepilogo non mostrabile).",
     "volumeWarning": "Scan ampio ({n} ricerche) — potrebbe richiedere un po'.",
     "quotaReached": "Il budget di richieste di oggi è esaurito — lo scan si fermerebbe a metà. Si azzera a mezzanotte UTC, oppure alza il limite nelle Impostazioni.",
-    "vagueTermWarning": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola di dominio, es. «AI QA»."
+    "vagueTermWarning": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola di dominio, es. «AI QA».",
+    "unscoredWarning": "{count} offerte non valutate finora."
   },
   "toast": {
     "enterKeyOrProvider": "Inserisci almeno una chiave o scegli un provider primario.",

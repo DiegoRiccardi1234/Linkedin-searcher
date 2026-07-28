@@ -732,6 +732,10 @@
         <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">key</span> <span data-i18n="settings.providers.title">AI Providers</span></h3>
           <p class="micro" data-i18n="settings.providers.subtitle">Add an API key for each provider you want to use, then pick one as primary.</p>
+          <!-- What each provider has actually done lately, read from usage_log:
+               free, no inference. A provider failing every call used to look
+               exactly like a working one. -->
+          <div id="providerHealth" class="provider-health"></div>
           <div id="providerCards" class="provider-grid"></div>
           <select id="primaryProvider" class="hidden" aria-hidden="true">
             <option value=""></option>

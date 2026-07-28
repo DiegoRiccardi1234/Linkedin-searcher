@@ -193,6 +193,36 @@ def build_router(container: AppContainer) -> APIRouter:
             container.db.set_preference(f"model_probe_{name}", json.dumps(payload))
         return {"ok": True, "provider": name, **payload}
 
+    @router.get("/api/providers/health")
+    def providers_health(days: int = 14) -> dict[str, Any]:
+        """What each provider has actually done lately, read from ``usage_log``.
+
+        Free and instant: no inference, no network — the same records the model
+        ranking already uses to de-rank a model that truncates or answers
+        garbage. It existed only inside the "Test models" report, so a provider
+        silently failing every scoring call looked exactly like a working one.
+        """
+        records = scoreboard(container.db, endpoint=None, days=max(1, min(days, 90)))
+        by_provider: dict[str, dict[str, Any]] = {}
+        for record in records:
+            entry = by_provider.setdefault(
+                record.provider,
+                {"provider": record.provider, "calls": 0, "successes": 0, "models": []},
+            )
+            entry["calls"] += record.calls
+            entry["successes"] += record.successes
+            entry["models"].append(record.as_dict())
+        for entry in by_provider.values():
+            entry["models"] = entry["models"][:5]
+            entry["success_rate"] = (
+                round(entry["successes"] / entry["calls"], 3) if entry["calls"] else 0.0
+            )
+        return {
+            "days": days,
+            # Busiest first: that is where a failure costs the most.
+            "providers": sorted(by_provider.values(), key=lambda e: e["calls"], reverse=True),
+        }
+
     # ── Local models: what this machine can run, and what it already has ─────
 
     @router.get("/api/local/status")

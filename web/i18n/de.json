@@ -325,7 +325,9 @@
       "getKey": "Kostenlosen Schlüssel holen",
       "endpoint": "Endpunkt (Basis-URL)",
       "apiKeyOptional": "API-Schlüssel (optional)",
-      "showHide": "Anzeigen / verbergen"
+      "showHide": "Anzeigen / verbergen",
+      "healthTitle": "Wie sie laufen (letzte 14 Tage)",
+      "healthUnfit": "unzuverlässig"
     },
     "features": {
       "title": "Automatisierung",
@@ -369,6 +371,10 @@
       "densityNormal": "Normal",
       "densityCompact": "Kompakt",
       "densitySaved": "Dichte aktualisiert"
+    },
+    "usage": {
+      "limitLabel": "Tägliches Anfragelimit (0 = kein Limit)",
+      "limitSaved": "Tägliches Limit aktualisiert."
     }
   },
   "coach": {
@@ -490,7 +496,8 @@
     "postScanRenderFailed": "Scan fertig (Zusammenfassung nicht darstellbar).",
     "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern.",
     "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen.",
-    "vagueTermWarning": "„{terms}“: Ein bloßes Rollenwort trifft auf alles zu (Payroll, Vertrieb, Partnerschaften). Ergänze ein Fachwort, z. B. „AI QA“."
+    "vagueTermWarning": "„{terms}“: Ein bloßes Rollenwort trifft auf alles zu (Payroll, Vertrieb, Partnerschaften). Ergänze ein Fachwort, z. B. „AI QA“.",
+    "unscoredWarning": "{count} Angebote bisher nicht bewertet."
   },
   "toast": {
     "enterKeyOrProvider": "Gib mindestens einen Schlüssel ein oder wähle einen primären Anbieter.",

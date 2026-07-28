@@ -14,12 +14,15 @@ An offer nobody read no longer gets a score.
 - **The scan summary distinguishes judged from unjudged** — "36 analysed" used to include offers nobody had read. It now reports how many were left to evaluate, why (rate limit, quota, unusable answer, no description) and what would fix it.
 
 ### Added
+- **The app says when a provider is failing, while it is failing.** Three unjudged offers in a row and the scan says so mid-run, with the reason and what would fix it, instead of letting you find out ten minutes later. Settings now also shows, per provider, what it has actually done over the last fortnight — how many calls, how many usable answers, which model is unreliable. It is read from the usage log: free, no inference, and it survives a restart. That record existed, but only inside the "Test models" report, so a provider failing every scoring call looked exactly like a working one.
 - **"Re-evaluate with AI" on a single offer.** Until now a job could only be scored while it was being created or during a scan, so an offer left unjudged because the provider was throttled stayed that way until the same posting turned up again — which, for an expired ad, never happens. When the posting itself is the problem (almost no text), the button is replaced by an invitation to open the ad: another model call would come back just as empty.
 
 ### Fixed
 - **Provider names are readable again** — in Settings each provider card showed its name one letter per line, with the "Free" badge squeezed into a circle. The badge added in 1.7.8 pushed an already-full header past its width, and the name was the part that gave way.
 - **The model picker scrolls** — with a provider exposing hundreds of models the list was cut off with no way to reach the rest, and the provider column silently hid its last three entries.
 - **The chat no longer reads an unjudged offer as a zero** — it received `Score: None/10` in its context, which a model interprets as the worst possible match.
+- **A model running on your own PC no longer eats the daily budget** — the ceiling exists to protect a shared cloud free tier, but every call was counted, so a local scan that spends nothing and leaves the machine at no point could still exhaust it and refuse to start.
+- **The daily request limit can finally be changed** — it could stop a scan outright, and it was writable neither through the API nor from any screen: the only remedy was editing the database by hand. It now sits under the usage bar. A small ceiling also no longer blocks an untouched budget (with a limit of 10, the "not worth starting" rule fired at zero requests used).
 
 ## [1.7.8] — 2026-07-27
 

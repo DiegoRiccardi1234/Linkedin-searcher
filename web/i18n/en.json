@@ -325,7 +325,9 @@
       "getKey": "Get a free key",
       "endpoint": "Endpoint (base URL)",
       "apiKeyOptional": "API key (optional)",
-      "showHide": "Show / hide"
+      "showHide": "Show / hide",
+      "healthTitle": "How they are doing (last 14 days)",
+      "healthUnfit": "unreliable"
     },
     "features": {
       "title": "Automation",
@@ -369,6 +371,10 @@
       "densityNormal": "Normal",
       "densityCompact": "Compact",
       "densitySaved": "Density updated"
+    },
+    "usage": {
+      "limitLabel": "Daily request limit (0 = no limit)",
+      "limitSaved": "Daily limit updated."
     }
   },
   "coach": {
@@ -490,7 +496,8 @@
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
     "volumeWarning": "Large scan ({n} searches) — this may take a while.",
     "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings.",
-    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a domain word, e.g. “AI QA”."
+    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a domain word, e.g. “AI QA”.",
+    "unscoredWarning": "{count} offers unevaluated so far."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",

@@ -325,7 +325,9 @@
       "getKey": "Obtenir une clé gratuite",
       "endpoint": "Point d'accès (URL de base)",
       "apiKeyOptional": "Clé API (facultative)",
-      "showHide": "Afficher / masquer"
+      "showHide": "Afficher / masquer",
+      "healthTitle": "Comment ils se portent (14 derniers jours)",
+      "healthUnfit": "peu fiable"
     },
     "features": {
       "title": "Automatisation",
@@ -369,6 +371,10 @@
       "densityNormal": "Normale",
       "densityCompact": "Compacte",
       "densitySaved": "Densité mise à jour"
+    },
+    "usage": {
+      "limitLabel": "Limite de requêtes par jour (0 = aucune limite)",
+      "limitSaved": "Limite quotidienne mise à jour."
     }
   },
   "coach": {
@@ -490,7 +496,8 @@
     "postScanRenderFailed": "Scan terminé (résumé non affichable).",
     "volumeWarning": "Grande recherche ({n} requêtes) — cela peut prendre du temps.",
     "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages.",
-    "vagueTermWarning": "« {terms} » : un intitulé générique ramène de tout (paie, ventes, partenariats). Ajoutez un mot de domaine, par ex. « AI QA »."
+    "vagueTermWarning": "« {terms} » : un intitulé générique ramène de tout (paie, ventes, partenariats). Ajoutez un mot de domaine, par ex. « AI QA ».",
+    "unscoredWarning": "{count} offres non évaluées jusqu'ici."
   },
   "toast": {
     "enterKeyOrProvider": "Entrez au moins une clé ou choisissez un fournisseur principal.",

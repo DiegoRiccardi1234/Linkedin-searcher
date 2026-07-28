@@ -439,6 +439,12 @@ _UNEVALUATED_BUCKETS = (
 )
 
 
+#: How many unjudged offers before the scan says so out loud. Three in a row is
+#: no longer a hiccup: something is down, and the user can act on it now (turn
+#: the local model on, add a free key) instead of at the end of a ten-minute run.
+_UNSCORED_WARN_AFTER = 3
+
+
 def _unevaluated_reason(analysis: dict[str, Any]) -> str:
     """Which situation left this offer unjudged, as a stable code."""
     raw = str(analysis.get("motivo_non_valutazione") or "").lower()
@@ -902,6 +908,7 @@ def run_scan(
     # Counted separately so a new filter can be judged on its own: how much it
     # cut, and (from the log lines it writes) what exactly it cut.
     scartati_per_titolo = 0
+    warned_unscored = False
     new_flags_cleared = False
 
     def _finalize_scored(item: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
@@ -1305,6 +1312,22 @@ def run_scan(
                             totale_non_valutati += 1
                             _bucket = _unevaluated_reason(result["analysis"])
                             motivi_non_valutati[_bucket] = motivi_non_valutati.get(_bucket, 0) + 1
+                            # Say it while it is happening. A scan takes ten
+                            # minutes, and finding out at the end that the
+                            # provider was down the whole time is ten minutes
+                            # spent for nothing.
+                            if (
+                                totale_non_valutati >= _UNSCORED_WARN_AFTER
+                                and not warned_unscored
+                                and _bucket != "descrizione_breve"
+                            ):
+                                warned_unscored = True
+                                yield {
+                                    "status": "warning",
+                                    "code": "unscored_streak",
+                                    "reason": _bucket,
+                                    "count": totale_non_valutati,
+                                }
                         else:
                             totale_analizzati += 1
                         pair_analyzed += 1
