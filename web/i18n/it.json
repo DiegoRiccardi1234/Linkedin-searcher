@@ -884,6 +884,8 @@
     "couldAlsoRun": "Questo computer potrebbe anche far girare:",
     "download": "Scarica",
     "pullStarting": "Avvio il download di {model}…",
-    "pullDone": "{model} è pronto"
+    "pullDone": "{model} è pronto",
+    "qualityIntact": "qualità quasi intatta",
+    "fromHub": "Popolari su Hugging Face e compatibili con la tua scheda:"
   }
 }

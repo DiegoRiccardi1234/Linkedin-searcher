@@ -884,6 +884,8 @@
     "couldAlsoRun": "Este equipo también podría ejecutar:",
     "download": "Descargar",
     "pullStarting": "Iniciando la descarga de {model}…",
-    "pullDone": "{model} está listo"
+    "pullDone": "{model} está listo",
+    "qualityIntact": "calidad casi intacta",
+    "fromHub": "Populares en Hugging Face y compatibles con tu tarjeta:"
   }
 }

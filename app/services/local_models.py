@@ -36,11 +36,81 @@ log = get_logger(__name__)
 OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_OPENAI_BASE = f"{OLLAMA_HOST}/v1"
 
-#: A quantised (Q4) model needs roughly 0.6 GB of VRAM per billion parameters,
-#: plus room for the context window. Rounded up from measurements rather than
-#: theory: a 12B Q4 occupies ~7 GB on disk and ~8.5 GB loaded with a 8k context.
-_GB_PER_B_Q4 = 0.62
+#: Bytes per parameter, by quantisation. What a model costs in VRAM is decided
+#: by how its weights are stored, and the app used to assume Q4 for everything:
+#: an FP16 build was reported as fitting a card three times too small, and a Q8
+#: as needing twice its actual room. Values are the measured file-size ratios,
+#: not the theoretical bit widths (a "4-bit" GGUF carries scales, and its
+#: embedding and output layers stay larger).
+_BYTES_PER_PARAM = {
+    "F32": 4.0,
+    "F16": 2.0,
+    "BF16": 2.0,
+    "Q8_0": 1.05,
+    "Q6_K": 0.80,
+    "Q5_K_M": 0.68,
+    "Q4_K_M": 0.58,
+    "Q4_0": 0.58,
+    "QAT-INT4": 0.50,
+    "Q3_K_M": 0.48,
+    "Q2_K": 0.37,
+}
+
+#: What each level costs in ANSWER quality, roughly, against the unquantised
+#: model. Not decoration: a Q2 build "fits" a small card and then scores jobs
+#: badly, which is worse than not offering it. Quantisation-aware training
+#: recovers most of the int4 loss, so a QAT build is close to a Q6 in quality at
+#: Q4 size — which is why the model already on this machine is the right one.
+_QUALITY_PENALTY = {
+    "F32": 0,
+    "F16": 0,
+    "BF16": 0,
+    "Q8_0": 0,
+    "Q6_K": -1,
+    "QAT-INT4": -2,
+    "Q5_K_M": -2,
+    "Q4_K_M": -5,
+    "Q4_0": -5,
+    "Q3_K_M": -8,
+    "Q2_K": -12,
+}
+
+#: What Ollama serves when a tag says nothing about quantisation.
+DEFAULT_QUANT = "Q4_K_M"
+
 _CONTEXT_OVERHEAD_GB = 1.5
+
+
+def quant_of(tag: str) -> str:
+    """The quantisation a model tag advertises, or the Ollama default.
+
+    Tags name it in every possible way — ``:Q8_0``, ``-qat-``, ``UD-Q4_K_XL``,
+    ``-f16`` — so this reads the name rather than trusting a convention.
+    """
+    name = (tag or "").upper().replace("_", "_")
+    if "QAT" in name:
+        return "QAT-INT4"
+    # Longest first: Q4_K_M must win over Q4_0's prefix, and UD-Q4_K_XL over Q4.
+    for level in ("Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q4_K_XL", "Q4_0", "Q3_K_M", "Q2_K"):
+        if level in name:
+            return "Q4_K_M" if level == "Q4_K_XL" else level
+    # "FP16" does not contain "F16": check the spelled-out forms too, or a
+    # half-precision build is silently costed as a Q4 and reported as fitting.
+    for level, aliases in (("BF16", ("BF16",)), ("F16", ("F16", "FP16")), ("F32", ("F32", "FP32"))):
+        if any(alias in name for alias in aliases):
+            return level
+    return DEFAULT_QUANT
+
+
+def vram_needed_gb(params_b: float, quant: str = DEFAULT_QUANT) -> float:
+    """VRAM a model of this size and quantisation needs, context included."""
+    per_param = _BYTES_PER_PARAM.get(quant, _BYTES_PER_PARAM[DEFAULT_QUANT])
+    return round(params_b * per_param + _CONTEXT_OVERHEAD_GB, 1)
+
+
+def quality_penalty(quant: str) -> int:
+    """How much answer quality this quantisation costs, roughly (0 = none)."""
+    return _QUALITY_PENALTY.get(quant, _QUALITY_PENALTY[DEFAULT_QUANT])
 
 
 @dataclass
@@ -143,10 +213,10 @@ def detect_hardware() -> Hardware:
     )
 
 
-def _fits(vram_gb: float) -> int:
-    """Largest parameter count (in billions) that fits in ``vram_gb`` at Q4."""
+def _fits(vram_gb: float, quant: str = DEFAULT_QUANT) -> int:
+    """Largest parameter count (in billions) that fits ``vram_gb`` at ``quant``."""
     usable = max(0.0, vram_gb - _CONTEXT_OVERHEAD_GB)
-    return int(usable / _GB_PER_B_Q4)
+    return int(usable / _BYTES_PER_PARAM.get(quant, _BYTES_PER_PARAM[DEFAULT_QUANT]))
 
 
 #: Ollama tags worth suggesting, smallest first. Deliberately short and all from
@@ -176,7 +246,15 @@ def recommend(hardware: Hardware) -> Recommendation:
         )
     ceiling = _fits(hardware.vram_gb)
     usable = [
-        {"tag": tag, "params_b": str(size), "note": note}
+        {
+            "tag": tag,
+            "params_b": str(size),
+            "note": note,
+            "quant": quant_of(tag),
+            # What it will actually take on this card, so "fits" is a figure and
+            # not a promise.
+            "vram_gb": str(vram_needed_gb(size, quant_of(tag))),
+        }
         for size, tag, note in _CANDIDATES
         if size <= ceiling
     ]
@@ -299,12 +377,15 @@ def _family_of(name: str) -> str:
     return next((f for f in _FAMILIES if f in lowered), "")
 
 
-def already_usable(models: list[dict[str, Any]], ceiling_b: int) -> list[dict[str, Any]]:
+def already_usable(
+    models: list[dict[str, Any]], ceiling_b: int, vram_ceiling_gb: float = 0.0
+) -> list[dict[str, Any]]:
     """Downloaded models that fit this machine, best-first.
 
     A model already on disk beats a better one that is not: it costs no download
     and it is what the user actually chose. Sizes are read from the tag, which is
-    how Ollama names things — "gemma-4-12b-it-GGUF:Q4_K_M" is a 12B.
+    how Ollama names things — "gemma-4-12b-it-GGUF:Q4_K_M" is a 12B — and so is
+    the quantisation, which decides what it actually costs in VRAM.
     """
     from app.providers.model_selector import infer_size_b
 
@@ -312,14 +393,26 @@ def already_usable(models: list[dict[str, Any]], ceiling_b: int) -> list[dict[st
     for model in models:
         name = str(model.get("name") or "")
         size = infer_size_b(name)
-        if ceiling_b and size > ceiling_b:
-            continue  # would spill out of VRAM and crawl on the CPU
+        quant = quant_of(name)
+        # Judge on the real footprint when the card is known: the parameter
+        # ceiling assumes the default quantisation, and an FP16 12B does NOT fit
+        # a card that holds a Q4 12B. Fall back to the parameter ceiling when
+        # VRAM could not be read (no nvidia-smi), where it is all we have.
+        if size:
+            if vram_ceiling_gb > 0:
+                if vram_needed_gb(size, quant) > vram_ceiling_gb:
+                    continue  # would spill out of VRAM and crawl on the CPU
+            elif ceiling_b and size > ceiling_b:
+                continue
         usable.append(
             {
                 "name": name,
                 "params_b": size,
                 "size_gb": model.get("size_gb"),
                 "family": _family_of(name),
+                "quant": quant,
+                "vram_gb": vram_needed_gb(size, quant) if size else None,
+                "quality_penalty": quality_penalty(quant),
             }
         )
     # Bigger is better among the ones that fit; a model whose tag states no size
@@ -332,7 +425,7 @@ def snapshot() -> dict[str, Any]:
     hardware = detect_hardware()
     recommendation = recommend(hardware)
     status = ollama_status()
-    ready = already_usable(status["models"], recommendation.max_params_b)
+    ready = already_usable(status["models"], recommendation.max_params_b, hardware.vram_gb)
 
     # Mark a suggestion as covered when a downloaded model of the same family is
     # at least as big: suggesting gemma3:12b to someone who already has a 12B
@@ -349,15 +442,35 @@ def snapshot() -> dict[str, Any]:
     reco: dict[str, Any] = asdict(recommendation)
     if ready:
         best = ready[0]
+        # Naming the quantisation matters: a QAT build loses almost nothing to
+        # the unquantised model, so "you already have this" is not a compromise.
+        quality = (
+            " (quantizzazione QAT: qualita' quasi intatta)"
+            if best.get("quant") == "QAT-INT4"
+            else ""
+        )
         reco["reason"] = (
             f"{hardware.gpu_name} con {hardware.vram_gb} GB regge modelli fino a "
             f"~{recommendation.max_params_b}B quantizzati. Hai gia' {best['name']} "
-            f"({best['params_b']}B): puoi usarlo subito, senza scaricare nulla."
+            f"({best['params_b']}B, {best.get('quant')}, ~{best.get('vram_gb')} GB){quality}: "
+            "puoi usarlo subito, senza scaricare nulla."
         )
+    # What the wider world runs locally, filtered to this card. Optional by
+    # design: no network, no panel — the hand-written list still stands.
+    discovered: list[dict[str, Any]] = []
+    if hardware.vram_gb > 0:
+        try:
+            from app.services.hf_catalog import fetch_catalog, fits_this_machine
+
+            discovered = fits_this_machine(fetch_catalog(), hardware.vram_gb)
+        except Exception as exc:  # pragma: no cover - defensive
+            log.debug("hugging face suggestions skipped: %s", exc)
+
     return {
         "hardware": asdict(hardware),
         "recommendation": reco,
         "ollama": status,
         "ready": ready,
+        "discovered": discovered,
         "openai_base_url": OLLAMA_OPENAI_BASE,
     }

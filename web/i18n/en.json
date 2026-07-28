@@ -884,6 +884,8 @@
     "couldAlsoRun": "This machine could also run:",
     "download": "Download",
     "pullStarting": "Starting download of {model}…",
-    "pullDone": "{model} is ready"
+    "pullDone": "{model} is ready",
+    "qualityIntact": "quality nearly intact",
+    "fromHub": "Popular on Hugging Face and a fit for your card:"
   }
 }

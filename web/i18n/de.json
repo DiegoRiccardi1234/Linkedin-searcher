@@ -884,6 +884,8 @@
     "couldAlsoRun": "Dieser Rechner könnte auch ausführen:",
     "download": "Herunterladen",
     "pullStarting": "Download von {model} wird gestartet…",
-    "pullDone": "{model} ist bereit"
+    "pullDone": "{model} ist bereit",
+    "qualityIntact": "Qualität nahezu unverändert",
+    "fromHub": "Beliebt auf Hugging Face und passend für deine Karte:"
   }
 }
