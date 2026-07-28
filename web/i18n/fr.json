@@ -886,6 +886,8 @@
     "pullStarting": "Démarrage du téléchargement de {model}…",
     "pullDone": "{model} est prêt",
     "qualityIntact": "qualité presque intacte",
-    "fromHub": "Populaires sur Hugging Face et compatibles avec votre carte :"
+    "fromHub": "Populaires sur Hugging Face et compatibles avec votre carte :",
+    "consentBody": "Pour vous dire quel modèle cette machine peut faire tourner, l'application doit lire la carte graphique, la mémoire vidéo et la RAM. Tout reste ici : rien n'est envoyé.",
+    "probe": "Analyser ce PC"
   }
 }

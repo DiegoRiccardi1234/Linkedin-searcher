@@ -758,6 +758,12 @@
         <article class="card-block card-block--wide" id="localModelsCard">
           <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>
           <p class="micro" data-i18n="local.subtitle">A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.</p>
+          <!-- Shown until the user allows the hardware probe. Reading someone's
+               GPU, RAM and Ollama install is asked for, never assumed. -->
+          <div id="localConsent" class="local-consent" hidden>
+            <p class="micro" data-i18n="local.consentBody">To tell you which model this machine can run, the app needs to read its graphics card, video memory and RAM. It runs here and nothing is sent anywhere.</p>
+            <button type="button" id="localProbeBtn" class="ghost-btn small"><span class="material-symbols-outlined">frame_inspect</span> <span data-i18n="local.probe">Check this PC</span></button>
+          </div>
           <div id="localHardware" class="local-hardware"></div>
           <p id="localVerdict" class="local-verdict"></p>
           <div id="localReady" class="local-ready"></div>

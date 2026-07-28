@@ -886,6 +886,8 @@
     "pullStarting": "Download von {model} wird gestartet…",
     "pullDone": "{model} ist bereit",
     "qualityIntact": "Qualität nahezu unverändert",
-    "fromHub": "Beliebt auf Hugging Face und passend für deine Karte:"
+    "fromHub": "Beliebt auf Hugging Face und passend für deine Karte:",
+    "consentBody": "Um zu sagen, welches Modell dieser Rechner schafft, muss die App Grafikkarte, Grafikspeicher und RAM auslesen. Das passiert hier: es wird nichts verschickt.",
+    "probe": "Diesen PC prüfen"
   }
 }

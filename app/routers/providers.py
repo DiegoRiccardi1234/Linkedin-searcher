@@ -59,8 +59,16 @@ def _stats_row(model: str, health: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+#: Where the user's answer to "may I look at this machine?" is kept. A
+#: preference, not a secret, and per-install like the machine it describes.
+_HARDWARE_PROBE_PREFERENCE = "local_hardware_probe"
+
+
 def build_router(container: AppContainer) -> APIRouter:
     router = APIRouter()
+
+    def _hardware_probe_allowed() -> bool:
+        return container.db.get_preference(_HARDWARE_PROBE_PREFERENCE, "") in ("1", "true", "on")
 
     @router.get("/api/providers/keys/status")
     def providers_keys_status() -> dict[str, Any]:
@@ -228,8 +236,28 @@ def build_router(container: AppContainer) -> APIRouter:
     @router.get("/api/local/status")
     def local_status() -> dict[str, Any]:
         """Hardware, the model sizes it can sustain, and what Ollama already has.
-        No inference and no downloads — this is the panel's read model."""
-        return local_models.snapshot()
+
+        Nothing is read until the user has said yes. Answering this used to mean
+        running ``nvidia-smi``, a PowerShell query for the RAM, a lookup for the
+        Ollama binary and — with a GPU present — a request to huggingface.co, all
+        from ``bootstrap()`` on every single launch, before anyone had opened
+        Settings. Inspecting someone's machine is a thing to ask for, not a side
+        effect of starting an app.
+        """
+        if not _hardware_probe_allowed():
+            return {"consent": False}
+        return {"consent": True, **local_models.snapshot()}
+
+    @router.post("/api/local/probe")
+    def local_probe() -> dict[str, Any]:
+        """Grant the hardware probe, and answer with what it found.
+
+        Consent and result in one round trip: the user clicked a button that
+        says "look at this PC", so making them wait for a second request to see
+        the answer would be theatre. Remembered from here on.
+        """
+        container.db.set_preference(_HARDWARE_PROBE_PREFERENCE, "1")
+        return {"consent": True, **local_models.snapshot()}
 
     @router.post("/api/local/pull")
     def local_pull(payload: LocalPullRequest) -> StreamingResponse:

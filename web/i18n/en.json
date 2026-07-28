@@ -886,6 +886,8 @@
     "pullStarting": "Starting download of {model}…",
     "pullDone": "{model} is ready",
     "qualityIntact": "quality nearly intact",
-    "fromHub": "Popular on Hugging Face and a fit for your card:"
+    "fromHub": "Popular on Hugging Face and a fit for your card:",
+    "consentBody": "To tell you which model this machine can run, the app needs to read its graphics card, video memory and RAM. It runs here and nothing is sent anywhere.",
+    "probe": "Check this PC"
   }
 }
