@@ -33,7 +33,7 @@ from app.providers.openai_compat import (
 )
 from app.providers.openai_provider import OpenAIProvider
 from app.providers.openrouter_provider import OpenRouterProvider
-from app.services import model_stats
+from app.services import local_models, model_stats
 
 _RetryT = TypeVar("_RetryT")
 
@@ -80,6 +80,20 @@ _MODEL_PENALTY_COOLDOWNS = {
 # recomputed. Long enough that a scan doesn't re-query per failover attempt,
 # short enough that a model recovering shows up within the same session.
 _UNFIT_CACHE_SECONDS = 600.0
+
+
+def _scoring_variant_in(models: list[str]) -> str | None:
+    """The wide-context scoring variant among a local server's models, if there.
+
+    Ollama lists a model under its full tag, so the variant the app created
+    appears as ``jobfinder-scorer:latest`` while the app pins it by bare name.
+    Both spellings are the same model and both must be recognised.
+    """
+    variant = local_models.SCORING_VARIANT
+    return next(
+        (m for m in models if m == variant or m.startswith(f"{variant}:")),
+        None,
+    )
 
 
 class ProviderManager:
@@ -522,6 +536,21 @@ class ProviderManager:
                     penalized = penalized | model_stats.unhealthy_ids(health)
                     pool = shortlist
             ranked = _rank(pool, penalized, limit)
+            # A local endpoint is not a catalog to be chosen from: it holds the
+            # one or two models the user downloaded, plus the wide-context
+            # variant this app derived for scoring. That variant cannot win on
+            # name — "jobfinder-scorer" states neither family nor size, so the
+            # ranking prefers the raw gemma tag it was built FROM, whose 4096
+            # token default context truncates every scoring reply (measured
+            # 2026-07-28: 0 usable answers out of 30, and the scan fell through
+            # to whatever cloud model the failover reached). Put it first.
+            if provider.name == "custom" and (policy_override or {}).get("hard_floor"):
+                variant = _scoring_variant_in(models)
+                # Not when it is penalized: a variant that keeps failing here has
+                # earned its place at the bottom, and the point of this promotion
+                # is the right model, not a favoured one.
+                if variant and variant not in penalized:
+                    ranked = [variant, *(m for m in ranked if m != variant)][:limit]
             if ranked:
                 return ranked
         policy = effective_policy

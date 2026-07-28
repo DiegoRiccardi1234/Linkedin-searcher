@@ -365,6 +365,43 @@ def test_no_credit_is_per_provider(tmp_path: Any) -> None:
     assert mgr._ranked_models_for(cerebras, limit=2)
 
 
+def test_scoring_on_a_local_endpoint_picks_the_wide_context_variant(tmp_path: Any) -> None:
+    """The variant cannot win on name, and losing costs every scoring reply.
+
+    ``jobfinder-scorer`` states neither family nor size, so the ranking prefers
+    the raw gemma tag it was derived FROM — which Ollama serves with a 4096-token
+    window, truncating every answer (measured 2026-07-28: 0 usable out of 30).
+    """
+    from app.services.local_models import SCORING_VARIANT
+    from app.services.scanner_service import _SCORING_POLICY
+
+    catalog = [f"{SCORING_VARIANT}:latest", "hf.co/unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"]
+    local = _CatalogProvider("custom", catalog)
+    mgr = _mgr(tmp_path, {"custom": local}, ["custom"], "custom")
+
+    ranked = mgr._ranked_models_for(local, limit=2, policy_override=_SCORING_POLICY)
+    assert ranked[0] == f"{SCORING_VARIANT}:latest"
+
+    # Chat and the CV tools are not scoring: no policy, no promotion.
+    assert mgr._ranked_models_for(local, limit=2)[0] != f"{SCORING_VARIANT}:latest"
+
+    # A variant that keeps failing here has earned its place at the bottom.
+    mgr.record_model_penalty("custom", f"{SCORING_VARIANT}:latest", "truncated")
+    penalised = mgr._ranked_models_for(local, limit=2, policy_override=_SCORING_POLICY)
+    assert penalised[0] != f"{SCORING_VARIANT}:latest"
+
+
+def test_a_local_endpoint_without_the_variant_ranks_as_before(tmp_path: Any) -> None:
+    """No variant to promote: the ordinary ranking, untouched."""
+    from app.services.scanner_service import _SCORING_POLICY
+
+    catalog = ["gemma-4-12b", "qwen2.5:14b"]
+    local = _CatalogProvider("custom", catalog)
+    mgr = _mgr(tmp_path, {"custom": local}, ["custom"], "custom")
+    ranked = mgr._ranked_models_for(local, limit=2, policy_override=_SCORING_POLICY)
+    assert set(ranked) <= set(catalog) and ranked
+
+
 def test_local_endpoint_is_exempt_from_the_scoring_floor(tmp_path: Any) -> None:
     """A 12B is what fits on a 12GB card; the 26B floor would leave nothing."""
     from app.services.scanner_service import _SCORING_POLICY
