@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.7.10] — 2026-07-28
+
+The scan knows when it is talking to your own machine, and the app asks before looking at it.
+
+### Fixed
+- **A scan scoring on your PC no longer wastes every call.** Choosing a local model wrote a pin, and everything worked; without that pin the app fell back to picking a model by name — and the name of the wide-context copy it had built for scoring ("jobfinder-scorer") says neither which family it belongs to nor how big it is, so the plain tag won every time. Ollama serves that one with room for 4096 tokens whatever it is asked for, and a scoring prompt is already ~2500 of CV and posting: every reply came back cut in half. Measured on a real scan: 92 calls for 6 offers judged, 43 of them truncated, and the six verdicts that survived came from whatever cloud model the failover happened to reach — not from the model you chose. Scoring on a local endpoint now takes the wide-context copy first, and a pin naming the plain tag is widened before use.
+- **A local model is given a local answer budget.** The app recognised "this is running on my machine" only from the pin, so an auto-selected local scan was sent the cloud budget — which a local model, more talkative and costing nothing but time, overruns. Even the copy that had the room for it came back truncated 13 times out of 15.
+
+### Changed
+- **The app asks before inspecting your computer.** Answering "which model can this PC run" means reading the graphics card, the video memory, the RAM and the list of installed models, and — with a GPU present — asking Hugging Face what else would fit. All of that ran at every launch, before Settings had even been opened. Now the panel shows what it would read and a button to allow it; nothing is touched until you press it, and the answer is remembered from then on.
+
 ## [1.7.9] — 2026-07-28
 
 An offer nobody read no longer gets a score.
