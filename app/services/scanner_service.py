@@ -43,6 +43,7 @@ from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
+from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
 from app.services import quota
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
@@ -55,6 +56,7 @@ from app.services.scan.hard_requirements import (
     FLAG_GIG,
     FLAG_GRADE_BLOCKED,
     FLAG_HEURISTIC,
+    FLAG_NOT_EVALUATED,
     FLAG_SALARY_BELOW,
     FLAG_SHORT_DESCRIPTION,
     _add_flag,
@@ -76,6 +78,7 @@ from app.services.scan.hard_requirements import (
     _salary_axis,
     enforce_hard_requirements,
     hard_block_reason,
+    is_unevaluated,
 )
 from app.services.scan.heuristics import (
     MIN_DESCRIPTION_CHARS,
@@ -85,8 +88,9 @@ from app.services.scan.heuristics import (
     _estimate_programming_demand,
     _estimate_smart_working,
     _fallback_analysis,
-    _heuristic_analysis,
     _insufficient_description_analysis,
+    _local_facts,
+    _unscored_analysis,
 )
 from app.services.scan.prompts import (
     _PER_OFFER_SCHEMA,
@@ -130,6 +134,7 @@ __all__ = [
     "FLAG_GIG",
     "FLAG_GRADE_BLOCKED",
     "FLAG_HEURISTIC",
+    "FLAG_NOT_EVALUATED",
     "FLAG_SALARY_BELOW",
     "FLAG_SHORT_DESCRIPTION",
     "MIN_DESCRIPTION_CHARS",
@@ -158,10 +163,10 @@ __all__ = [
     "_geo_status",
     "_grade_status",
     "_has_salary_signal",
-    "_heuristic_analysis",
     "_indeed_country_for",
     "_insufficient_description_analysis",
     "_is_non_eu_location",
+    "_local_facts",
     "_normalize_analysis",
     "_parse_ral",
     "_prep_description",
@@ -171,10 +176,12 @@ __all__ = [
     "_row_job_type_ok",
     "_row_work_mode_ok",
     "_scrape_split_indeed",
+    "_unscored_analysis",
     "analyze_offer",
     "analyze_offers_batch",
     "enforce_hard_requirements",
     "hard_block_reason",
+    "is_unevaluated",
     "pre_filtro",
     "run_scan",
 ]
@@ -412,6 +419,27 @@ def analyze_offer(
     )
 
 
+#: Raw ``motivo_non_valutazione`` -> the bucket the summary reports. The raw
+#: value is a provider exception message, which is useless to the user and
+#: unbounded in shape; what they need is which of the four fixable situations
+#: they are in.
+_UNEVALUATED_BUCKETS = (
+    ("descrizione_breve", ("insufficient_description",)),
+    ("quota_finita", ("daily_limit", "quota", "insufficient_quota")),
+    ("modello_non_disponibile", ("429", "rate", "timeout", "connection", "503", "502", "403")),
+    ("risposta_inutilizzabile", ("invalid response", "truncat", "empty", "json")),
+)
+
+
+def _unevaluated_reason(analysis: dict[str, Any]) -> str:
+    """Which situation left this offer unjudged, as a stable code."""
+    raw = str(analysis.get("motivo_non_valutazione") or "").lower()
+    for bucket, markers in _UNEVALUATED_BUCKETS:
+        if any(marker in raw for marker in markers):
+            return bucket
+    return "errore_provider"
+
+
 def _blocked_analysis(
     profile_markdown: str, titolo: str, azienda: str, descrizione: str, reason: str
 ) -> dict[str, Any]:
@@ -423,9 +451,14 @@ def _blocked_analysis(
     the cap, so this only has to be honest about WHY.
     """
     log.info("HARD_BLOCK_SKIP: '%s' @ %s (%s)", titolo, azienda, reason)
-    result = _heuristic_analysis(profile_markdown, titolo, azienda, descrizione)
-    result["riassunto"] = f"Non candidabile: {reason}. Analisi locale, nessuna chiamata IA."
-    return result
+    return {
+        # Not "unevaluated": this offer HAS a verdict, computed by the app from
+        # the posting itself. ``enforce_hard_requirements`` caps it to 3 right
+        # after (``_cap_score`` reads a missing score as 0 and applies the cap).
+        ANALYSIS_SOURCE_KEY: HEURISTIC_SOURCE,
+        "riassunto": f"Non candidabile: {reason}. Analisi locale, nessuna chiamata IA.",
+        **_local_facts(titolo, descrizione),
+    }
 
 
 def _analyze_offer_raw(
@@ -851,6 +884,11 @@ def run_scan(
     totale_trovati = 0
     totale_nuovi = 0
     totale_analizzati = 0
+    totale_non_valutati = 0
+    # Why offers went unjudged, bucketed — the summary needs ONE reason to show,
+    # and "the provider is rate-limited" and "the ad had no text" call for
+    # completely different actions from the user.
+    motivi_non_valutati: dict[str, int] = {}
     totale_scartati = 0
     new_flags_cleared = False
 
@@ -871,21 +909,31 @@ def run_scan(
         interval = str(row.get("interval") or "")
         low = _annual_amount(row.get("min_amount"), interval)
         high = _annual_amount(row.get("max_amount"), interval)
+        unevaluated = is_unevaluated(analysis)
         axes = analysis.get("match_axes")
-        if isinstance(axes, dict) and axes.get("salary_match") is None:
+        # Only for an offer someone judged: a lone salary axis on an unevaluated
+        # analysis draws a one-spoke radar, which reads as "it WAS analysed".
+        if not unevaluated and isinstance(axes, dict) and axes.get("salary_match") is None:
             axis = _salary_axis(low, high, ral_min)
             if axis is not None:
                 axes["salary_match"] = axis
         if ral_min and high and high < ral_min:
+            # A fact about the posting, not a judgement of it: flag it either way.
             detail = f"RAL dichiarata fino a {int(high)} EUR, sotto la tua minima ({ral_min})"
             _add_flag(analysis, FLAG_SALARY_BELOW, detail)
             _add_missing(analysis, detail)
-        raw_score = analysis.get("punteggio", 0)
-        try:
-            analysis["punteggio"] = int(raw_score)
-        except (TypeError, ValueError):
-            numbers = re.findall(r"\d+", str(raw_score))
-            analysis["punteggio"] = int(numbers[0]) if numbers else 0
+        # Coerce the score to int — but never resurrect a missing one as 0:
+        # int(None) raises, and the regex fallback below would read "None" as no
+        # digits and write 0, silently turning "nobody judged it" into a verdict.
+        raw_score = analysis.get("punteggio")
+        if raw_score is None:
+            analysis["punteggio"] = None
+        else:
+            try:
+                analysis["punteggio"] = int(raw_score)
+            except (TypeError, ValueError):
+                numbers = re.findall(r"\d+", str(raw_score))
+                analysis["punteggio"] = int(numbers[0]) if numbers else 0
 
         recruiter = None
         link = item["link"]
@@ -1215,7 +1263,18 @@ def run_scan(
                         db.update_job_analysis(job_id=result["job_id"], analysis=result["analysis"])
                         if result["recruiter"]:
                             db.upsert_recruiter(result["job_id"], result["recruiter"])
-                        totale_analizzati += 1
+                        # "Analysed" must mean judged. An offer that came back
+                        # unevaluated (provider down, unusable answer, no
+                        # description) is counted apart, so the summary cannot
+                        # report 36 analysed when 11 of them were never read.
+                        # ``pair_analyzed`` still counts everything: it drives
+                        # the progress bar, which must keep moving.
+                        if is_unevaluated(result["analysis"]):
+                            totale_non_valutati += 1
+                            _bucket = _unevaluated_reason(result["analysis"])
+                            motivi_non_valutati[_bucket] = motivi_non_valutati.get(_bucket, 0) + 1
+                        else:
+                            totale_analizzati += 1
                         pair_analyzed += 1
 
                         elapsed_ms = int(time.time() * 1000) - started_at_ms
@@ -1239,7 +1298,9 @@ def run_scan(
                             "job": {
                                 "titolo": result["titolo"],
                                 "azienda": result["azienda"],
-                                "score": result["analysis"].get("punteggio", 0),
+                                # None (not 0) when nobody judged it: the feed
+                                # renders it as "da valutare", never as 0/10.
+                                "score": result["analysis"].get("punteggio"),
                             },
                             "current": seen_now,
                             "total": expected_total,
@@ -1280,6 +1341,13 @@ def run_scan(
         "totale_trovati": totale_trovati,
         "totale_nuovi": totale_nuovi,
         "totale_analizzati": totale_analizzati,
+        "totale_non_valutati": totale_non_valutati,
+        # The single reason to show the user, with what it would take to fix it.
+        "motivo_non_valutati": (
+            max(motivi_non_valutati.items(), key=lambda kv: kv[1])[0]
+            if motivi_non_valutati
+            else ""
+        ),
         "totale_scartati": totale_scartati,
         "archiviati": archiviati,
         "duration_ms": duration_ms,

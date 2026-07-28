@@ -4,9 +4,10 @@ import csv
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from app import rate_limit
 from app.models import (
     FavoriteRequest,
     JobActionRequest,
@@ -23,7 +24,7 @@ from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
 from app.services.onboarding import onboarding_context
 from app.services.scan.companies import WATCHLIST_SUGGESTIONS, canonical_company
-from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer
+from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer, is_unevaluated
 from app.services.skill_gap import compute_skill_gap, suggest_learning
 
 if TYPE_CHECKING:
@@ -90,6 +91,48 @@ def build_router(container: AppContainer) -> APIRouter:
             "job": job,
             "recruiter": recruiter,
             "score_feedback": container.db.latest_score_feedback(job_id),
+        }
+
+    @router.post("/api/jobs/{job_id}/analyze")
+    def analyze_job(job_id: int, request: Request) -> dict[str, Any]:
+        """Score an offer already in the archive — typically an unevaluated one.
+
+        Until now a job could only be scored while it was being created (manual
+        add, import) or during a scan. So an offer left unjudged because the
+        provider was rate-limited stayed that way until the same posting turned
+        up in another scan, which for an expired ad never happens.
+
+        Returns 200 even when the retry also fails: the app did its part, the
+        provider did not, and ``evaluated`` says which of the two happened.
+        """
+        rate_limit.check(request, bucket="rescore", limit=10, window_seconds=60)
+        container.require_provider()
+        job = container.db.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        profile = container.db.get_active_candidate_profile()
+        profile_markdown = profile["markdown"] if profile else "Profile not loaded"
+        profile_markdown += _linkedin_suffix(container.db)
+
+        analysis = analyze_offer(
+            provider_manager=container.providers,
+            profile_markdown=profile_markdown,
+            titolo=job.get("titolo", ""),
+            azienda=job.get("azienda", ""),
+            descrizione=job.get("descrizione") or "",
+            privacy=container.feature_enabled("privacy_mode", True),
+            extra_context=onboarding_context(container.db),
+            candidate_name=(profile.get("name") if profile else None),
+            # Without the location the geo-eligibility cap is structurally dead.
+            sede=job.get("sede") or "",
+        )
+        container.db.update_job_analysis(job_id=job_id, analysis=analysis)
+        return {
+            "job_id": job_id,
+            "analysis": analysis,
+            "punteggio": analysis.get("punteggio"),
+            "evaluated": not is_unevaluated(analysis),
         }
 
     @router.post("/api/jobs/{job_id}/cover-letter")

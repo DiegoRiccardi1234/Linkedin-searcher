@@ -56,14 +56,29 @@ def test_gig_work_is_flagged_but_not_blocking() -> None:
     assert out["punteggio"] == 7  # a flag, never a cap
 
 
-def test_heuristic_analysis_says_so() -> None:
+def test_unscored_analysis_says_so() -> None:
     out = ss.enforce_hard_requirements(
-        ss._heuristic_analysis(_CV, "AI QA", "Acme", _JD),
+        ss._unscored_analysis("AI QA", "Acme", _JD, reason="provider down"),
         profile_markdown=_CV,
         descrizione=_JD,
         sede="Torino, Italy",
     )
+    assert ss.FLAG_NOT_EVALUATED in out["blocchi"]
+    assert ss.FLAG_NOT_EVALUATED not in ss.BLOCKING_FLAGS  # unjudged != inapplicable
+    assert out["punteggio"] is None
+
+
+def test_hard_blocked_analysis_is_scored_not_unevaluated() -> None:
+    """A blocker is a verdict the app computes itself: it keeps its cap of 3."""
+    out = ss.enforce_hard_requirements(
+        ss._blocked_analysis(_CV, "AI QA", "Acme", _JD, "sede fuori UE"),
+        profile_markdown=_CV,
+        descrizione=_JD,
+        sede="Austin, TX",
+    )
     assert ss.FLAG_HEURISTIC in out["blocchi"]
+    assert ss.FLAG_NOT_EVALUATED not in out["blocchi"]
+    assert out["punteggio"] == 3
 
 
 def test_clean_offer_has_no_flags() -> None:

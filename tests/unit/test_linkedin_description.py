@@ -4,7 +4,8 @@ jobspy's LinkedIn search returns only job cards (no description) unless
 ``linkedin_fetch_description=True``; without it the AI scored LinkedIn jobs
 blind (title only). These tests cover: the flag is passed, jobspy's ``NaN``
 descriptions are cleaned, a missing description is retried, and a job that stays
-description-less gets an honest capped estimate (never a blind "9").
+description-less gets NO score at all (never a blind "9", and since v1.7.9 not
+even a capped guess: nobody read it).
 """
 
 from __future__ import annotations
@@ -103,13 +104,13 @@ def test_linkedin_fetch_description_absent_for_indeed_only(
     assert "linkedin_fetch_description" not in captured
 
 
-# --- Change 4: description-less job → honest capped estimate -----------------
+# --- Change 4: description-less job → no score at all ------------------------
 
 
-def test_analyze_offer_empty_description_is_honest_and_capped() -> None:
+def test_analyze_offer_empty_description_is_unevaluated() -> None:
     res = ss.analyze_offer(_NoopPM(), "CV Diego", "Senior AI Engineer", "BigCo", "")
-    assert res["punteggio"] <= 6
-    assert res["consiglio"] != "Candidati subito"
+    assert res["punteggio"] is None
+    assert res["consiglio"] == ""
     assert "non disponibile" in res["riassunto"].lower()
 
 
@@ -136,8 +137,8 @@ def test_batch_overrides_description_less_offer() -> None:
     ]
     out = ss.analyze_offers_batch(_PM(), "CV", offers)
     assert out[0]["punteggio"] == 9  # scored normally
-    assert out[1]["punteggio"] <= 6  # description-less → capped, not a blind 9
-    assert out[1]["consiglio"] != "Candidati subito"
+    assert out[1]["punteggio"] is None  # description-less → the blind 9 is discarded
+    assert out[1]["consiglio"] == ""
 
 
 def test_run_scan_nan_description_job_is_not_blindly_scored(
@@ -145,7 +146,7 @@ def test_run_scan_nan_description_job_is_not_blindly_scored(
 ) -> None:
     # A LinkedIn row with a NaN description whose url isn't a real linkedin.com
     # page (so the re-fetch no-ops) must flow through without an LLM call and
-    # end up capped, not a fabricated high score.
+    # end up with NO score, not a fabricated one.
     df = pd.DataFrame(
         [
             {
@@ -175,7 +176,7 @@ def test_run_scan_nan_description_job_is_not_blindly_scored(
         db.close()
     analyzed = [e for e in events if e.get("status") == "analyzed"]
     assert len(analyzed) == 1
-    assert analyzed[0]["job"]["score"] <= 6
+    assert analyzed[0]["job"]["score"] is None
 
 
 # --- Change 3: fetch_linkedin_description -----------------------------------
@@ -294,7 +295,14 @@ def test_relevance_gate_drops_offtopic_keeps_tech(
             {
                 "title": "AI Data Specialist",
                 "company": "Tech",
-                "description": "Python, machine learning, data annotation e NLP per modelli AI.",
+                # Long enough to clear MIN_DESCRIPTION_CHARS: this test is about
+                # the relevance gate, and a short description would take the
+                # unevaluated path instead of reaching the model.
+                "description": (
+                    "Python, machine learning, data annotation e NLP per modelli AI. "
+                    "Requisiti: laurea triennale, buona conoscenza di Python e SQL, "
+                    "inglese B2. Si offre contratto a tempo indeterminato. " * 3
+                ),
                 "location": "Torino",
                 "site": "linkedin",
                 "job_url": "http://x/2",

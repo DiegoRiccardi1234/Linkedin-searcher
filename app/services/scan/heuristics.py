@@ -1,9 +1,14 @@
-"""Scoring without a model: keyword overlap against the CV.
+"""What the app can say about an offer WITHOUT a model — and what it cannot.
 
-Used when the AI is unreachable, when it answers unusably, and when the
-posting is too thin to judge on merit. An honest capped estimate beats a
-confident invented one — and the result is marked as heuristic so the job is
-re-scored properly next time (see app.scoring_schema).
+Used when the AI is unreachable, when it answers unusably, and when the posting
+is too thin to judge on merit. Until v1.7.8 this module also produced a score in
+those cases, by counting words shared with the CV: on a real scan that put seven
+postings no model had ever read above 6/10, a PAYROLL SPECIALIST among them.
+
+A score is a judgement, and this module makes none. It reads the facts a regex
+can honestly read from the text (contract, work mode, years, degree) and leaves
+``punteggio`` empty. The result is marked as unevaluated so the job is re-scored
+on the next scan, or on demand (see app.scoring_schema).
 """
 
 from __future__ import annotations
@@ -12,9 +17,9 @@ import re
 from typing import Any
 
 from app.log import get_logger
-from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
+from app.scoring_schema import ANALYSIS_SOURCE_KEY, NOT_EVALUATED_SOURCE
 from app.services.scan.hard_requirements import FLAG_SHORT_DESCRIPTION, _add_flag
-from app.services.scan.vocab import TECH_KEYWORDS, _tokenize
+from app.services.scan.vocab import TECH_KEYWORDS
 
 log = get_logger(__name__)
 
@@ -80,10 +85,16 @@ def _fallback_analysis(
     azienda: str,
     descrizione: str,
 ) -> dict[str, Any]:
-    # ``reason`` (provider error / invalid response) is for diagnostics only —
-    # it must never leak into the user-facing ``riassunto`` below.
-    log.warning("Heuristic fallback analysis for '%s' @ %s: %s", titolo, azienda, reason)
-    return _heuristic_analysis(profile_markdown, titolo, azienda, descrizione)
+    """No model produced a usable verdict for this offer, so there is no score.
+
+    ``reason`` (provider error / invalid response) is for diagnostics only — it
+    must never leak into the user-facing ``riassunto``. ``profile_markdown`` is
+    no longer read: matching a CV against the posting is exactly the guesswork
+    this path stopped doing. It stays in the signature because every call site
+    passes it by keyword.
+    """
+    log.warning("Unevaluated offer '%s' @ %s: %s", titolo, azienda, reason)
+    return _unscored_analysis(titolo, azienda, descrizione, reason=reason)
 
 
 _EDU_PHD = re.compile(r"\bph\.?d\b|dottorato di ricerca", re.IGNORECASE)
@@ -101,80 +112,47 @@ def _detect_education_requirement(offer_text: str) -> str:
     return "Non specificato"
 
 
-def _heuristic_analysis(
-    profile_markdown: str,
-    titolo: str,
-    azienda: str,
-    descrizione: str,
-) -> dict[str, Any]:
+def _local_facts(titolo: str, descrizione: str) -> dict[str, Any]:
+    """What the posting states about itself, read with regexes.
+
+    Facts, not judgements: every field here is something the text says, so it
+    stays true whether or not a model ever looked at the offer. Shared by the
+    unevaluated path and by the hard-blocked path, which has a score of its own.
+    """
     offer_text = f"{titolo} {descrizione}".lower()
-    profile_tokens = _tokenize(profile_markdown)
-    offer_tokens = _tokenize(offer_text)
-    overlap = sorted(profile_tokens.intersection(offer_tokens))
-
-    score = 3 + min(4, len(overlap) // 3)
-    if "junior" in offer_text or "entry level" in offer_text:
-        score += 2
-    if any(token in offer_text for token in ["remote", "hybrid", "smart working"]):
-        score += 1
-    if any(token in offer_text for token in ["senior", "lead", "principal", "staff"]):
-        score -= 2
-    # Advanced-degree requirement: same weight as a senior title (the real case
-    # was a Master's-required posting scored 9 for a Bachelor's profile).
-    edu_required = _detect_education_requirement(offer_text)
-    if edu_required in ("Magistrale", "PhD"):
-        score -= 2
-
-    score = max(1, min(score, 10))
-
-    if score >= 8:
-        advice = "Candidati subito"
-    elif score >= 6:
-        advice = "Valutabile"
-    else:
-        advice = "Salta"
-
-    overlap_preview = ", ".join(overlap[:5]) if overlap else "competenze base IT"
-    weakness_text = (
-        "Richieste non completamente allineate al profilo"
-        if score < 7
-        else "Competenze verificabili in colloquio"
-    )
-    if edu_required == "Magistrale":
-        weakness_text = "Richiesta laurea magistrale. " + weakness_text
-    elif edu_required == "PhD":
-        weakness_text = "Richiesto PhD/dottorato. " + weakness_text
-
     return {
-        # No model ever saw this offer: the score comes from keyword overlap.
-        # The marker keeps it out of "already analysed" (see app.scoring_schema)
-        # so the job is re-scored properly the next time it shows up.
-        ANALYSIS_SOURCE_KEY: HEURISTIC_SOURCE,
-        "punteggio": score,
         "programmazione_richiesta": _estimate_programming_demand(offer_text),
         "smart_working": _estimate_smart_working(offer_text),
         "contratto": _estimate_contract_type(offer_text),
         "anni_esperienza_richiesti": _estimate_experience_band(offer_text),
-        "titolo_studio_richiesto": edu_required,
-        "punti_forza": f"Match su: {overlap_preview}.",
-        "punti_deboli": weakness_text,
-        "riassunto": f"Analisi euristica usata (IA non disponibile). Match stimato {score}/10.",
-        "consiglio": advice,
-        "ral_stimata": "Non stimabile",
+        "titolo_studio_richiesto": _detect_education_requirement(offer_text),
         "adatta_neolaureati": "Sì"
         if any(token in offer_text for token in ["junior", "stage", "intern", "entry"])
         else "Non specificato",
-        "match_axes": {
-            "skills_match": max(0, min(10, score + min(2, len(overlap) // 2))),
-            "seniority_match": 8
-            if any(t in offer_text for t in ["junior", "entry", "stage", "intern"])
-            else (3 if any(t in offer_text for t in ["senior", "lead"]) else 6),
-            "remote_match": 9
-            if any(t in offer_text for t in ["remote", "smart working"])
-            else (6 if "hybrid" in offer_text or "ibrid" in offer_text else 4),
-            "salary_match": 5,
-            "contract_match": 3 if any(t in offer_text for t in ["partita iva", "p.iva"]) else 7,
-        },
+    }
+
+
+def _unscored_analysis(
+    titolo: str, azienda: str, descrizione: str, *, reason: str
+) -> dict[str, Any]:
+    """An offer nobody judged: the facts it states, and no verdict.
+
+    ``punteggio`` is None rather than a low number — a low number is still a
+    judgement, and it would sort among real ones. ``_normalize_analysis``
+    enforces the rest (empty advice, null axes, the ``non_valutato`` flag) and
+    leaves out the schema version, which is what gets the job re-scored later.
+    """
+    return {
+        ANALYSIS_SOURCE_KEY: NOT_EVALUATED_SOURCE,
+        "punteggio": None,
+        "consiglio": "",
+        # Diagnostics: why no model produced a verdict. Not user-facing copy.
+        "motivo_non_valutazione": reason,
+        "punti_forza": "",
+        "punti_deboli": "",
+        "riassunto": "",
+        "ral_stimata": "Non stimabile",
+        **_local_facts(titolo, descrizione),
     }
 
 
@@ -189,31 +167,21 @@ def _insufficient_description_analysis(
 ) -> dict[str, Any]:
     """A job whose description is missing or too short to judge on merit
     (LinkedIn blocked the page, or served a marketing blurb without the JD).
-    Score it heuristically from the little text available so it still gets an
-    ordering, but flag it honestly and CAP it — an unread job must never
-    surface as a top "Candidati subito"/9. Skips the LLM (no point scoring
-    blind, and it would hallucinate requirements)."""
-    result = _fallback_analysis(
-        "insufficient_description",
-        profile_markdown=profile_markdown,
-        titolo=titolo,
-        azienda=azienda,
-        descrizione=descrizione,
-    )
-    result["punteggio"] = min(int(result.get("punteggio", 3) or 3), 6)
-    result["consiglio"] = "Valutabile" if result["punteggio"] >= 5 else "Salta"
+
+    Nobody can judge a posting nobody could read, so it gets no score — not even
+    a capped one. Sending it to the LLM anyway is worse: on a real 82-character
+    blurb the model invented requirements wholesale. The offer stays visible,
+    flagged, with the one useful instruction: open the ad.
+    """
+    result = _unscored_analysis(titolo, azienda, descrizione, reason="insufficient_description")
     _add_flag(result, FLAG_SHORT_DESCRIPTION)
     if descrizione.strip():
-        result["riassunto"] = (
-            "Descrizione troppo breve — stima dal titolo. Apri l'annuncio per valutare."
-        )
+        result["riassunto"] = "Descrizione troppo breve per valutare. Apri l'annuncio."
         result["punti_deboli"] = (
             "Descrizione quasi assente: requisiti ed esperienza richiesta non verificati."
         )
     else:
-        result["riassunto"] = (
-            "Descrizione non disponibile — stima dal titolo. Apri l'annuncio per valutare."
-        )
+        result["riassunto"] = "Descrizione non disponibile. Apri l'annuncio."
         result["punti_deboli"] = (
             "Descrizione non recuperata: requisiti ed esperienza richiesta non verificati."
         )

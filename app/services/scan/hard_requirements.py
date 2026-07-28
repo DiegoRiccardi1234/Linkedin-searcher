@@ -14,6 +14,7 @@ whether a job gets re-scored.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from app.scoring_schema import (
@@ -21,6 +22,7 @@ from app.scoring_schema import (
     ANALYSIS_VERSION_KEY,
     CURRENT_ANALYSIS_VERSION,
     HEURISTIC_SOURCE,
+    NOT_EVALUATED_SOURCE,
 )
 from app.services.onboarding import RAL_MIN_LABEL
 
@@ -291,9 +293,22 @@ FLAG_SHORT_DESCRIPTION = "descrizione_breve"  # judged on a blurb, capped
 FLAG_HEURISTIC = "analisi_locale"  # no model saw this: keyword score
 FLAG_GIG = "lavoro_a_task"  # platform/gig work, not employment
 FLAG_SALARY_BELOW = "ral_sotto_minima"  # declared pay under the user's floor
+FLAG_NOT_EVALUATED = "non_valutato"  # no model judged this: there is no score
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
+#: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
+#: "you cannot apply" — the offer may well be the best one in the archive.
 BLOCKING_FLAGS = frozenset({FLAG_GEO_BLOCKED, FLAG_GRADE_BLOCKED})
+
+
+def is_unevaluated(analysis: Mapping[str, Any]) -> bool:
+    """True when no score was ever produced for this offer.
+
+    Defined on the invariant (a missing score) rather than on the provenance
+    marker, so a deterministic cap applied afterwards — which DOES set a score —
+    automatically stops matching, with no cleanup logic to keep in sync.
+    """
+    return analysis.get("punteggio") is None
 
 
 def _add_flag(analysis: dict[str, Any], code: str, detail: str = "") -> None:
@@ -343,6 +358,11 @@ def _cap_score(analysis: dict[str, Any], cap: int, weakness: str) -> None:
     analysis["consiglio"] = "Salta"
     previous = str(analysis.get("punti_deboli") or "").strip()
     analysis["punti_deboli"] = f"{weakness} {previous}".strip()
+    # A capped offer HAS been judged — deterministically, by this app. "Not
+    # evaluated" and "3/10 because you cannot legally take it" cannot both hold.
+    flags = analysis.get("blocchi")
+    if isinstance(flags, list) and FLAG_NOT_EVALUATED in flags:
+        flags.remove(FLAG_NOT_EVALUATED)
 
 
 def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str) -> None:
@@ -468,7 +488,18 @@ def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
     # — heuristics included — freezing keyword scores forever.
     if not isinstance(out.get("blocchi"), list):
         out["blocchi"] = []
-    if str(out.get(ANALYSIS_SOURCE_KEY, "")) == HEURISTIC_SOURCE:
+    source = str(out.get(ANALYSIS_SOURCE_KEY, ""))
+    if source == NOT_EVALUATED_SOURCE:
+        # Nobody judged this offer, so the defaults filled in above — a score,
+        # "Valutabile", five axes at 5 — would be inventions. Strip them here,
+        # after every other branch has run, so no producer can leak a made-up
+        # verdict by forgetting a check of its own.
+        out.pop(ANALYSIS_VERSION_KEY, None)
+        out["punteggio"] = None
+        out["consiglio"] = ""
+        out["match_axes"] = dict.fromkeys(_MATCH_AXES_KEYS)
+        _add_flag(out, FLAG_NOT_EVALUATED)
+    elif source == HEURISTIC_SOURCE:
         out.pop(ANALYSIS_VERSION_KEY, None)
         _add_flag(out, FLAG_HEURISTIC)
     else:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -147,6 +148,112 @@ def test_migration_011_cleans_orphaned_child_rows(tmp_path: Path) -> None:
             ).fetchone()[0]
             assert ghosts == 0, f"orphans left in {tbl}"
             assert kept == 1, f"live rows lost from {tbl}"
+    finally:
+        db.close()
+
+
+def _rewind_to_before_018(db: Database) -> None:
+    """Fresh DBs are already at the latest version: rewind so 018 re-runs here."""
+    db.conn.execute("DELETE FROM schema_version WHERE version >= 18")
+    db.conn.commit()
+
+
+def test_migration_018_strips_invented_heuristic_scores(tmp_path: Path) -> None:
+    """A keyword score already in the archive must not survive the update.
+
+    The scan only re-scores a job when the same posting shows up again, and
+    expired ads never do — so without this the user keeps seeing "PAYROLL
+    SPECIALIST 6/10" at the top forever.
+    """
+    db = Database(tmp_path / "u.db")
+    try:
+        invented, _, _ = db.upsert_job({"titolo": "PAYROLL", "azienda": "A", "link": "l1"})
+        db.conn.execute(
+            "UPDATE jobs SET analysis_json = ?, punteggio_ai = 6, consiglio = 'Valutabile', "
+            "analysis_v = NULL WHERE id = ?",
+            (
+                json.dumps(
+                    {
+                        "punteggio": 6,
+                        "consiglio": "Valutabile",
+                        "riassunto": "Analisi euristica usata. Match stimato 6/10.",
+                        "match_axes": {"skills_match": 8, "salary_match": 5},
+                        "fonte_analisi": "euristica",
+                        "blocchi": ["analisi_locale"],
+                    }
+                ),
+                invented,
+            ),
+        )
+        judged, _, _ = db.upsert_job({"titolo": "AI QA", "azienda": "A", "link": "l2"})
+        db.conn.execute(
+            "UPDATE jobs SET analysis_json = ?, punteggio_ai = 8, analysis_v = 2 WHERE id = ?",
+            (json.dumps({"punteggio": 8, "scoring_v": 2}), judged),
+        )
+        _rewind_to_before_018(db)
+
+        apply_migrations(db.conn)
+
+        row = db.conn.execute(
+            "SELECT punteggio_ai, consiglio, analysis_json FROM jobs WHERE id = ?", (invented,)
+        ).fetchone()
+        assert row[0] is None
+        assert row[1] == ""
+        blob = json.loads(row[2])
+        assert blob["punteggio"] is None
+        assert blob["riassunto"] == ""
+        assert all(v is None for v in blob["match_axes"].values())
+        assert "non_valutato" in blob["blocchi"]
+        assert "analisi_locale" not in blob["blocchi"]
+        # A model-written analysis is untouched.
+        assert db.conn.execute(
+            "SELECT punteggio_ai FROM jobs WHERE id = ?", (judged,)
+        ).fetchone()[0] == 8
+    finally:
+        db.close()
+
+
+def test_migration_018_keeps_deterministic_caps(tmp_path: Path) -> None:
+    """A 3/10 from a hard blocker WAS computed — by this app, from the ad."""
+    db = Database(tmp_path / "c.db")
+    try:
+        blocked, _, _ = db.upsert_job({"titolo": "US role", "azienda": "A", "link": "l3"})
+        db.conn.execute(
+            "UPDATE jobs SET analysis_json = ?, punteggio_ai = 3, consiglio = 'Salta', "
+            "analysis_v = NULL WHERE id = ?",
+            (
+                json.dumps(
+                    {"punteggio": 3, "consiglio": "Salta", "blocchi": ["geo_non_ue"]},
+                ),
+                blocked,
+            ),
+        )
+        _rewind_to_before_018(db)
+
+        apply_migrations(db.conn)
+
+        row = db.conn.execute(
+            "SELECT punteggio_ai, consiglio FROM jobs WHERE id = ?", (blocked,)
+        ).fetchone()
+        assert row[0] == 3
+        assert row[1] == "Salta"
+    finally:
+        db.close()
+
+
+def test_migration_018_nulls_never_analysed_rows(tmp_path: Path) -> None:
+    """``punteggio_ai INTEGER DEFAULT 0`` claimed a verdict on every fresh row."""
+    db = Database(tmp_path / "n.db")
+    try:
+        fresh, _, _ = db.upsert_job({"titolo": "New", "azienda": "A", "link": "l4"})
+        _rewind_to_before_018(db)
+
+        apply_migrations(db.conn)
+
+        assert (
+            db.conn.execute("SELECT punteggio_ai FROM jobs WHERE id = ?", (fresh,)).fetchone()[0]
+            is None
+        )
     finally:
         db.close()
 
