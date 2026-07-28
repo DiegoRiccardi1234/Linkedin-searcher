@@ -151,7 +151,8 @@
     "scoreDist": "Distribución de Puntuaciones IA",
     "matchScore": "Puntuación",
     "topCompanies": "Empresas frecuentes",
-    "noData": "Sin datos aún"
+    "noData": "Sin datos aún",
+    "unscored": "Sin evaluar"
   },
   "recommendations": {
     "title": "Mejores para Ti",
@@ -231,12 +232,14 @@
       "salary": "Por debajo de tu mínimo",
       "salaryLong": "El salario declarado está por debajo del mínimo que fijaste",
       "shortDesc": "Descripción breve",
-      "heuristic": "Estimación local"
+      "heuristic": "Estimación local",
+      "notEvaluated": "Sin evaluar"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
       "likelyExpired": "Probablemente caducada"
-    }
+    },
+    "adviceToEvaluate": "Por evaluar"
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -430,7 +433,11 @@
     "generateRecruiterMsg": "Mensaje al reclutador",
     "recruiterMsg": "Mensaje al reclutador",
     "engagement": "Tipo de contratación",
-    "axisSalaryUnknown": "Ninguna fuente publica el salario de esta oferta"
+    "axisSalaryUnknown": "Ninguna fuente publica el salario de esta oferta",
+    "reanalyze": "Reevaluar con IA",
+    "reanalyzeRunning": "Evaluando…",
+    "shortDescHint": "Este anuncio tiene muy poco texto para evaluarlo. Ábrelo para leerlo.",
+    "noBreakdown": "Sin desglose: esta oferta no ha sido evaluada."
   },
   "scan": {
     "scanning": "Escaneando portales de empleo...",
@@ -537,7 +544,10 @@
     "themeLight": "Tema claro",
     "languageChanged": "Idioma actualizado",
     "exportError": "Error de exportación",
-    "cvAlreadyUploaded": "Este CV ya se había subido: reutilizo el análisis guardado."
+    "cvAlreadyUploaded": "Este CV ya se había subido: reutilizo el análisis guardado.",
+    "reanalyzeDone": "Oferta evaluada.",
+    "reanalyzeStillUnscored": "Ningún modelo respondió: inténtalo más tarde.",
+    "reanalyzeFailed": "La reevaluación ha fallado"
   },
   "update": {
     "title": "Nueva versión disponible",
@@ -633,7 +643,16 @@
     "duration": "Duración",
     "topMatches": "Mejores coincidencias",
     "viewList": "Ver lista",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "Por evaluar",
+    "unscoredHint": "{count} ofertas no se han evaluado.",
+    "unscoredWhy": {
+      "descrizione_breve": "Los anuncios tenían muy poco texto: ábrelos para leerlos.",
+      "quota_finita": "El presupuesto diario de peticiones de IA se ha agotado.",
+      "modello_non_disponibile": "El proveedor no estaba disponible o limitó las peticiones: inténtalo más tarde o usa un modelo en tu PC.",
+      "risposta_inutilizzabile": "La respuesta del modelo no era utilizable: prueba con otro modelo.",
+      "errore_provider": "Error del proveedor de IA."
+    }
   },
   "info": {
     "title": "Cómo funciona Job",

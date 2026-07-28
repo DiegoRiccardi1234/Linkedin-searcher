@@ -151,7 +151,8 @@
     "scoreDist": "KI-Score-Verteilung",
     "matchScore": "Match-Score",
     "topCompanies": "Häufigste Unternehmen",
-    "noData": "Noch keine Daten"
+    "noData": "Noch keine Daten",
+    "unscored": "Nicht bewertet"
   },
   "recommendations": {
     "title": "Beste für Dich",
@@ -231,12 +232,14 @@
       "salary": "Unter deinem Minimum",
       "salaryLong": "Die angegebene Vergütung liegt unter deinem Minimum",
       "shortDesc": "Kurze Beschreibung",
-      "heuristic": "Lokale Schätzung"
+      "heuristic": "Lokale Schätzung",
+      "notEvaluated": "Nicht bewertet"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
       "likelyExpired": "Wahrscheinlich abgelaufen"
-    }
+    },
+    "adviceToEvaluate": "Zu bewerten"
   },
   "kanbanCols": {
     "open": "Offen",
@@ -430,7 +433,11 @@
     "generateRecruiterMsg": "Recruiter-Nachricht",
     "recruiterMsg": "Recruiter-Nachricht",
     "engagement": "Art der Beschäftigung",
-    "axisSalaryUnknown": "Keine Quelle nennt die Vergütung dieser Stelle"
+    "axisSalaryUnknown": "Keine Quelle nennt die Vergütung dieser Stelle",
+    "reanalyze": "Mit KI neu bewerten",
+    "reanalyzeRunning": "Wird bewertet…",
+    "shortDescHint": "Diese Anzeige hat zu wenig Text für eine Bewertung. Öffne sie, um sie zu lesen.",
+    "noBreakdown": "Keine Aufschlüsselung: Dieses Angebot wurde nicht bewertet."
   },
   "scan": {
     "scanning": "Jobportale werden gescannt...",
@@ -537,7 +544,10 @@
     "themeLight": "Helles Design",
     "languageChanged": "Sprache aktualisiert",
     "exportError": "Export fehlgeschlagen",
-    "cvAlreadyUploaded": "Dieser Lebenslauf wurde bereits hochgeladen — gespeicherte Analyse wird genutzt."
+    "cvAlreadyUploaded": "Dieser Lebenslauf wurde bereits hochgeladen — gespeicherte Analyse wird genutzt.",
+    "reanalyzeDone": "Angebot bewertet.",
+    "reanalyzeStillUnscored": "Kein Modell hat geantwortet: später erneut versuchen.",
+    "reanalyzeFailed": "Neubewertung fehlgeschlagen"
   },
   "update": {
     "title": "Neue Version verfügbar",
@@ -633,7 +643,16 @@
     "duration": "Dauer",
     "topMatches": "Top-Treffer",
     "viewList": "Liste anzeigen",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "Zu bewerten",
+    "unscoredHint": "{count} Angebote wurden nicht bewertet.",
+    "unscoredWhy": {
+      "descrizione_breve": "Die Anzeigen hatten zu wenig Text: Öffne sie, um sie zu lesen.",
+      "quota_finita": "Das tägliche KI-Anfragebudget ist aufgebraucht.",
+      "modello_non_disponibile": "Der Anbieter war nicht erreichbar oder gedrosselt: später erneut versuchen oder ein Modell auf dem eigenen PC nutzen.",
+      "risposta_inutilizzabile": "Die Antwort des Modells war unbrauchbar: Versuche ein anderes Modell.",
+      "errore_provider": "Fehler beim KI-Anbieter."
+    }
   },
   "info": {
     "title": "So funktioniert Job",

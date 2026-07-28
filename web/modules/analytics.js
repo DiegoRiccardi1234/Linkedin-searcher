@@ -73,17 +73,25 @@ export async function loadAnalytics() {
     const scoreCtx = document.getElementById("scoreChart");
     if (scoreCtx) {
       if (scoreChart) scoreChart.destroy();
-      if (_hasData(data.score_distribution)) {
+      // Offers nobody judged get their own bar rather than being folded into
+      // "0": a 0 is a verdict, and hiding them would make the bars stop adding
+      // up to the archive.
+      const unscored = Number(data.unscored || 0);
+      const scoreLabels = [...Object.keys(data.score_distribution || {}), t("analytics.unscored")];
+      const scoreValues = [...Object.values(data.score_distribution || {}), unscored];
+      if (_hasData(data.score_distribution) || unscored > 0) {
         _showCanvas(scoreCtx);
         scoreChart = new Chart(scoreCtx, {
           type: "bar",
           data: {
-            labels: Object.keys(data.score_distribution),
+            labels: scoreLabels,
             datasets: [
               {
                 label: t("analytics.matchScore") || "Match Score",
-                data: Object.values(data.score_distribution),
-                backgroundColor: "#0d6efd",
+                data: scoreValues,
+                backgroundColor: scoreLabels.map((_, i) =>
+                  i === scoreLabels.length - 1 ? "#94a3b8" : "#0d6efd",
+                ),
               },
             ],
           },

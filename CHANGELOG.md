@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [1.7.9] — 2026-07-28
+
+An offer nobody read no longer gets a score.
+
+### Changed
+- **No more invented scores.** When no model could judge an offer — the provider was down or rate-limited, the answer came back unusable, or the posting carried no description worth reading — the app used to score it anyway, by counting words the ad shared with your CV. That number is indistinguishable from a real verdict once it is in the list, and it sorts among the real ones: on a real scan, seven of the eleven highest-scoring off-target offers had never been read by anything, a PAYROLL SPECIALIST at 6/10 and a DIGITAL COMMUNICATION SPECIALIST at 8/10 among them. Such an offer is now shown as **to evaluate**: no score, no advice, no radar, and a badge saying so. It stays visible and is re-scored on the next scan.
+  - Existing archives are cleaned on update: offers that carry a keyword score lose it. Offers capped by a hard blocker (outside the EU, degree grade below the stated minimum) **keep** their 3/10 — that cap is computed by the app from the ad, not guessed.
+  - A quality filter (minimum score) no longer returns unevaluated offers, and they are excluded from the recommendations rather than filling the gaps.
+  - The score chart counts them in a bar of their own instead of dropping them silently.
+- **The scan summary distinguishes judged from unjudged** — "36 analysed" used to include offers nobody had read. It now reports how many were left to evaluate, why (rate limit, quota, unusable answer, no description) and what would fix it.
+
+### Added
+- **"Re-evaluate with AI" on a single offer.** Until now a job could only be scored while it was being created or during a scan, so an offer left unjudged because the provider was throttled stayed that way until the same posting turned up again — which, for an expired ad, never happens. When the posting itself is the problem (almost no text), the button is replaced by an invitation to open the ad: another model call would come back just as empty.
+
+### Fixed
+- **Provider names are readable again** — in Settings each provider card showed its name one letter per line, with the "Free" badge squeezed into a circle. The badge added in 1.7.8 pushed an already-full header past its width, and the name was the part that gave way.
+- **The model picker scrolls** — with a provider exposing hundreds of models the list was cut off with no way to reach the rest, and the provider column silently hid its last three entries.
+- **The chat no longer reads an unjudged offer as a zero** — it received `Score: None/10` in its context, which a model interprets as the worst possible match.
+
 ## [1.7.8] — 2026-07-27
 
 The search stops being only about keywords, an application stops being only a column, and the scores can finally be told they are wrong.

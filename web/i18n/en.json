@@ -151,7 +151,8 @@
     "scoreDist": "AI Score Distribution",
     "matchScore": "Match Score",
     "topCompanies": "Top Companies",
-    "noData": "No data yet"
+    "noData": "No data yet",
+    "unscored": "Not evaluated"
   },
   "recommendations": {
     "title": "Top Picks for You",
@@ -231,12 +232,14 @@
       "salary": "Below your minimum",
       "salaryLong": "The declared pay is below the minimum you set",
       "shortDesc": "Short description",
-      "heuristic": "Local estimate"
+      "heuristic": "Local estimate",
+      "notEvaluated": "Not evaluated"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
       "likelyExpired": "Probably expired"
-    }
+    },
+    "adviceToEvaluate": "To evaluate"
   },
   "kanbanCols": {
     "open": "Open",
@@ -430,7 +433,11 @@
     "generateRecruiterMsg": "Recruiter message",
     "recruiterMsg": "Recruiter message",
     "engagement": "Engagement type",
-    "axisSalaryUnknown": "No source publishes the pay for this posting"
+    "axisSalaryUnknown": "No source publishes the pay for this posting",
+    "reanalyze": "Re-evaluate with AI",
+    "reanalyzeRunning": "Evaluating…",
+    "shortDescHint": "This posting has too little text to judge. Open it to read it.",
+    "noBreakdown": "No breakdown: this offer was not evaluated."
   },
   "scan": {
     "scanning": "Scanning job portals...",
@@ -537,7 +544,10 @@
     "themeLight": "Light theme",
     "languageChanged": "Language updated",
     "exportError": "Export failed",
-    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis."
+    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis.",
+    "reanalyzeDone": "Offer evaluated.",
+    "reanalyzeStillUnscored": "No model answered: try again later.",
+    "reanalyzeFailed": "Re-evaluation failed"
   },
   "update": {
     "title": "New version available",
@@ -633,7 +643,16 @@
     "duration": "Duration",
     "topMatches": "Top matches",
     "viewList": "View list",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "To evaluate",
+    "unscoredHint": "{count} offers were not evaluated.",
+    "unscoredWhy": {
+      "descrizione_breve": "The postings had too little text: open them to read them.",
+      "quota_finita": "The daily AI request budget ran out.",
+      "modello_non_disponibile": "The provider was unreachable or rate-limited: try again later, or use a model on your own PC.",
+      "risposta_inutilizzabile": "The model's reply was unusable: try a different model.",
+      "errore_provider": "AI provider error."
+    }
   },
   "info": {
     "title": "How Job",

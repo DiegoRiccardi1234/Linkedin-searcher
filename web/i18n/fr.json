@@ -151,7 +151,8 @@
     "scoreDist": "Distribution des Scores IA",
     "matchScore": "Score de match",
     "topCompanies": "Entreprises fréquentes",
-    "noData": "Pas encore de données"
+    "noData": "Pas encore de données",
+    "unscored": "Non évaluées"
   },
   "recommendations": {
     "title": "Meilleurs pour Vous",
@@ -231,12 +232,14 @@
       "salary": "Sous ton minimum",
       "salaryLong": "La rémunération annoncée est inférieure à ton minimum",
       "shortDesc": "Description courte",
-      "heuristic": "Estimation locale"
+      "heuristic": "Estimation locale",
+      "notEvaluated": "Non évaluée"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
       "likelyExpired": "Probablement expirée"
-    }
+    },
+    "adviceToEvaluate": "À évaluer"
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -430,7 +433,11 @@
     "generateRecruiterMsg": "Message au recruteur",
     "recruiterMsg": "Message au recruteur",
     "engagement": "Type d'engagement",
-    "axisSalaryUnknown": "Aucune source ne publie la rémunération de cette offre"
+    "axisSalaryUnknown": "Aucune source ne publie la rémunération de cette offre",
+    "reanalyze": "Réévaluer avec l'IA",
+    "reanalyzeRunning": "Évaluation…",
+    "shortDescHint": "Cette annonce contient trop peu de texte pour être évaluée. Ouvrez-la pour la lire.",
+    "noBreakdown": "Aucun détail : cette offre n'a pas été évaluée."
   },
   "scan": {
     "scanning": "Scan des portails d'emploi...",
@@ -537,7 +544,10 @@
     "themeLight": "Thème clair",
     "languageChanged": "Langue mise à jour",
     "exportError": "Échec de l'export",
-    "cvAlreadyUploaded": "Ce CV a déjà été téléversé — analyse enregistrée réutilisée."
+    "cvAlreadyUploaded": "Ce CV a déjà été téléversé — analyse enregistrée réutilisée.",
+    "reanalyzeDone": "Offre évaluée.",
+    "reanalyzeStillUnscored": "Aucun modèle n'a répondu : réessayez plus tard.",
+    "reanalyzeFailed": "Échec de la réévaluation"
   },
   "update": {
     "title": "Nouvelle version disponible",
@@ -633,7 +643,16 @@
     "duration": "Durée",
     "topMatches": "Meilleurs matchs",
     "viewList": "Voir la liste",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "À évaluer",
+    "unscoredHint": "{count} offres n'ont pas été évaluées.",
+    "unscoredWhy": {
+      "descrizione_breve": "Les annonces contenaient trop peu de texte : ouvrez-les pour les lire.",
+      "quota_finita": "Le budget quotidien de requêtes IA est épuisé.",
+      "modello_non_disponibile": "Le fournisseur était injoignable ou limité : réessayez plus tard, ou utilisez un modèle sur votre PC.",
+      "risposta_inutilizzabile": "La réponse du modèle était inutilisable : essayez un autre modèle.",
+      "errore_provider": "Erreur du fournisseur d'IA."
+    }
   },
   "info": {
     "title": "Fonctionnement de Job",

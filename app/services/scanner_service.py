@@ -1344,9 +1344,7 @@ def run_scan(
         "totale_non_valutati": totale_non_valutati,
         # The single reason to show the user, with what it would take to fix it.
         "motivo_non_valutati": (
-            max(motivi_non_valutati.items(), key=lambda kv: kv[1])[0]
-            if motivi_non_valutati
-            else ""
+            max(motivi_non_valutati.items(), key=lambda kv: kv[1])[0] if motivi_non_valutati else ""
         ),
         "totale_scartati": totale_scartati,
         "archiviati": archiviati,

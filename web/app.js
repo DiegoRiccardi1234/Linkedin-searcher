@@ -1158,7 +1158,8 @@ function setupSharedLayout() {
 async function bootstrap() {
   await initI18n();
   refreshModelPickerLabel();
-  initJobDetail({ pinJobToActiveSession });
+  // loadJobs: after an on-demand re-score the list still shows "to evaluate".
+  initJobDetail({ pinJobToActiveSession, loadJobs });
   initJobList({
     showJobDetail,
     performJobAction,

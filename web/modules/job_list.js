@@ -54,6 +54,9 @@ export function fmtDate(s) {
 // scanner_service), rendered as badges so a hard blocker stops arriving as a
 // bare 3/10. Order matters — blockers first.
 const FLAG_BADGES = [
+  // First: without it, an empty score cell looks like a rendering glitch rather
+  // than the deliberate statement that nobody judged this offer.
+  { code: "non_valutato", cls: "flag-info", icon: "help", key: "jobs.flag.notEvaluated" },
   { code: "geo_non_ue", cls: "flag-block", icon: "public_off", key: "jobs.flag.geo" },
   { code: "voto_minimo", cls: "flag-block", icon: "school", key: "jobs.flag.grade" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
@@ -207,7 +210,7 @@ export async function loadJobs() {
       <td>${escapeHtml(truncate(job.azienda || ""))}</td>
       <td>${escapeHtml(truncate(job.sede || ""))}</td>
       <td>${escapeHtml(truncate(job.fonte || ""))}</td>
-      <td>${escapeHtml(truncate(job.consiglio || ""))}</td>
+      <td>${escapeHtml(truncate(job.consiglio || (sc.cls === "score-none" ? t("jobs.adviceToEvaluate") : "")))}</td>
       <td>
         <label class="compare-pick" title="${escapeHtml(t("compare.pick"))}"><input type="checkbox" class="compare-check" data-compare-id="${job.id}"${_deps.isCompareSelected(job.id) ? " checked" : ""} /><span class="material-symbols-outlined">compare_arrows</span></label>
         <button data-detail-id="${job.id}" class="secondary">${t("jobs.details")}</button>

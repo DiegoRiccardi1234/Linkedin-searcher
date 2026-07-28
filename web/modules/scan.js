@@ -224,16 +224,22 @@ async function _onScanSubmit(event) {
       } else if (data.status === "analyzed") {
         analysisCount++;
         const j = data.job || {};
-        const score = Number(j.score || 0);
-        lastTopJobs.push({ titolo: j.titolo, azienda: j.azienda, score });
-        lastTopJobs.sort((a, b) => b.score - a.score);
-        if (lastTopJobs.length > 5) lastTopJobs.length = 5;
-        const cls = score >= 7 ? "score-high" : score >= 4 ? "score-mid" : "score-low";
+        // null score = nobody judged it. `Number(null || 0)` used to render that
+        // as a confident 0/10 and let it into the top-5 of the summary.
+        const unscored = j.score === null || j.score === undefined;
+        const score = unscored ? null : Number(j.score);
+        if (!unscored) {
+          lastTopJobs.push({ titolo: j.titolo, azienda: j.azienda, score });
+          lastTopJobs.sort((a, b) => b.score - a.score);
+          if (lastTopJobs.length > 5) lastTopJobs.length = 5;
+        }
+        const cls = unscored ? "score-none" : score >= 7 ? "score-high" : score >= 4 ? "score-mid" : "score-low";
+        const label = unscored ? t("jobs.notScored") : `${score}/10`;
         const pct = Number(data.percent || Math.min(30 + analysisCount * 3, 95));
         const eta = fmtEta(data.eta_ms);
-        const line = t("scan.analyzed", { title: j.titolo || "?", company: j.azienda || "?", score });
+        const line = t("scan.analyzed", { title: j.titolo || "?", company: j.azienda || "?", score: label });
         setProgress(pct, eta ? `${line} · ${t("scan.progress.eta") || "ETA"} ${eta}` : line);
-        appendFeed("check_circle", t("scan.feedAnalyzed", { title: escHtml(j.titolo || "?"), company: escHtml(j.azienda || "?") }), { label: `${score}/10`, cls });
+        appendFeed(unscored ? "help" : "check_circle", t("scan.feedAnalyzed", { title: escHtml(j.titolo || "?"), company: escHtml(j.azienda || "?") }), { label, cls });
       } else if (data.status === "complete") {
         setProgress(100, t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));
         appendFeed("task_alt", t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));

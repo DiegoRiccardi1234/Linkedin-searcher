@@ -151,7 +151,8 @@
     "scoreDist": "Distribuzione Punteggi IA",
     "matchScore": "Punteggio match",
     "topCompanies": "Aziende più frequenti",
-    "noData": "Ancora nessun dato"
+    "noData": "Ancora nessun dato",
+    "unscored": "Non valutate"
   },
   "recommendations": {
     "title": "Migliori per Te",
@@ -231,12 +232,14 @@
       "salary": "Sotto la tua RAL minima",
       "salaryLong": "La retribuzione dichiarata è sotto la minima che hai impostato",
       "shortDesc": "Descrizione breve",
-      "heuristic": "Stima locale"
+      "heuristic": "Stima locale",
+      "notEvaluated": "Da valutare"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",
       "likelyExpired": "Probabilmente scaduta"
-    }
+    },
+    "adviceToEvaluate": "Da valutare"
   },
   "kanbanCols": {
     "open": "Aperto",
@@ -430,7 +433,11 @@
     "generateRecruiterMsg": "Messaggio recruiter",
     "recruiterMsg": "Messaggio recruiter",
     "engagement": "Tipo di ingaggio",
-    "axisSalaryUnknown": "Nessuna fonte dichiara la retribuzione di questo annuncio"
+    "axisSalaryUnknown": "Nessuna fonte dichiara la retribuzione di questo annuncio",
+    "reanalyze": "Rivaluta con l'IA",
+    "reanalyzeRunning": "Valutazione in corso…",
+    "shortDescHint": "L'annuncio non contiene abbastanza testo per essere valutato. Aprilo per leggerlo.",
+    "noBreakdown": "Nessun dettaglio: questa offerta non è stata valutata."
   },
   "scan": {
     "scanning": "Scansione portali lavoro...",
@@ -537,7 +544,10 @@
     "themeLight": "Tema chiaro",
     "languageChanged": "Lingua aggiornata",
     "exportError": "Esportazione fallita",
-    "cvAlreadyUploaded": "Questo CV era già stato caricato — riuso l'analisi salvata."
+    "cvAlreadyUploaded": "Questo CV era già stato caricato — riuso l'analisi salvata.",
+    "reanalyzeDone": "Offerta valutata.",
+    "reanalyzeStillUnscored": "Nessun modello ha risposto: riprova più tardi.",
+    "reanalyzeFailed": "Rivalutazione non riuscita"
   },
   "update": {
     "title": "Nuova versione disponibile",
@@ -633,7 +643,16 @@
     "duration": "Durata",
     "topMatches": "Migliori match",
     "viewList": "Vai alla lista",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "Da valutare",
+    "unscoredHint": "{count} offerte non sono state valutate.",
+    "unscoredWhy": {
+      "descrizione_breve": "Gli annunci non contenevano abbastanza testo: aprili per leggerli.",
+      "quota_finita": "Il budget giornaliero di richieste IA è esaurito.",
+      "modello_non_disponibile": "Il provider era irraggiungibile o a rate limit: riprova più tardi, oppure usa un modello sul tuo PC.",
+      "risposta_inutilizzabile": "Il modello ha risposto in modo inutilizzabile: prova un modello diverso.",
+      "errore_provider": "Errore del provider IA."
+    }
   },
   "info": {
     "title": "Come funziona Job",
