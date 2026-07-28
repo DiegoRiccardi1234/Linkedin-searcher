@@ -162,3 +162,54 @@ def test_scan_falls_back_to_the_cloud_when_the_local_server_is_off(
         "provider_name": "custom",
         "model_name": "jobfinder-scorer",
     }
+
+
+def test_a_pin_on_the_base_tag_is_widened_before_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A config written by hand names the tag the user downloaded, not the
+    variant — and Ollama serves that with a 4096-token window, truncating every
+    scoring reply. Deriving the variant costs one instant call and no disk."""
+    from app.services import scanner_service as ss
+
+    class _Settings:
+        scoring_model = "hf.co/unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
+        scoring_provider = "custom"
+        custom_base_url = "http://localhost:11434/v1"
+        llm_provider_order = ["custom"]
+
+    class _PM:
+        settings = _Settings()
+
+    asked: list[str] = []
+    monkeypatch.setattr(ss, "_local_server_reachable", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        lm, "ensure_scoring_variant", lambda base: asked.append(base) or lm.SCORING_VARIANT
+    )
+
+    ss._widened_local_model.cache_clear()
+    assert ss._scoring_call_kwargs(_PM())["model_name"] == lm.SCORING_VARIANT
+    assert asked == [_Settings.scoring_model]
+
+
+def test_a_pin_already_on_the_variant_asks_ollama_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ollama lists the variant as ``<name>:latest``; both spellings are it."""
+    from app.services import scanner_service as ss
+
+    class _Settings:
+        scoring_model = f"{lm.SCORING_VARIANT}:latest"
+        scoring_provider = "custom"
+        custom_base_url = "http://localhost:11434/v1"
+        llm_provider_order = ["custom"]
+
+    class _PM:
+        settings = _Settings()
+
+    def _unexpected(_base: str) -> str:
+        raise AssertionError("the variant must not be re-derived from itself")
+
+    monkeypatch.setattr(ss, "_local_server_reachable", lambda *_a, **_k: True)
+    monkeypatch.setattr(lm, "ensure_scoring_variant", _unexpected)
+
+    ss._widened_local_model.cache_clear()
+    assert ss._scoring_call_kwargs(_PM())["model_name"] == f"{lm.SCORING_VARIANT}:latest"

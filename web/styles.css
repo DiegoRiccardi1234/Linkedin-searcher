@@ -2816,6 +2816,14 @@ pre {
 .local-model-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .local-model-main strong { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .local-progress { margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+/* Asking permission to read the machine: the sections it would fill are empty
+   until the button is pressed, so this stands alone and needs its own room. */
+.local-consent {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem;
+  margin-top: 0.6rem; padding: 0.7rem 0.8rem;
+  background: var(--card, rgba(127,127,127,0.05)); border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.local-consent p { margin: 0; }
 
 /* Thumbs up/down on an AI score, inside the score card of the detail drawer. */
 .score-feedback { margin-top: 0.7rem; width: 100%; text-align: center; }

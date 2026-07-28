@@ -86,15 +86,10 @@ function _pull(tag, button) {
     });
 }
 
-export async function loadLocalModels() {
-  const card = document.getElementById("localModelsCard");
-  if (!card) return;
-  try {
-    _snapshot = await api("/api/local/status");
-  } catch {
-    return;
-  }
-  const { hardware, recommendation, ollama, ready } = _snapshot;
+// The card is rendered from a snapshot the caller already has, so consenting and
+// reading the answer are one round trip rather than two.
+function _render(snapshot) {
+  const { hardware, recommendation, ollama, ready } = snapshot;
 
   const hw = document.getElementById("localHardware");
   if (hw) hw.textContent = _hardwareLine(hardware);
@@ -158,7 +153,7 @@ export async function loadLocalModels() {
 
   // What the wider world runs locally, filtered to this card. The hand-written
   // list above ages the day a new model lands; this one does not.
-  const discovered = _snapshot.discovered || [];
+  const discovered = snapshot.discovered || [];
   const hub = document.getElementById("localDiscovered");
   if (hub) {
     hub.innerHTML = discovered.length
@@ -178,6 +173,61 @@ export async function loadLocalModels() {
   }
 }
 
+// Empty every section the probe fills, so the card cannot show yesterday's
+// hardware next to a consent prompt asking to read it.
+function _clearProbeSections() {
+  for (const id of [
+    "localHardware",
+    "localVerdict",
+    "localReady",
+    "localSuggestions",
+    "localDiscovered",
+  ]) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = "";
+  }
+}
+
+export async function loadLocalModels() {
+  const card = document.getElementById("localModelsCard");
+  if (!card) return;
+  try {
+    _snapshot = await api("/api/local/status");
+  } catch {
+    return;
+  }
+  const consent = document.getElementById("localConsent");
+  const refresh = document.getElementById("localRefresh");
+  // No consent: the server read nothing, so there is nothing to render. Ask.
+  if (_snapshot.consent === false) {
+    _clearProbeSections();
+    if (consent) consent.hidden = false;
+    if (refresh) refresh.hidden = true;
+    return;
+  }
+  if (consent) consent.hidden = true;
+  if (refresh) refresh.hidden = false;
+  _render(_snapshot);
+}
+
+async function _probe(button) {
+  button.disabled = true;
+  try {
+    _snapshot = await api("/api/local/probe", { method: "POST" });
+    const consent = document.getElementById("localConsent");
+    const refresh = document.getElementById("localRefresh");
+    if (consent) consent.hidden = true;
+    if (refresh) refresh.hidden = false;
+    _render(_snapshot);
+  } catch (err) {
+    showToast(`${t("toast.actionError")}: ${err.message}`, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 export function initLocalModels() {
   document.getElementById("localRefresh")?.addEventListener("click", loadLocalModels);
+  const probeBtn = document.getElementById("localProbeBtn");
+  probeBtn?.addEventListener("click", () => _probe(probeBtn));
 }

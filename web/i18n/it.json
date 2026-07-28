@@ -886,6 +886,8 @@
     "pullStarting": "Avvio il download di {model}…",
     "pullDone": "{model} è pronto",
     "qualityIntact": "qualità quasi intatta",
-    "fromHub": "Popolari su Hugging Face e compatibili con la tua scheda:"
+    "fromHub": "Popolari su Hugging Face e compatibili con la tua scheda:",
+    "consentBody": "Per dirti quale modello regge questa macchina, l'app deve leggere scheda video, memoria video e RAM. Succede tutto qui: non esce niente dal PC.",
+    "probe": "Analizza questo PC"
   }
 }

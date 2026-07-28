@@ -44,7 +44,7 @@ from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
 from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
-from app.services import quota
+from app.services import local_models, quota
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
@@ -315,9 +315,29 @@ def _watchlist_for_scan(db: Database, payload: ScanRequest) -> list[dict[str, st
     return [r for r in rows if r["canonical"]][:_MAX_WATCHLIST_COMPANIES]
 
 
-def _local_scoring(call_kwargs: dict[str, Any]) -> bool:
-    """True when this scoring call runs on the user's own machine."""
-    return str(call_kwargs.get("provider_name") or "") == "custom"
+def _local_scoring(call_kwargs: dict[str, Any], settings: Any = None) -> bool:
+    """True when this scoring call runs on the user's own machine.
+
+    A pinned model names its provider in the kwargs. Nothing does in auto mode,
+    and reading the kwargs alone made the app treat an Ollama call as a cloud
+    one: it sent the cloud token budget, which a local model — more verbose, and
+    costing nothing but time — overruns, and the answer came back truncated.
+    Measured 2026-07-28 on the real install: 2 usable replies out of 15 from the
+    wide-context variant, which has the room and simply was not given it.
+
+    So the chain is consulted too. A budget that is too generous for the model
+    that ends up serving the call is free (``max_tokens`` is a ceiling, not a
+    consumption); one that is too tight is the defect being closed here.
+    """
+    pinned = str(call_kwargs.get("provider_name") or "")
+    if pinned:
+        return pinned == "custom"
+    if settings is None:
+        return False
+    if str(getattr(settings, "scoring_provider", "") or "") == "custom":
+        return True
+    order = [str(p).lower() for p in (getattr(settings, "llm_provider_order", None) or [])]
+    return bool(order) and order[0] == "custom"
 
 
 def _local_server_reachable(settings: Any, timeout: float = 2.0) -> bool:
@@ -336,6 +356,24 @@ def _local_server_reachable(settings: Any, timeout: float = 2.0) -> bool:
     except Exception as exc:
         log.debug("local endpoint %s unreachable: %s", base, exc)
         return False
+
+
+@functools.lru_cache(maxsize=8)
+def _widened_local_model(base: str) -> str:
+    """The wide-context twin of a pinned local model, derived once per process.
+
+    A pin written by hand — or carried over from an older install — names the
+    base tag, and Ollama serves it with a 4096-token window whatever
+    ``max_tokens`` asks for. A scoring prompt is ~2500 tokens of CV and posting,
+    so the reply is cut off every single time (measured: 0 usable answers out of
+    30). Deriving the variant costs one instant call and no disk: Ollama layers
+    the parameter over the same weights. Cached because the batch loop asks for
+    the kwargs once per batch, and the answer cannot change under us.
+    """
+    variant = local_models.SCORING_VARIANT
+    if base.split(":", 1)[0] == variant:
+        return base  # already the variant (Ollama lists it as "<name>:latest")
+    return local_models.ensure_scoring_variant(base)
 
 
 def _scoring_max_tokens(n_offers: int, local: bool = False) -> int:
@@ -390,6 +428,8 @@ def _scoring_call_kwargs(provider_manager: ProviderManager) -> dict[str, Any]:
                 scoring_model,
             )
             return {"policy_override": _SCORING_POLICY}
+        if provider == "custom":
+            scoring_model = _widened_local_model(scoring_model)
         return {"provider_name": provider, "model_name": scoring_model}
     return {"policy_override": _SCORING_POLICY}
 
@@ -506,7 +546,9 @@ def _analyze_offer_raw(
     try:
         result = provider_manager.complete_json(
             prompt=prompt,
-            max_tokens=_scoring_max_tokens(1, local=_local_scoring(call_kwargs)),
+            max_tokens=_scoring_max_tokens(
+                1, local=_local_scoring(call_kwargs, getattr(provider_manager, "settings", None))
+            ),
             **call_kwargs,
         )
         # A non-dict, empty dict, or dict without a score is NOT an analysis:
@@ -600,7 +642,10 @@ def analyze_offers_batch(
             batch_kwargs = _scoring_call_kwargs(provider_manager)
             result = provider_manager.complete_json(
                 prompt=prompt,
-                max_tokens=_scoring_max_tokens(len(scorable), local=_local_scoring(batch_kwargs)),
+                max_tokens=_scoring_max_tokens(
+                    len(scorable),
+                    local=_local_scoring(batch_kwargs, getattr(provider_manager, "settings", None)),
+                ),
                 **batch_kwargs,
             )
             if isinstance(result, dict):

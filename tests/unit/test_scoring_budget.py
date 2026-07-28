@@ -58,6 +58,43 @@ def test_single_offer_budget_fits_the_schema() -> None:
     assert spy.budgets[0] > 1000
 
 
+class _AutoLocal:
+    """Settings of an install that scores locally without pinning a model."""
+
+    scoring_model = None
+    scoring_provider = "custom"
+    llm_provider_order = ["custom", "openrouter"]
+
+
+class _Cloud:
+    scoring_model = None
+    scoring_provider = None
+    llm_provider_order = ["openrouter", "custom"]
+
+
+def test_auto_selected_local_scoring_gets_the_local_budget() -> None:
+    """Recognising the local server only by the pin sent it the cloud budget.
+
+    A pinned model names its provider in the call kwargs; in auto mode nothing
+    does, so a scan running on Ollama asked for 500·n+1600 tokens — which a local
+    model overruns. Measured 2026-07-28: 2 usable replies out of 15 from the very
+    variant that has the context window for it.
+    """
+    assert ss._local_scoring({"policy_override": {}}, _AutoLocal()) is True
+    assert ss._scoring_max_tokens(3, local=True) > ss._scoring_max_tokens(3)
+
+
+def test_a_pin_elsewhere_is_not_local_whatever_the_order_says() -> None:
+    assert ss._local_scoring({"provider_name": "openrouter"}, _AutoLocal()) is False
+    assert ss._local_scoring({"provider_name": "custom"}, _Cloud()) is True
+
+
+def test_a_cloud_chain_keeps_the_cloud_budget() -> None:
+    assert ss._local_scoring({"policy_override": {}}, _Cloud()) is False
+    # No settings at all (test stubs, older call sites): cloud, as before.
+    assert ss._local_scoring({"policy_override": {}}) is False
+
+
 def test_batch_budget_scales_with_offer_count() -> None:
     assert ss._scoring_max_tokens(3) > ss._scoring_max_tokens(1)
     assert ss._scoring_max_tokens(3) == 500 * 3 + 1600
