@@ -43,14 +43,21 @@ def test_batch_prompt_instructs_education_weighing() -> None:
 _BASE = "Analisi dati e supporto al team su progetti interni."
 
 
-def test_fallback_penalizes_masters_requirement() -> None:
+def test_fallback_reads_the_degree_without_scoring() -> None:
+    """The fallback path reports what the ad requires and judges nothing.
+
+    It used to score the offer by keyword overlap and subtract 2 for a Master's:
+    a number nobody had computed from the merits. The degree requirement is a
+    fact in the text, so it stays; the score does not.
+    """
     plain = ss._fallback_analysis("t", "CV", "Analyst", "Co", _BASE)
     masters = ss._fallback_analysis(
         "t", "CV", "Analyst", "Co", _BASE + " Requisiti: laurea magistrale in informatica."
     )
-    assert masters["punteggio"] < plain["punteggio"]
+    assert plain["punteggio"] is None
+    assert masters["punteggio"] is None
     assert masters["titolo_studio_richiesto"] == "Magistrale"
-    assert "magistrale" in masters["punti_deboli"].lower()
+    assert plain["titolo_studio_richiesto"] == "Non specificato"
 
 
 def test_fallback_penalizes_phd_requirement() -> None:
@@ -95,24 +102,25 @@ def test_job_has_analysis_false_for_legacy_schema(tmp_path: Path) -> None:
         db.close()
 
 
-def test_heuristic_analysis_never_counts_as_scored(tmp_path: Path) -> None:
-    """A keyword-only analysis must not freeze the job at that score.
+def test_unevaluated_analysis_never_counts_as_scored(tmp_path: Path) -> None:
+    """An offer nobody judged must not be frozen as "already analysed".
 
-    It used to: the normaliser injects the marker key into EVERY analysis, so a
-    job that fell back to the heuristic (e.g. because the model truncated) was
-    "already analysed" forever.
+    It used to be: the normaliser injected the marker key into EVERY analysis, so
+    a job that fell back to the keyword estimate (e.g. because the model
+    truncated) was "already analysed" forever — at an invented score.
     """
     db = Database(tmp_path / "h.db")
     try:
         jid, _, _ = db.upsert_job({"titolo": "AI QA", "azienda": "A", "link": "https://x/2"})
-        heuristic = ss.enforce_hard_requirements(
-            ss._heuristic_analysis("CV python", "AI QA Engineer", "A", "descrizione"),
+        unscored = ss.enforce_hard_requirements(
+            ss._unscored_analysis("AI QA Engineer", "A", "descrizione", reason="429"),
             profile_markdown="CV python",
             descrizione="descrizione",
         )
-        assert ANALYSIS_VERSION_KEY not in heuristic
-        db.update_job_analysis(jid, heuristic)
+        assert ANALYSIS_VERSION_KEY not in unscored
+        db.update_job_analysis(jid, unscored)
         assert db.job_has_analysis(jid) is False
+        assert db.list_jobs(limit=5)[0]["punteggio_ai"] is None
 
         scored = ss.enforce_hard_requirements(
             {"punteggio": 8, "consiglio": "Valutabile"},

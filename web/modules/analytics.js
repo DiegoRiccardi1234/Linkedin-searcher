@@ -1,7 +1,7 @@
 // Dashboard analytics charts (Chart.js). Self-contained: owns its three chart
 // instances and re-renders them from /api/analytics. Each card shows a
 // "no data yet" note instead of an empty/broken canvas when its series is empty.
-import { api } from "./helpers.js";
+import { api, showToast } from "./helpers.js";
 import { getCurrentLang, t } from "./i18n.js";
 import { loadScoreFeedbackSummary } from "./score_feedback.js";
 
@@ -73,17 +73,25 @@ export async function loadAnalytics() {
     const scoreCtx = document.getElementById("scoreChart");
     if (scoreCtx) {
       if (scoreChart) scoreChart.destroy();
-      if (_hasData(data.score_distribution)) {
+      // Offers nobody judged get their own bar rather than being folded into
+      // "0": a 0 is a verdict, and hiding them would make the bars stop adding
+      // up to the archive.
+      const unscored = Number(data.unscored || 0);
+      const scoreLabels = [...Object.keys(data.score_distribution || {}), t("analytics.unscored")];
+      const scoreValues = [...Object.values(data.score_distribution || {}), unscored];
+      if (_hasData(data.score_distribution) || unscored > 0) {
         _showCanvas(scoreCtx);
         scoreChart = new Chart(scoreCtx, {
           type: "bar",
           data: {
-            labels: Object.keys(data.score_distribution),
+            labels: scoreLabels,
             datasets: [
               {
                 label: t("analytics.matchScore") || "Match Score",
-                data: Object.values(data.score_distribution),
-                backgroundColor: "#0d6efd",
+                data: scoreValues,
+                backgroundColor: scoreLabels.map((_, i) =>
+                  i === scoreLabels.length - 1 ? "#94a3b8" : "#0d6efd",
+                ),
               },
             ],
           },
@@ -145,6 +153,7 @@ export async function loadUsage(range) {
   if (!data.total_calls) {
     body.innerHTML =
       `<p class="analytics-empty">${t("usage.noData")}</p>` + quotaBarHtml(quota);
+    wireDailyLimitInput();
     return;
   }
   const fmt = (n) => Number(n || 0).toLocaleString(getCurrentLang());
@@ -163,6 +172,7 @@ export async function loadUsage(range) {
     </div>
     <div class="usage-list">${rows}</div>
     ${quotaBarHtml(quota)}`;
+  wireDailyLimitInput();
 }
 
 // Today's requests against the daily ceiling. A free OpenRouter account gets
@@ -181,5 +191,30 @@ function quotaBarHtml(quota) {
         <span class="${level}">${used} / ${limit}</span>
       </div>
       <div class="usage-quota-track"><div class="usage-quota-fill" style="width:${pct}%"></div></div>
+      <label class="micro usage-quota-edit">
+        <span>${t("settings.usage.limitLabel")}</span>
+        <input type="number" id="dailyLimitInput" min="0" step="50" value="${limit}" />
+      </label>
     </div>`;
+}
+
+// The ceiling could stop a scan outright and there was no way to change it: not
+// writable through the API, and no field anywhere. Editing the DB by hand was
+// the only remedy.
+export function wireDailyLimitInput() {
+  const input = document.getElementById("dailyLimitInput");
+  if (!input || input.dataset.wired) return;
+  input.dataset.wired = "1";
+  input.addEventListener("change", async () => {
+    const value = String(Math.max(0, Number(input.value) || 0));
+    try {
+      await api("/api/preferences", {
+        method: "POST",
+        body: JSON.stringify({ key: "daily_request_limit", value }),
+      });
+      showToast(t("settings.usage.limitSaved"), "success");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
 }

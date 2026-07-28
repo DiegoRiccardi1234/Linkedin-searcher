@@ -106,6 +106,25 @@ export function applyScanConfig(cfg) {
   if (sal) sal.value = cfg.min_salary ? String(cfg.min_salary) : "";
 }
 
+// Role words that match anything on a job board. "AI Specialist" alone returned
+// 27 of 47 postings on a real scan and nearly all of its noise, because
+// "Specialist" also names payroll, sales and partnership roles. The scan runs
+// anyway — this is a lesson, not a gate, and it belongs where the mistake is made.
+const _VAGUE_TERMS = new Set([
+  "specialist", "consultant", "consulente", "analyst", "analista", "engineer",
+  "ingegnere", "developer", "sviluppatore", "manager", "coordinator", "coordinatore",
+  "operatore", "operator", "assistant", "assistente", "junior", "senior", "stage",
+  "tirocinio", "internship",
+]);
+
+function warnAboutVagueTerms(tags) {
+  const vague = (tags || []).filter((tag) => {
+    const words = String(tag).trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return words.length === 1 && _VAGUE_TERMS.has(words[0]);
+  });
+  if (vague.length) showToast(t("scan.vagueTermWarning", { terms: vague.join(", ") }), "info");
+}
+
 async function _onScanSubmit(event) {
   event.preventDefault();
 
@@ -119,6 +138,7 @@ async function _onScanSubmit(event) {
 
   // Add any pending typed text that wasn't entered
   const kwInputRaw = document.getElementById("keywordsInput").value.trim();
+  // (see warnAboutVagueTerms below — a bare role word is where the noise starts)
   if (kwInputRaw) {
     getKeywords.addMultiple([kwInputRaw]);
     document.getElementById("keywordsInput").value = '';
@@ -130,6 +150,7 @@ async function _onScanSubmit(event) {
   }
 
   const termsText = getKeywords.getTags().join(", ");
+  warnAboutVagueTerms(getKeywords.getTags());
   const siteCheckboxes = document.querySelectorAll('input[name="scanSites"]:checked');
   const selectedSites = Array.from(siteCheckboxes).map(cb => cb.value);
   const isRemote = document.getElementById("remoteToggle")?.checked || false;
@@ -224,16 +245,29 @@ async function _onScanSubmit(event) {
       } else if (data.status === "analyzed") {
         analysisCount++;
         const j = data.job || {};
-        const score = Number(j.score || 0);
-        lastTopJobs.push({ titolo: j.titolo, azienda: j.azienda, score });
-        lastTopJobs.sort((a, b) => b.score - a.score);
-        if (lastTopJobs.length > 5) lastTopJobs.length = 5;
-        const cls = score >= 7 ? "score-high" : score >= 4 ? "score-mid" : "score-low";
+        // null score = nobody judged it. `Number(null || 0)` used to render that
+        // as a confident 0/10 and let it into the top-5 of the summary.
+        const unscored = j.score === null || j.score === undefined;
+        const score = unscored ? null : Number(j.score);
+        if (!unscored) {
+          lastTopJobs.push({ titolo: j.titolo, azienda: j.azienda, score });
+          lastTopJobs.sort((a, b) => b.score - a.score);
+          if (lastTopJobs.length > 5) lastTopJobs.length = 5;
+        }
+        const cls = unscored ? "score-none" : score >= 7 ? "score-high" : score >= 4 ? "score-mid" : "score-low";
+        const label = unscored ? t("jobs.notScored") : `${score}/10`;
         const pct = Number(data.percent || Math.min(30 + analysisCount * 3, 95));
         const eta = fmtEta(data.eta_ms);
-        const line = t("scan.analyzed", { title: j.titolo || "?", company: j.azienda || "?", score });
+        const line = t("scan.analyzed", { title: j.titolo || "?", company: j.azienda || "?", score: label });
         setProgress(pct, eta ? `${line} · ${t("scan.progress.eta") || "ETA"} ${eta}` : line);
-        appendFeed("check_circle", t("scan.feedAnalyzed", { title: escHtml(j.titolo || "?"), company: escHtml(j.azienda || "?") }), { label: `${score}/10`, cls });
+        appendFeed(unscored ? "help" : "check_circle", t("scan.feedAnalyzed", { title: escHtml(j.titolo || "?"), company: escHtml(j.azienda || "?") }), { label, cls });
+      } else if (data.status === "warning") {
+        // Something is wrong NOW: the provider is down, throttled or out of
+        // budget. Said mid-run, it is still actionable.
+        const why = t(`postScan.unscoredWhy.${data.reason || ""}`) || "";
+        const msg = `${t("scan.unscoredWarning", { count: data.count || 0 })} ${why}`.trim();
+        appendFeed("warning", escHtml(msg));
+        showToast(msg, "info");
       } else if (data.status === "complete") {
         setProgress(100, t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));
         appendFeed("task_alt", t("scan.complete", { newJobs: data.totale_nuovi || 0, analyzed: data.totale_analizzati || 0 }));

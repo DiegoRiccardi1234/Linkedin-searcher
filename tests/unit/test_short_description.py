@@ -2,10 +2,10 @@
 
 A truncated/marketing-only description (the real case: an 82-char company
 blurb with no requirements) must NOT be LLM-scored as if it were a full JD —
-the model hallucinates requirements from nothing. Such jobs take the honest
-capped path, and the relevance gate judges them by TITLE only (a stray domain
-token in a 82-char blurb must not save an off-topic job, nor missing tokens
-condemn a good one).
+the model hallucinates requirements from nothing. Such jobs get NO score at all
+(v1.7.9: not even a capped one — nobody could read them), and the relevance gate
+judges them by TITLE only (a stray domain token in a 82-char blurb must not save
+an off-topic job, nor missing tokens condemn a good one).
 """
 
 from __future__ import annotations
@@ -63,11 +63,14 @@ class _CountingPM:
         return {"valutazioni": [{"punteggio": 9} for _ in range(n)]}
 
 
-def test_analyze_offer_short_description_capped_no_llm() -> None:
+def test_analyze_offer_short_description_is_unscored_no_llm() -> None:
     pm = _CountingPM()
     res = ss.analyze_offer(pm, "CV con Python", "Data Scientist", "Sidea Group", _SHORT_DESC)
     assert pm.calls == 0, "a near-empty description must not be LLM-scored"
-    assert res["punteggio"] <= 6
+    assert res["punteggio"] is None, "nobody read this posting: it gets no score"
+    assert res["consiglio"] == ""
+    assert "non_valutato" in res["blocchi"]
+    assert "descrizione_breve" in res["blocchi"]
     assert "breve" in res["riassunto"].lower()
 
 
@@ -78,7 +81,7 @@ def test_analyze_offer_long_description_uses_llm() -> None:
     assert res["punteggio"] == 9
 
 
-def test_batch_short_slot_capped_long_slot_scored() -> None:
+def test_batch_short_slot_unscored_long_slot_scored() -> None:
     pm = _CountingPM()
     offers = [
         {"titolo": "AI Engineer", "azienda": "Co", "descrizione": _LONG_DESC},
@@ -86,13 +89,13 @@ def test_batch_short_slot_capped_long_slot_scored() -> None:
     ]
     out = ss.analyze_offers_batch(pm, "CV", offers)
     assert out[0]["punteggio"] == 9  # full JD: batch slot used
-    assert out[1]["punteggio"] <= 6  # short: capped, batch's blind 9 overridden
+    assert out[1]["punteggio"] is None  # short: the batch's blind 9 is discarded
     assert "breve" in out[1]["riassunto"].lower()
 
 
 def test_empty_description_keeps_unavailable_message() -> None:
     res = ss.analyze_offer(_CountingPM(), "CV", "Senior AI Engineer", "BigCo", "")
-    assert res["punteggio"] <= 6
+    assert res["punteggio"] is None
     assert "non disponibile" in res["riassunto"].lower()
 
 
@@ -139,12 +142,13 @@ def test_gate_short_desc_offtopic_title_dropped(
     assert complete["totale_scartati"] >= 1
 
 
-def test_gate_short_desc_relevant_title_kept_capped(
+def test_gate_short_desc_relevant_title_kept_unscored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Relevant title ("data" is domain vocab) → kept, scored via the capped path.
+    # Relevant title ("data" is domain vocab) → kept, but with no score: the
+    # description is too thin for anyone, model or app, to judge it.
     df = pd.DataFrame([_row("Data Scientist", _SHORT_DESC)], columns=_COLS)
     events = _run(df, tmp_path, monkeypatch)
     analyzed = [e for e in events if e.get("status") == "analyzed"]
     assert len(analyzed) == 1
-    assert analyzed[0]["job"]["score"] <= 6
+    assert analyzed[0]["job"]["score"] is None

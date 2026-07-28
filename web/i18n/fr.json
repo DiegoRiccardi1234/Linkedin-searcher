@@ -151,7 +151,8 @@
     "scoreDist": "Distribution des Scores IA",
     "matchScore": "Score de match",
     "topCompanies": "Entreprises fréquentes",
-    "noData": "Pas encore de données"
+    "noData": "Pas encore de données",
+    "unscored": "Non évaluées"
   },
   "recommendations": {
     "title": "Meilleurs pour Vous",
@@ -231,12 +232,16 @@
       "salary": "Sous ton minimum",
       "salaryLong": "La rémunération annoncée est inférieure à ton minimum",
       "shortDesc": "Description courte",
-      "heuristic": "Estimation locale"
+      "heuristic": "Estimation locale",
+      "notEvaluated": "Non évaluée",
+      "aggregator": "Agrégateur",
+      "aggregatorLong": "Republiée par un agrégateur : l'entreprise affichée n'est pas celle qui recrute"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
       "likelyExpired": "Probablement expirée"
-    }
+    },
+    "adviceToEvaluate": "À évaluer"
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -320,7 +325,9 @@
       "getKey": "Obtenir une clé gratuite",
       "endpoint": "Point d'accès (URL de base)",
       "apiKeyOptional": "Clé API (facultative)",
-      "showHide": "Afficher / masquer"
+      "showHide": "Afficher / masquer",
+      "healthTitle": "Comment ils se portent (14 derniers jours)",
+      "healthUnfit": "peu fiable"
     },
     "features": {
       "title": "Automatisation",
@@ -364,6 +371,10 @@
       "densityNormal": "Normale",
       "densityCompact": "Compacte",
       "densitySaved": "Densité mise à jour"
+    },
+    "usage": {
+      "limitLabel": "Limite de requêtes par jour (0 = aucune limite)",
+      "limitSaved": "Limite quotidienne mise à jour."
     }
   },
   "coach": {
@@ -430,7 +441,11 @@
     "generateRecruiterMsg": "Message au recruteur",
     "recruiterMsg": "Message au recruteur",
     "engagement": "Type d'engagement",
-    "axisSalaryUnknown": "Aucune source ne publie la rémunération de cette offre"
+    "axisSalaryUnknown": "Aucune source ne publie la rémunération de cette offre",
+    "reanalyze": "Réévaluer avec l'IA",
+    "reanalyzeRunning": "Évaluation…",
+    "shortDescHint": "Cette annonce contient trop peu de texte pour être évaluée. Ouvrez-la pour la lire.",
+    "noBreakdown": "Aucun détail : cette offre n'a pas été évaluée."
   },
   "scan": {
     "scanning": "Scan des portails d'emploi...",
@@ -480,7 +495,9 @@
     },
     "postScanRenderFailed": "Scan terminé (résumé non affichable).",
     "volumeWarning": "Grande recherche ({n} requêtes) — cela peut prendre du temps.",
-    "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages."
+    "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages.",
+    "vagueTermWarning": "« {terms} » : un intitulé générique ramène de tout (paie, ventes, partenariats). Ajoutez un mot de domaine, par ex. « AI QA ».",
+    "unscoredWarning": "{count} offres non évaluées jusqu'ici."
   },
   "toast": {
     "enterKeyOrProvider": "Entrez au moins une clé ou choisissez un fournisseur principal.",
@@ -537,7 +554,10 @@
     "themeLight": "Thème clair",
     "languageChanged": "Langue mise à jour",
     "exportError": "Échec de l'export",
-    "cvAlreadyUploaded": "Ce CV a déjà été téléversé — analyse enregistrée réutilisée."
+    "cvAlreadyUploaded": "Ce CV a déjà été téléversé — analyse enregistrée réutilisée.",
+    "reanalyzeDone": "Offre évaluée.",
+    "reanalyzeStillUnscored": "Aucun modèle n'a répondu : réessayez plus tard.",
+    "reanalyzeFailed": "Échec de la réévaluation"
   },
   "update": {
     "title": "Nouvelle version disponible",
@@ -633,7 +653,16 @@
     "duration": "Durée",
     "topMatches": "Meilleurs matchs",
     "viewList": "Voir la liste",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "À évaluer",
+    "unscoredHint": "{count} offres n'ont pas été évaluées.",
+    "unscoredWhy": {
+      "descrizione_breve": "Les annonces contenaient trop peu de texte : ouvrez-les pour les lire.",
+      "quota_finita": "Le budget quotidien de requêtes IA est épuisé.",
+      "modello_non_disponibile": "Le fournisseur était injoignable ou limité : réessayez plus tard, ou utilisez un modèle sur votre PC.",
+      "risposta_inutilizzabile": "La réponse du modèle était inutilisable : essayez un autre modèle.",
+      "errore_provider": "Erreur du fournisseur d'IA."
+    }
   },
   "info": {
     "title": "Fonctionnement de Job",
@@ -855,6 +884,8 @@
     "couldAlsoRun": "Cette machine pourrait aussi faire tourner :",
     "download": "Télécharger",
     "pullStarting": "Démarrage du téléchargement de {model}…",
-    "pullDone": "{model} est prêt"
+    "pullDone": "{model} est prêt",
+    "qualityIntact": "qualité presque intacte",
+    "fromHub": "Populaires sur Hugging Face et compatibles avec votre carte :"
   }
 }

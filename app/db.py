@@ -282,9 +282,13 @@ class Database:
             INSERT INTO jobs(
                 job_hash, dedup_key, titolo, azienda, descrizione, sede, fonte, link,
                 ricerca_usata, modalita, sources_json,
-                first_seen_at, last_seen_at, updated_at, is_new
+                first_seen_at, last_seen_at, updated_at, is_new, punteggio_ai
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            -- punteggio_ai NULL, not the column's DEFAULT 0: between being
+            -- scraped and being scored a job has no verdict, and a 0 is one —
+            -- the worst one. It showed as "0/10" in the list for the minutes a
+            -- scan takes to reach it.
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL)
             """,
             (
                 hash_value,
@@ -309,7 +313,16 @@ class Database:
 
     @_synchronized
     def update_job_analysis(self, job_id: int, analysis: dict[str, Any]) -> None:
-        score = int(analysis.get("punteggio", 0) or 0)
+        # NULL, not 0, when nobody produced a score: a 0 is a verdict ("worst
+        # possible match") and would be indistinguishable from a real one. NULL
+        # also does the right thing on its own in SQL — it satisfies no
+        # ``min_score`` filter and sorts last under ORDER BY … DESC.
+        raw_score = analysis.get("punteggio")
+        score: int | None
+        try:
+            score = int(raw_score) if raw_score is not None else None
+        except (TypeError, ValueError):
+            score = None
         consiglio = str(analysis.get("consiglio", ""))
         # NULL for a heuristic/fallback analysis (the scorer leaves the version
         # out) so the job is re-scored next time instead of being frozen at a
@@ -764,7 +777,10 @@ class Database:
             like = f"%{_escape_like(search_text.strip().lower())}%"
             params.extend([like, like, like])
         if min_score is not None:
-            query += " AND punteggio_ai >= ?"
+            # IS NOT NULL is redundant in SQL (NULL >= n is never true) but says
+            # the intent out loud: a quality threshold filters judgements, and an
+            # offer nobody judged has none — not even a zero.
+            query += " AND punteggio_ai IS NOT NULL AND punteggio_ai >= ?"
             params.append(min_score)
         if max_age_days is not None:
             query += " AND julianday('now') - julianday(last_seen_at) <= ?"
@@ -795,7 +811,7 @@ class Database:
             """
             SELECT *
             FROM jobs
-            WHERE status = 'open'
+            WHERE status = 'open' AND punteggio_ai IS NOT NULL
             ORDER BY
                 CASE
                     WHEN LOWER(consiglio) LIKE '%candidati subito%' THEN 0
@@ -1241,6 +1257,14 @@ class Database:
             if 0 <= score <= 10:
                 score_distribution[str(score)] = int(row[1] or 0)
 
+        # Counted apart, not folded into "0": these offers have no score at all,
+        # and the loop above drops them silently — which would make them vanish
+        # from a chart whose bars are supposed to add up to the archive.
+        unscored = (
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE punteggio_ai IS NULL").fetchone()[0]
+            or 0
+        )
+
         top_companies: list[dict[str, Any]] = []
         for row in cursor.execute(
             "SELECT azienda, COUNT(*) AS c FROM jobs WHERE azienda != '' "
@@ -1254,6 +1278,7 @@ class Database:
             "rejected": rejected,
             "jobs_by_status": jobs_by_status,
             "score_distribution": score_distribution,
+            "unscored": int(unscored),
             "top_companies": top_companies,
         }
 

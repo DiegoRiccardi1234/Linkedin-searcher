@@ -43,6 +43,7 @@ from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
+from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
 from app.services import quota
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
@@ -51,10 +52,12 @@ from app.services.scan.companies import canonical_company, company_matches
 from app.services.scan.hard_requirements import (
     _MATCH_AXES_KEYS,
     BLOCKING_FLAGS,
+    FLAG_AGGREGATOR,
     FLAG_GEO_BLOCKED,
     FLAG_GIG,
     FLAG_GRADE_BLOCKED,
     FLAG_HEURISTIC,
+    FLAG_NOT_EVALUATED,
     FLAG_SALARY_BELOW,
     FLAG_SHORT_DESCRIPTION,
     _add_flag,
@@ -76,6 +79,8 @@ from app.services.scan.hard_requirements import (
     _salary_axis,
     enforce_hard_requirements,
     hard_block_reason,
+    is_bait_posting,
+    is_unevaluated,
 )
 from app.services.scan.heuristics import (
     MIN_DESCRIPTION_CHARS,
@@ -85,8 +90,9 @@ from app.services.scan.heuristics import (
     _estimate_programming_demand,
     _estimate_smart_working,
     _fallback_analysis,
-    _heuristic_analysis,
     _insufficient_description_analysis,
+    _local_facts,
+    _unscored_analysis,
 )
 from app.services.scan.prompts import (
     _PER_OFFER_SCHEMA,
@@ -111,11 +117,16 @@ from app.services.scan.scraping import (
 from app.services.scan.synonyms import expand_terms
 from app.services.scan.vocab import (
     _DOMAIN_VOCAB,
+    _TITLE_DOMAIN,
     BLACKLIST,
     STOPWORDS,
     TECH_KEYWORDS,
     _tokenize,
+    default_title_vocabulary,
+    description_on_topic,
     pre_filtro,
+    title_off_topic,
+    title_vocabulary,
 )
 
 # This module stays the front door of the scan pipeline: the internals now live
@@ -126,10 +137,12 @@ from app.services.scan.vocab import (
 __all__ = [
     "BLACKLIST",
     "BLOCKING_FLAGS",
+    "FLAG_AGGREGATOR",
     "FLAG_GEO_BLOCKED",
     "FLAG_GIG",
     "FLAG_GRADE_BLOCKED",
     "FLAG_HEURISTIC",
+    "FLAG_NOT_EVALUATED",
     "FLAG_SALARY_BELOW",
     "FLAG_SHORT_DESCRIPTION",
     "MIN_DESCRIPTION_CHARS",
@@ -138,6 +151,7 @@ __all__ = [
     "_MATCH_AXES_KEYS",
     "_PER_OFFER_SCHEMA",
     "_SCORING_RULES",
+    "_TITLE_DOMAIN",
     "_analysis_prompt",
     "_apply_geo_eligibility",
     "_apply_grade_requirement",
@@ -158,10 +172,10 @@ __all__ = [
     "_geo_status",
     "_grade_status",
     "_has_salary_signal",
-    "_heuristic_analysis",
     "_indeed_country_for",
     "_insufficient_description_analysis",
     "_is_non_eu_location",
+    "_local_facts",
     "_normalize_analysis",
     "_parse_ral",
     "_prep_description",
@@ -171,12 +185,18 @@ __all__ = [
     "_row_job_type_ok",
     "_row_work_mode_ok",
     "_scrape_split_indeed",
+    "_unscored_analysis",
     "analyze_offer",
     "analyze_offers_batch",
+    "description_on_topic",
     "enforce_hard_requirements",
     "hard_block_reason",
+    "is_bait_posting",
+    "is_unevaluated",
     "pre_filtro",
     "run_scan",
+    "title_off_topic",
+    "title_vocabulary",
 ]
 
 log = get_logger(__name__)
@@ -412,6 +432,33 @@ def analyze_offer(
     )
 
 
+#: Raw ``motivo_non_valutazione`` -> the bucket the summary reports. The raw
+#: value is a provider exception message, which is useless to the user and
+#: unbounded in shape; what they need is which of the four fixable situations
+#: they are in.
+_UNEVALUATED_BUCKETS = (
+    ("descrizione_breve", ("insufficient_description",)),
+    ("quota_finita", ("daily_limit", "quota", "insufficient_quota")),
+    ("modello_non_disponibile", ("429", "rate", "timeout", "connection", "503", "502", "403")),
+    ("risposta_inutilizzabile", ("invalid response", "truncat", "empty", "json")),
+)
+
+
+#: How many unjudged offers before the scan says so out loud. Three in a row is
+#: no longer a hiccup: something is down, and the user can act on it now (turn
+#: the local model on, add a free key) instead of at the end of a ten-minute run.
+_UNSCORED_WARN_AFTER = 3
+
+
+def _unevaluated_reason(analysis: dict[str, Any]) -> str:
+    """Which situation left this offer unjudged, as a stable code."""
+    raw = str(analysis.get("motivo_non_valutazione") or "").lower()
+    for bucket, markers in _UNEVALUATED_BUCKETS:
+        if any(marker in raw for marker in markers):
+            return bucket
+    return "errore_provider"
+
+
 def _blocked_analysis(
     profile_markdown: str, titolo: str, azienda: str, descrizione: str, reason: str
 ) -> dict[str, Any]:
@@ -423,9 +470,14 @@ def _blocked_analysis(
     the cap, so this only has to be honest about WHY.
     """
     log.info("HARD_BLOCK_SKIP: '%s' @ %s (%s)", titolo, azienda, reason)
-    result = _heuristic_analysis(profile_markdown, titolo, azienda, descrizione)
-    result["riassunto"] = f"Non candidabile: {reason}. Analisi locale, nessuna chiamata IA."
-    return result
+    return {
+        # Not "unevaluated": this offer HAS a verdict, computed by the app from
+        # the posting itself. ``enforce_hard_requirements`` caps it to 3 right
+        # after (``_cap_score`` reads a missing score as 0 and applies the cap).
+        ANALYSIS_SOURCE_KEY: HEURISTIC_SOURCE,
+        "riassunto": f"Non candidabile: {reason}. Analisi locale, nessuna chiamata IA.",
+        **_local_facts(titolo, descrizione),
+    }
 
 
 def _analyze_offer_raw(
@@ -750,9 +802,10 @@ def run_scan(
     # wastes an LLM scoring call. Conservative: zero-overlap only.
     _summary = profile.get("summary_json") if profile else None
     _skills = _summary.get("skills") if isinstance(_summary, dict) else None
-    relevance_vocab = _DOMAIN_VOCAB | (
+    skill_tokens = (
         _tokenize(" ".join(str(s) for s in _skills)) if isinstance(_skills, list) else set()
     )
+    relevance_vocab = _DOMAIN_VOCAB | skill_tokens
 
     linkedin_url = db.get_preference("linkedin_url", "")
     if linkedin_url:
@@ -787,6 +840,26 @@ def run_scan(
     if not work_types:
         work_types = _work_types_from_goal(db.get_preference("onboarding_work_mode", ""))
     min_salary = int(payload.min_salary or 0)
+
+    # The words that mean "this is my trade" — for THIS user, not for the trade
+    # this app was first written for. Built from what they asked for (the terms
+    # of this scan), what they can do (CV skills) and what they said they want
+    # (preferred roles + the onboarding goal). A fixed list would work only for
+    # one profile: someone searching "infermiere pediatrico" would have every
+    # posting dropped by a gate that only recognises AI and software words.
+    user_vocab = title_vocabulary(
+        search_terms=terms,
+        skills=[str(s) for s in _skills] if isinstance(_skills, list) else [],
+        roles=[
+            db.get_preference("preferred_roles", ""),
+            db.get_preference("onboarding_goal", ""),
+            db.get_preference("onboarding_sector", ""),
+        ],
+    )
+    # With no profile at all (a first scan on a fresh install) the broad default
+    # gates the title — but it never rescues one, or every ad saying "software"
+    # would come back through.
+    gate_vocab = user_vocab or default_title_vocabulary()
 
     is_remote_effective = payload.is_remote or ("remote" in work_types)
 
@@ -851,7 +924,16 @@ def run_scan(
     totale_trovati = 0
     totale_nuovi = 0
     totale_analizzati = 0
+    totale_non_valutati = 0
+    # Why offers went unjudged, bucketed — the summary needs ONE reason to show,
+    # and "the provider is rate-limited" and "the ad had no text" call for
+    # completely different actions from the user.
+    motivi_non_valutati: dict[str, int] = {}
     totale_scartati = 0
+    # Counted separately so a new filter can be judged on its own: how much it
+    # cut, and (from the log lines it writes) what exactly it cut.
+    scartati_per_titolo = 0
+    warned_unscored = False
     new_flags_cleared = False
 
     def _finalize_scored(item: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
@@ -871,21 +953,31 @@ def run_scan(
         interval = str(row.get("interval") or "")
         low = _annual_amount(row.get("min_amount"), interval)
         high = _annual_amount(row.get("max_amount"), interval)
+        unevaluated = is_unevaluated(analysis)
         axes = analysis.get("match_axes")
-        if isinstance(axes, dict) and axes.get("salary_match") is None:
+        # Only for an offer someone judged: a lone salary axis on an unevaluated
+        # analysis draws a one-spoke radar, which reads as "it WAS analysed".
+        if not unevaluated and isinstance(axes, dict) and axes.get("salary_match") is None:
             axis = _salary_axis(low, high, ral_min)
             if axis is not None:
                 axes["salary_match"] = axis
         if ral_min and high and high < ral_min:
+            # A fact about the posting, not a judgement of it: flag it either way.
             detail = f"RAL dichiarata fino a {int(high)} EUR, sotto la tua minima ({ral_min})"
             _add_flag(analysis, FLAG_SALARY_BELOW, detail)
             _add_missing(analysis, detail)
-        raw_score = analysis.get("punteggio", 0)
-        try:
-            analysis["punteggio"] = int(raw_score)
-        except (TypeError, ValueError):
-            numbers = re.findall(r"\d+", str(raw_score))
-            analysis["punteggio"] = int(numbers[0]) if numbers else 0
+        # Coerce the score to int — but never resurrect a missing one as 0:
+        # int(None) raises, and the regex fallback below would read "None" as no
+        # digits and write 0, silently turning "nobody judged it" into a verdict.
+        raw_score = analysis.get("punteggio")
+        if raw_score is None:
+            analysis["punteggio"] = None
+        else:
+            try:
+                analysis["punteggio"] = int(raw_score)
+            except (TypeError, ValueError):
+                numbers = re.findall(r"\d+", str(raw_score))
+                analysis["punteggio"] = int(numbers[0]) if numbers else 0
 
         recruiter = None
         link = item["link"]
@@ -1098,6 +1190,34 @@ def run_scan(
             # they want to see what THIS company posts, and the vocabulary check
             # would drop a language-data role at RWS for not sounding technical.
             # The hard blockers (geo, degree grade, pay) still apply downstream.
+            # Not a job at all — a lead-capture form. Dropped before anything
+            # else: there is no role to judge, and one of these scored 8/10.
+            if is_bait_posting(titolo):
+                totale_scartati += 1
+                log.info("BAIT_SKIP: '%s' @ %s (not a position)", titolo, azienda)
+                continue
+
+            # First gate: does the TITLE name a trade the candidate practises?
+            # The description gate below only ever fired on zero overlap, which
+            # no corporate ad reaches — "data", "software" and "cloud" are in
+            # every one of them. Measured on a real scan: 26 of 47 postings were
+            # off-domain from the title alone, and 11 of those still scored >=6.
+            # …unless the description is about the trade throughout, which is
+            # how an acronym title survives: "RAI Specialist" at Accenture is a
+            # Responsible AI role, and it names five distinct domain markers in
+            # its text against at most two for any off-domain posting.
+            if (
+                not watched
+                and title_off_topic(titolo, gate_vocab)
+                and not description_on_topic(descrizione, user_vocab)
+            ):
+                totale_scartati += 1
+                scartati_per_titolo += 1
+                # Logged with the title: a new filter has to be auditable, or a
+                # false negative is invisible by construction.
+                log.info("RELEVANCE_SKIP (title): '%s' @ %s", titolo, azienda)
+                continue
+
             desc_sufficient = len(descrizione) >= MIN_DESCRIPTION_CHARS
             gate_text = f"{titolo} {descrizione}" if desc_sufficient else titolo
             if (
@@ -1215,7 +1335,34 @@ def run_scan(
                         db.update_job_analysis(job_id=result["job_id"], analysis=result["analysis"])
                         if result["recruiter"]:
                             db.upsert_recruiter(result["job_id"], result["recruiter"])
-                        totale_analizzati += 1
+                        # "Analysed" must mean judged. An offer that came back
+                        # unevaluated (provider down, unusable answer, no
+                        # description) is counted apart, so the summary cannot
+                        # report 36 analysed when 11 of them were never read.
+                        # ``pair_analyzed`` still counts everything: it drives
+                        # the progress bar, which must keep moving.
+                        if is_unevaluated(result["analysis"]):
+                            totale_non_valutati += 1
+                            _bucket = _unevaluated_reason(result["analysis"])
+                            motivi_non_valutati[_bucket] = motivi_non_valutati.get(_bucket, 0) + 1
+                            # Say it while it is happening. A scan takes ten
+                            # minutes, and finding out at the end that the
+                            # provider was down the whole time is ten minutes
+                            # spent for nothing.
+                            if (
+                                totale_non_valutati >= _UNSCORED_WARN_AFTER
+                                and not warned_unscored
+                                and _bucket != "descrizione_breve"
+                            ):
+                                warned_unscored = True
+                                yield {
+                                    "status": "warning",
+                                    "code": "unscored_streak",
+                                    "reason": _bucket,
+                                    "count": totale_non_valutati,
+                                }
+                        else:
+                            totale_analizzati += 1
                         pair_analyzed += 1
 
                         elapsed_ms = int(time.time() * 1000) - started_at_ms
@@ -1239,7 +1386,9 @@ def run_scan(
                             "job": {
                                 "titolo": result["titolo"],
                                 "azienda": result["azienda"],
-                                "score": result["analysis"].get("punteggio", 0),
+                                # None (not 0) when nobody judged it: the feed
+                                # renders it as "da valutare", never as 0/10.
+                                "score": result["analysis"].get("punteggio"),
                             },
                             "current": seen_now,
                             "total": expected_total,
@@ -1280,7 +1429,13 @@ def run_scan(
         "totale_trovati": totale_trovati,
         "totale_nuovi": totale_nuovi,
         "totale_analizzati": totale_analizzati,
+        "totale_non_valutati": totale_non_valutati,
+        # The single reason to show the user, with what it would take to fix it.
+        "motivo_non_valutati": (
+            max(motivi_non_valutati.items(), key=lambda kv: kv[1])[0] if motivi_non_valutati else ""
+        ),
         "totale_scartati": totale_scartati,
+        "scartati_per_titolo": scartati_per_titolo,
         "archiviati": archiviati,
         "duration_ms": duration_ms,
         "percent": 100,

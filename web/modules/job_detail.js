@@ -56,6 +56,12 @@ function renderMatchRadar(axes) {
     _matchRadarChart.destroy();
     _matchRadarChart = null;
   }
+  // No axis at all = nobody judged this offer (or it was blocked before anyone
+  // did). An empty chart canvas reads as a broken widget; say it in words.
+  const empty = document.getElementById("detailRadarEmpty");
+  if (empty) empty.classList.toggle("hidden", axisSpecs.length > 0);
+  canvas.classList.toggle("hidden", axisSpecs.length === 0);
+  if (!axisSpecs.length) return;
   const isDark = document.documentElement.getAttribute("data-theme") === "dark";
   const gridColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
   const textColor = isDark ? "#cbd5e1" : "#334155";
@@ -312,6 +318,19 @@ export async function showJobDetail(jobId) {
     if (engagement && engagement !== "Non specificato") {
       engagementSpan = `<div class="info-tag"><strong>${t("offcanvas.engagement")}:</strong> ${escapeHtml(engagement)}</div>`;
     }
+    // Nobody judged this offer. Offer the retry — unless the posting itself is
+    // the problem, in which case another model call would come back just as
+    // empty and the only useful action is opening the ad.
+    const unscored = job.punteggio_ai === null || job.punteggio_ai === undefined;
+    const shortDesc = (analysis?.blocchi || []).includes("descrizione_breve");
+    let rescoreRow = "";
+    if (unscored && shortDesc) {
+      rescoreRow = `<p class="micro mt-8 text-center">${t("offcanvas.shortDescHint")}</p>`;
+    } else if (unscored) {
+      rescoreRow =
+        `<button type="button" id="detailReanalyzeBtn" data-id="${job.id}" class="secondary mt-8">` +
+        `<span class="material-symbols-outlined">refresh</span> ${t("offcanvas.reanalyze")}</button>`;
+    }
 
     container.innerHTML = `
       <div class="modern-detail">
@@ -322,7 +341,8 @@ export async function showJobDetail(jobId) {
             <div class="text-sm mt-8 text-center">${escapeHtml((analysis ? analysis.consiglio : null) || job.consiglio || "")}</div>
             <button type="button" data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn detail-fav${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
             ${flagsRow}
-            ${scoreFeedbackHtml(payload.score_feedback)}
+            ${rescoreRow}
+            ${unscored ? "" : scoreFeedbackHtml(payload.score_feedback)}
           </div>
           <div class="info-card">
             <h4>${t("offcanvas.positionDetails")}</h4>
@@ -348,7 +368,8 @@ export async function showJobDetail(jobId) {
         <div class="mt-16 info-card">
           <h4>${t("offcanvas.breakdown")}</h4>
           <canvas id="detailMatchRadar" height="220"></canvas>
-          ${axisReasonsHtml(analysis)}
+          <p id="detailRadarEmpty" class="micro hidden">${t("offcanvas.noBreakdown")}</p>
+          ${unscored ? "" : axisReasonsHtml(analysis)}
         </div>
         ${requisitiBlock}
         ${responsabilitaBlock}
@@ -391,6 +412,31 @@ export async function showJobDetail(jobId) {
       const btn = event.currentTarget;
       toggleFavorite(btn.dataset.id, btn.dataset.favorite === "1");
     });
+    const rescoreBtn = document.getElementById("detailReanalyzeBtn");
+    if (rescoreBtn) {
+      rescoreBtn.addEventListener("click", async () => {
+        rescoreBtn.disabled = true;
+        const original = rescoreBtn.innerHTML;
+        rescoreBtn.textContent = t("offcanvas.reanalyzeRunning");
+        try {
+          const res = await api(`/api/jobs/${job.id}/analyze`, { method: "POST" });
+          if (res.evaluated) {
+            showToast(t("toast.reanalyzeDone"), "success");
+            await showJobDetail(job.id);
+            if (typeof _deps.loadJobs === "function") await _deps.loadJobs();
+          } else {
+            // The provider is still down. Not an app error, and not a score.
+            showToast(t("toast.reanalyzeStillUnscored"), "info");
+            rescoreBtn.disabled = false;
+            rescoreBtn.innerHTML = original;
+          }
+        } catch (err) {
+          showToast(`${t("toast.reanalyzeFailed")}: ${err.message}`, "error");
+          rescoreBtn.disabled = false;
+          rescoreBtn.innerHTML = original;
+        }
+      });
+    }
     const noteBtn = document.getElementById("detailNoteBtn");
     const noteInput = document.getElementById("detailNoteInput");
     if (noteBtn && noteInput) {

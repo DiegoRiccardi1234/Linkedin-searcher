@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [1.7.9] — 2026-07-28
+
+An offer nobody read no longer gets a score.
+
+### Changed
+- **No more invented scores.** When no model could judge an offer — the provider was down or rate-limited, the answer came back unusable, or the posting carried no description worth reading — the app used to score it anyway, by counting words the ad shared with your CV. That number is indistinguishable from a real verdict once it is in the list, and it sorts among the real ones: on a real scan, seven of the eleven highest-scoring off-target offers had never been read by anything, a PAYROLL SPECIALIST at 6/10 and a DIGITAL COMMUNICATION SPECIALIST at 8/10 among them. Such an offer is now shown as **to evaluate**: no score, no advice, no radar, and a badge saying so. It stays visible and is re-scored on the next scan.
+  - Existing archives are cleaned on update: offers that carry a keyword score lose it. Offers capped by a hard blocker (outside the EU, degree grade below the stated minimum) **keep** their 3/10 — that cap is computed by the app from the ad, not guessed.
+  - A quality filter (minimum score) no longer returns unevaluated offers, and they are excluded from the recommendations rather than filling the gaps.
+  - The score chart counts them in a bar of their own instead of dropping them silently.
+- **The scan filters on the job title, not on words every ad contains.** The relevance gate read title+description and only dropped a posting sharing *nothing* with the domain vocabulary — a bar no corporate ad ever fails, since "data", "software" and "cloud" appear in all of them. It dropped nothing. On a real scan, 26 of 47 postings were off-domain from the title alone and 11 of those still scored 6 or more, all from one over-broad search term. The title now has to name a trade you practise, with exemptions for a followed company and for entry routes ("Tirocinio", "Graduate"). Every drop is logged with its title and counted in the summary: a new filter has to be auditable, or what it wrongly cut is invisible.
+  - **What counts as "your trade" comes from you**, not from a list in the app: the terms you search, the skills on your CV, the roles you said you want. A fixed list would only ever work for the job the app was first written for — someone searching "infermiere pediatrico" would have every posting dropped by a gate that knows only AI and software words. Bare role words ("Specialist", "Consultant") are excluded from it, or searching "AI Specialist" would teach the gate that "PAYROLL SPECIALIST" is on topic.
+  - **A description that talks about your trade throughout overrules a silent title**, so "RAI Specialist" at Accenture — a *Responsible AI* role, and one of the best matches in the archive — is kept. Measured: it names your words 27 times, a genuine frontend role 8, and every off-domain ad 4 or fewer. Short acronyms are matched case-sensitively, because "ai" is also an everyday Italian preposition.
+- **"Candidatura spontanea" and talent-pool forms are no longer treated as jobs** — one scored 8/10. There is no role in them to score. Job boards reposting other employers' ads are flagged instead, since those sometimes carry a real position under someone else's name.
+- **Default search terms carry two domain tokens each.** "AI Specialist" alone returned 27 of 47 postings and nearly all of the noise, because job boards match "Specialist" against payroll, sales and partnership roles. Typing a bare role word into the scan form now says so.
+- **The scan summary distinguishes judged from unjudged** — "36 analysed" used to include offers nobody had read. It now reports how many were left to evaluate, why (rate limit, quota, unusable answer, no description) and what would fix it.
+
+### Added
+- **The local-model panel knows what a model actually costs.** It assumed every model was stored the same way, so a half-precision build was offered as fitting a card three times too small. VRAM is now computed from the quantisation the tag names (Q4, Q6, Q8, FP16, QAT…), each suggestion says what it will take and what it costs in answer quality, and a quantisation-aware build is marked as what it is: int4 size, almost no quality lost.
+- **Suggestions from Hugging Face, filtered to your card.** The panel offered five tags written by hand — good ones, but the list ages the day a new model lands, and it could not know that the best build for a 12 GB card is a quantisation-aware 12B published on the Hub. It now also lists popular GGUF builds that fit, with the exact `ollama pull` command. Public endpoint, no account, no inference, cached for a day, and skipped in silence when unreachable.
+- **The app says when a provider is failing, while it is failing.** Three unjudged offers in a row and the scan says so mid-run, with the reason and what would fix it, instead of letting you find out ten minutes later. Settings now also shows, per provider, what it has actually done over the last fortnight — how many calls, how many usable answers, which model is unreliable. It is read from the usage log: free, no inference, and it survives a restart. That record existed, but only inside the "Test models" report, so a provider failing every scoring call looked exactly like a working one.
+- **"Re-evaluate with AI" on a single offer.** Until now a job could only be scored while it was being created or during a scan, so an offer left unjudged because the provider was throttled stayed that way until the same posting turned up again — which, for an expired ad, never happens. When the posting itself is the problem (almost no text), the button is replaced by an invitation to open the ad: another model call would come back just as empty.
+
+### Fixed
+- **Provider names are readable again** — in Settings each provider card showed its name one letter per line, with the "Free" badge squeezed into a circle. The badge added in 1.7.8 pushed an already-full header past its width, and the name was the part that gave way.
+- **The model picker scrolls** — with a provider exposing hundreds of models the list was cut off with no way to reach the rest, and the provider column silently hid its last three entries.
+- **The chat no longer reads an unjudged offer as a zero** — it received `Score: None/10` in its context, which a model interprets as the worst possible match.
+- **A model running on your own PC no longer eats the daily budget** — the ceiling exists to protect a shared cloud free tier, but every call was counted, so a local scan that spends nothing and leaves the machine at no point could still exhaust it and refuse to start.
+- **The daily request limit can finally be changed** — it could stop a scan outright, and it was writable neither through the API nor from any screen: the only remedy was editing the database by hand. It now sits under the usage bar. A small ceiling also no longer blocks an untouched budget (with a limit of 10, the "not worth starting" rule fired at zero requests used).
+
 ## [1.7.8] — 2026-07-27
 
 The search stops being only about keywords, an application stops being only a column, and the scores can finally be told they are wrong.

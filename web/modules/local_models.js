@@ -116,12 +116,20 @@ export async function loadLocalModels() {
       readyBox.innerHTML = `<p class="micro">${t("local.noneDownloaded")}</p>`;
     } else {
       readyBox.innerHTML = ready
-        .map(
-          (m) =>
+        .map((m) => {
+          // Naming the quantisation is the difference between "12B" and "12B
+          // stored in a way that costs 7.5 GB and loses almost no quality".
+          const quant = m.quant ? ` · ${escapeHtml(m.quant)}` : "";
+          const vram = m.vram_gb ? ` · ~${m.vram_gb} GB VRAM` : "";
+          const intact = m.quality_penalty === 0 || m.quality_penalty === -2
+            ? ` <span class="micro local-quality-ok">${t("local.qualityIntact")}</span>`
+            : "";
+          return (
             `<div class="local-model"><span class="local-model-main"><strong>${escapeHtml(m.name)}</strong>` +
-            `<span class="micro">${m.params_b ? `${m.params_b}B · ` : ""}${m.size_gb || "?"} GB</span></span>` +
-            `<button type="button" class="ghost-btn small" data-use="${escapeHtml(m.name)}">${t("local.useForScoring")}</button></div>`,
-        )
+            `<span class="micro">${m.params_b ? `${m.params_b}B` : ""}${quant}${vram}${intact}</span></span>` +
+            `<button type="button" class="ghost-btn small" data-use="${escapeHtml(m.name)}">${t("local.useForScoring")}</button></div>`
+          );
+        })
         .join("");
       readyBox.querySelectorAll("[data-use]").forEach((el) => {
         el.addEventListener("click", () => _use(el.dataset.use));
@@ -144,6 +152,27 @@ export async function loadLocalModels() {
           .join("")
       : "";
     box.querySelectorAll("[data-pull]").forEach((el) => {
+      el.addEventListener("click", () => _pull(el.dataset.pull, el));
+    });
+  }
+
+  // What the wider world runs locally, filtered to this card. The hand-written
+  // list above ages the day a new model lands; this one does not.
+  const discovered = _snapshot.discovered || [];
+  const hub = document.getElementById("localDiscovered");
+  if (hub) {
+    hub.innerHTML = discovered.length
+      ? `<p class="micro">${t("local.fromHub")}</p>` +
+        discovered
+          .map(
+            (m) =>
+              `<div class="local-model"><span class="local-model-main"><strong>${escapeHtml(m.repo)}</strong>` +
+              `<span class="micro">${m.params_b}B · ${escapeHtml(m.quant)} · ~${m.vram_gb} GB VRAM</span></span>` +
+              `<button type="button" class="ghost-btn small" data-pull="${escapeHtml(m.pull)}"${ollama.running ? "" : " disabled"}>${t("local.download")}</button></div>`,
+          )
+          .join("")
+      : "";
+    hub.querySelectorAll("[data-pull]").forEach((el) => {
       el.addEventListener("click", () => _pull(el.dataset.pull, el));
     });
   }

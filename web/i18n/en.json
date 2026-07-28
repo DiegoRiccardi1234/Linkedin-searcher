@@ -151,7 +151,8 @@
     "scoreDist": "AI Score Distribution",
     "matchScore": "Match Score",
     "topCompanies": "Top Companies",
-    "noData": "No data yet"
+    "noData": "No data yet",
+    "unscored": "Not evaluated"
   },
   "recommendations": {
     "title": "Top Picks for You",
@@ -231,12 +232,16 @@
       "salary": "Below your minimum",
       "salaryLong": "The declared pay is below the minimum you set",
       "shortDesc": "Short description",
-      "heuristic": "Local estimate"
+      "heuristic": "Local estimate",
+      "notEvaluated": "Not evaluated",
+      "aggregator": "Aggregator",
+      "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
       "likelyExpired": "Probably expired"
-    }
+    },
+    "adviceToEvaluate": "To evaluate"
   },
   "kanbanCols": {
     "open": "Open",
@@ -320,7 +325,9 @@
       "getKey": "Get a free key",
       "endpoint": "Endpoint (base URL)",
       "apiKeyOptional": "API key (optional)",
-      "showHide": "Show / hide"
+      "showHide": "Show / hide",
+      "healthTitle": "How they are doing (last 14 days)",
+      "healthUnfit": "unreliable"
     },
     "features": {
       "title": "Automation",
@@ -364,6 +371,10 @@
       "densityNormal": "Normal",
       "densityCompact": "Compact",
       "densitySaved": "Density updated"
+    },
+    "usage": {
+      "limitLabel": "Daily request limit (0 = no limit)",
+      "limitSaved": "Daily limit updated."
     }
   },
   "coach": {
@@ -430,7 +441,11 @@
     "generateRecruiterMsg": "Recruiter message",
     "recruiterMsg": "Recruiter message",
     "engagement": "Engagement type",
-    "axisSalaryUnknown": "No source publishes the pay for this posting"
+    "axisSalaryUnknown": "No source publishes the pay for this posting",
+    "reanalyze": "Re-evaluate with AI",
+    "reanalyzeRunning": "Evaluating…",
+    "shortDescHint": "This posting has too little text to judge. Open it to read it.",
+    "noBreakdown": "No breakdown: this offer was not evaluated."
   },
   "scan": {
     "scanning": "Scanning job portals...",
@@ -480,7 +495,9 @@
     },
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
     "volumeWarning": "Large scan ({n} searches) — this may take a while.",
-    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings."
+    "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings.",
+    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a domain word, e.g. “AI QA”.",
+    "unscoredWarning": "{count} offers unevaluated so far."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",
@@ -537,7 +554,10 @@
     "themeLight": "Light theme",
     "languageChanged": "Language updated",
     "exportError": "Export failed",
-    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis."
+    "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis.",
+    "reanalyzeDone": "Offer evaluated.",
+    "reanalyzeStillUnscored": "No model answered: try again later.",
+    "reanalyzeFailed": "Re-evaluation failed"
   },
   "update": {
     "title": "New version available",
@@ -633,7 +653,16 @@
     "duration": "Duration",
     "topMatches": "Top matches",
     "viewList": "View list",
-    "noTop": "—"
+    "noTop": "—",
+    "unscored": "To evaluate",
+    "unscoredHint": "{count} offers were not evaluated.",
+    "unscoredWhy": {
+      "descrizione_breve": "The postings had too little text: open them to read them.",
+      "quota_finita": "The daily AI request budget ran out.",
+      "modello_non_disponibile": "The provider was unreachable or rate-limited: try again later, or use a model on your own PC.",
+      "risposta_inutilizzabile": "The model's reply was unusable: try a different model.",
+      "errore_provider": "AI provider error."
+    }
   },
   "info": {
     "title": "How Job",
@@ -855,6 +884,8 @@
     "couldAlsoRun": "This machine could also run:",
     "download": "Download",
     "pullStarting": "Starting download of {model}…",
-    "pullDone": "{model} is ready"
+    "pullDone": "{model} is ready",
+    "qualityIntact": "quality nearly intact",
+    "fromHub": "Popular on Hugging Face and a fit for your card:"
   }
 }

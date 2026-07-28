@@ -27,6 +27,10 @@ _WRITABLE_PREFIX = (
 _WRITABLE_KEYS = frozenset(
     {
         "active_profile_id",
+        # The daily request ceiling. It could stop a scan outright and there was
+        # no way to change it: not in this list, and no field in the UI — the
+        # only remedy was editing the DB by hand.
+        "daily_request_limit",
         "dedup_mode",
         "density",
         "linkedin_url",

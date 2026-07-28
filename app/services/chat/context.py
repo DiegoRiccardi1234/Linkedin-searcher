@@ -21,17 +21,27 @@ def _format_job_brief(job: dict[str, Any], idx: int) -> str:
     exp_years = analysis.get("anni_esperienza_richiesti", "N/A")
     return (
         f"{idx}. {job.get('titolo')} @ {job.get('azienda')} | "
-        f"Score: {job.get('punteggio_ai')}/10 | "
+        f"Score: {_score_text(job)} | "
         f"Advice: {job.get('consiglio')} | "
         f"Remote: {smart_working} | Contract: {contratto} | Exp: {exp_years}y"
     )
+
+
+def _score_text(job: dict[str, Any]) -> str:
+    """The score for a prompt — or the fact that there isn't one.
+
+    Never interpolate the raw value: an unjudged job would reach the model as
+    "Score: None/10", which reads as a zero and gets the offer written off.
+    """
+    score = job.get("punteggio_ai")
+    return f"{score}/10" if score is not None else "non ancora valutato"
 
 
 def _format_job_full(job: dict[str, Any], idx: int) -> str:
     desc = (job.get("descrizione") or "")[:800]
     return (
         f"[Pinned #{idx}] {job.get('titolo')} @ {job.get('azienda')}\n"
-        f"Location: {job.get('sede') or 'N/A'} | Score: {job.get('punteggio_ai')}/10\n"
+        f"Location: {job.get('sede') or 'N/A'} | Score: {_score_text(job)}\n"
         f"Advice: {job.get('consiglio')}\n"
         f"Description (excerpt): {desc}\n"
         f"Link: {job.get('link') or 'N/A'}"

@@ -359,9 +359,21 @@ export function showPostScanModal(summary, topJobs) {
   setText("psFound", summary?.totale_trovati ?? 0);
   setText("psNew", summary?.totale_nuovi ?? 0);
   setText("psAnalyzed", summary?.totale_analizzati ?? 0);
+  setText("psUnscored", summary?.totale_non_valutati ?? 0);
   setText("psSkipped", summary?.totale_scartati ?? 0);
   setText("psArchived", summary?.archiviati ?? 0);
   setText("psDuration", `${dur.toFixed(1)}s`);
+  // "12 analysed" alone hides the fact that 9 more came back unjudged. Say how
+  // many, why, and what would fix it — the reason decides the action.
+  const hint = modal.querySelector("#psUnscoredHint");
+  if (hint) {
+    const unscored = Number(summary?.totale_non_valutati || 0);
+    const reason = String(summary?.motivo_non_valutati || "");
+    hint.classList.toggle("hidden", unscored < 1);
+    hint.textContent = unscored
+      ? `${t("postScan.unscoredHint", { count: unscored })} ${t(`postScan.unscoredWhy.${reason}`) || ""}`.trim()
+      : "";
+  }
   const list = modal.querySelector("#psTopJobs");
   if (list) {
     if (!topJobs || !topJobs.length) {
@@ -370,6 +382,8 @@ export function showPostScanModal(summary, topJobs) {
       list.innerHTML = topJobs
         .slice(0, 3)
         .map((j) => {
+          // Unjudged offers never enter this list (see scan.js), so a score is
+          // always present here.
           const score = Number(j.score || 0);
           const cls = score >= 7 ? "score-high" : score >= 4 ? "score-mid" : "score-low";
           return `<li><span class="ps-title">${escapeHtmlSafe(j.titolo || "?")}</span><span class="ps-co">${escapeHtmlSafe(j.azienda || "?")}</span><span class="ps-score ${cls}">${score}/10</span></li>`;

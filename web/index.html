@@ -732,6 +732,10 @@
         <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">key</span> <span data-i18n="settings.providers.title">AI Providers</span></h3>
           <p class="micro" data-i18n="settings.providers.subtitle">Add an API key for each provider you want to use, then pick one as primary.</p>
+          <!-- What each provider has actually done lately, read from usage_log:
+               free, no inference. A provider failing every call used to look
+               exactly like a working one. -->
+          <div id="providerHealth" class="provider-health"></div>
           <div id="providerCards" class="provider-grid"></div>
           <select id="primaryProvider" class="hidden" aria-hidden="true">
             <option value=""></option>
@@ -758,6 +762,10 @@
           <p id="localVerdict" class="local-verdict"></p>
           <div id="localReady" class="local-ready"></div>
           <div id="localSuggestions" class="local-suggestions"></div>
+          <!-- Popular GGUF builds from Hugging Face that fit this card. Read
+               from a public, unauthenticated endpoint, cached, and skipped in
+               silence when it is unavailable. -->
+          <div id="localDiscovered" class="local-suggestions"></div>
           <p id="localProgress" class="micro local-progress" hidden></p>
           <button type="button" id="localRefresh" class="ghost-btn small"><span class="material-symbols-outlined">refresh</span> <span data-i18n="local.refresh">Check again</span></button>
         </article>
@@ -995,10 +1003,14 @@
         <div><span class="ps-num" id="psFound">0</span><span class="ps-label" data-i18n="postScan.found">Found</span></div>
         <div><span class="ps-num" id="psNew">0</span><span class="ps-label" data-i18n="postScan.new">New</span></div>
         <div><span class="ps-num" id="psAnalyzed">0</span><span class="ps-label" data-i18n="postScan.analyzed">Analyzed</span></div>
+        <div><span class="ps-num" id="psUnscored">0</span><span class="ps-label" data-i18n="postScan.unscored">To evaluate</span></div>
         <div><span class="ps-num" id="psSkipped">0</span><span class="ps-label" data-i18n="postScan.skipped">Skipped</span></div>
         <div><span class="ps-num" id="psArchived">0</span><span class="ps-label" data-i18n="postScan.archived">Archived</span></div>
         <div><span class="ps-num" id="psDuration">0s</span><span class="ps-label" data-i18n="postScan.duration">Duration</span></div>
       </div>
+      <!-- Shown only when offers came back unjudged: which situation it was,
+           and the one action that fixes it. -->
+      <p id="psUnscoredHint" class="micro post-scan-hint hidden"></p>
       <div class="post-scan-section">
         <h4 data-i18n="postScan.topMatches">Top matches</h4>
         <ul id="psTopJobs" class="post-scan-top"></ul>

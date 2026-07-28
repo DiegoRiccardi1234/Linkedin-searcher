@@ -37,10 +37,22 @@ CURRENT_ANALYSIS_VERSION = 2
 #: Key holding :data:`CURRENT_ANALYSIS_VERSION` inside a stored analysis dict.
 ANALYSIS_VERSION_KEY = "scoring_v"
 
-#: Value of ``fonte_analisi`` marking an analysis no model ever saw. Such an
-#: analysis is a legitimate result to show the user (honest capped estimate) but
-#: never a reason to skip re-scoring the job later.
+#: Value of ``fonte_analisi`` marking an analysis the app computed itself,
+#: deterministically, without asking a model — today only the hard-blocker path
+#: (outside the EU, degree grade below the stated minimum), whose score is
+#: CALCULATED rather than guessed. Never a reason to skip re-scoring later.
 HEURISTIC_SOURCE = "euristica"
+
+#: Value of ``fonte_analisi`` marking an offer NOBODY judged: the provider was
+#: down, the answer was unusable, or the posting carried no description worth
+#: reading. Such an analysis carries no score, no advice and no match axes.
+#:
+#: Until v1.7.8 this case was filled with a keyword-overlap estimate — a number
+#: the user could not tell apart from a model's verdict, and which put postings
+#: nobody had read at the top of the list (measured: 7 of 11 false positives on
+#: a real scan). An unjudged job is now shown as unjudged, and re-scored on the
+#: next scan or on demand.
+NOT_EVALUATED_SOURCE = "non_valutata"
 
 #: Key carrying :data:`HEURISTIC_SOURCE`.
 ANALYSIS_SOURCE_KEY = "fonte_analisi"
