@@ -298,6 +298,33 @@ def title_off_topic(titolo: str, skill_tokens: set[str] | None = None) -> bool:
     return not (tokens & allowed)
 
 
+# The rescue for a title that hides the trade behind an acronym. Real case:
+# "RAI Specialist" at Accenture is a RESPONSIBLE AI role — a genuine match the
+# title gate would have thrown away, since "RAI" is also a television network.
+#
+# Deliberately narrow: no "dati", no "software", no "cloud". Those are in every
+# corporate ad, which is precisely why the old description gate never fired. And
+# it takes SEVERAL distinct markers, not one: measured on 47 real postings, the
+# Responsible AI role hit 5 of these, while every off-domain posting hit at most
+# 2 — one stray "AI" in a company boilerplate paragraph is not a subject.
+_STRONG_DOMAIN_RE = re.compile(
+    r"\b(a\.?i\.?|ml|nlp|llm|genai|machine learning|deep learning|intelligenza artificiale"
+    r"|artificial intelligence|responsible ai|prompt|annotation|annotazione|labeling|dataset"
+    r"|qa|quality assurance|testing|test automation|automation|automazione"
+    r"|valutazione dei modelli|model evaluation|hallucination|generative ai|gen ai)\b",
+    re.IGNORECASE,
+)
+
+#: How many DISTINCT strong markers a description needs to overrule the title.
+MIN_STRONG_DOMAIN_HITS = 3
+
+
+def description_on_topic(descrizione: str, min_hits: int = MIN_STRONG_DOMAIN_HITS) -> bool:
+    """True when the posting is about this trade for more than one stray word."""
+    hits = {match.group(0).lower() for match in _STRONG_DOMAIN_RE.finditer(descrizione or "")}
+    return len(hits) >= min_hits
+
+
 def pre_filtro(titolo: str, descrizione: str) -> tuple[bool, str]:
     testo = (titolo + " " + descrizione).lower()
     for frase in BLACKLIST:

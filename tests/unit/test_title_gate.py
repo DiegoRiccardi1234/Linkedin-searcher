@@ -32,7 +32,7 @@ _OFF_TOPIC = [
     "PRODUCT INSIGHTS SPECIALIST",
     "SALES AND SERVICE SPECIALIST - BRESCIA",
     "TECHNICAL TRAINER & PROMOTER",
-    "RAI Specialist",
+    "RAI Specialist",  # the title alone says nothing — see the rescue below
     "Key Account Manager",
     "Aiuto Cuoco Spa",
 ]
@@ -76,6 +76,34 @@ def test_entry_routes_survive_without_naming_the_trade() -> None:
 def test_candidate_skills_widen_the_gate() -> None:
     assert ss.title_off_topic("Quarkus Consultant", set()) is True
     assert ss.title_off_topic("Quarkus Consultant", {"quarkus"}) is False
+
+
+# --- the rescue: a title that hides the trade behind an acronym ---------------
+
+# Shortened from the real Accenture posting for "RAI Specialist".
+_RESPONSIBLE_AI_JD = (
+    "Come Responsible AI Specialist contribuirai alla progettazione di architetture AI "
+    "affidabili, al testing dei modelli e alla valutazione dei prompt in ambito GenAI."
+)
+
+# Shortened from the real "PAYROLL SPECIALIST" and "Application Specialist" ads:
+# one stray "AI" inside a company boilerplate paragraph.
+_BOILERPLATE_JD = (
+    "Azienda leader nel settore, con un percorso di trasformazione digitale che include "
+    "anche progetti AI, cerca una figura per la gestione amministrativa del personale."
+)
+
+
+def test_a_domain_rich_description_overrules_a_silent_title() -> None:
+    """"RAI Specialist" is a Responsible AI role: the title says nothing, the ad
+    says it five times over. Losing it would be the gate's worst failure."""
+    assert ss.title_off_topic("RAI Specialist", set()) is True
+    assert ss.description_on_topic(_RESPONSIBLE_AI_JD) is True
+
+
+def test_one_stray_mention_does_not_rescue_a_payroll_ad() -> None:
+    """The old gate fired on zero overlap, so a single "AI" saved anything."""
+    assert ss.description_on_topic(_BOILERPLATE_JD) is False
 
 
 # --- bait postings and aggregators -------------------------------------------

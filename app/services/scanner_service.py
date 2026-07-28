@@ -122,6 +122,7 @@ from app.services.scan.vocab import (
     STOPWORDS,
     TECH_KEYWORDS,
     _tokenize,
+    description_on_topic,
     pre_filtro,
     title_off_topic,
 )
@@ -185,6 +186,7 @@ __all__ = [
     "_unscored_analysis",
     "analyze_offer",
     "analyze_offers_batch",
+    "description_on_topic",
     "enforce_hard_requirements",
     "hard_block_reason",
     "is_bait_posting",
@@ -1177,7 +1179,15 @@ def run_scan(
             # no corporate ad reaches — "data", "software" and "cloud" are in
             # every one of them. Measured on a real scan: 26 of 47 postings were
             # off-domain from the title alone, and 11 of those still scored >=6.
-            if not watched and title_off_topic(titolo, skill_tokens):
+            # …unless the description is about the trade throughout, which is
+            # how an acronym title survives: "RAI Specialist" at Accenture is a
+            # Responsible AI role, and it names five distinct domain markers in
+            # its text against at most two for any off-domain posting.
+            if (
+                not watched
+                and title_off_topic(titolo, skill_tokens)
+                and not description_on_topic(descrizione)
+            ):
                 totale_scartati += 1
                 scartati_per_titolo += 1
                 # Logged with the title: a new filter has to be auditable, or a
