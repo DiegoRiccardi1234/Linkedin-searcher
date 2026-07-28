@@ -92,6 +92,20 @@ def test_batch_slot_that_fails_is_unscored() -> None:
 # --- persistence and queries --------------------------------------------------
 
 
+def test_a_freshly_scraped_job_has_no_score_yet(tmp_path: Path) -> None:
+    """Between being scraped and being scored a job has no verdict, and the
+    column's DEFAULT 0 is one — the worst one. On a real scan it showed as
+    "0/10" in the list for the minutes the scan took to reach that row.
+    """
+    db = Database(tmp_path / "f.db")
+    try:
+        job_id, _, _ = db.upsert_job({"titolo": "AI QA", "azienda": "A", "link": "f1"})
+        assert db.list_jobs(limit=5)[0]["punteggio_ai"] is None
+        assert db.get_job(job_id)["punteggio_ai"] is None
+    finally:
+        db.close()
+
+
 def test_unscored_persists_as_null_not_zero(tmp_path: Path) -> None:
     db = Database(tmp_path / "u.db")
     try:

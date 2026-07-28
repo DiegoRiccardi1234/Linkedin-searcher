@@ -282,9 +282,13 @@ class Database:
             INSERT INTO jobs(
                 job_hash, dedup_key, titolo, azienda, descrizione, sede, fonte, link,
                 ricerca_usata, modalita, sources_json,
-                first_seen_at, last_seen_at, updated_at, is_new
+                first_seen_at, last_seen_at, updated_at, is_new, punteggio_ai
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            -- punteggio_ai NULL, not the column's DEFAULT 0: between being
+            -- scraped and being scored a job has no verdict, and a 0 is one —
+            -- the worst one. It showed as "0/10" in the list for the minutes a
+            -- scan takes to reach it.
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL)
             """,
             (
                 hash_value,
