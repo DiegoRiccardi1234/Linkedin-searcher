@@ -272,3 +272,112 @@ def test_find_candidate_profile_by_hash_dedup(tmp_path: Path) -> None:
         assert db.find_candidate_profile_by_hash("not-found") is None
     finally:
         db.close()
+
+
+def _rewind_to_before_019(db: Database) -> None:
+    db.conn.execute("DELETE FROM schema_version WHERE version >= 19")
+    db.conn.commit()
+
+
+def _seed_019(db: Database, titolo: str, sede: str, modalita: str, descrizione: str) -> int:
+    job_id, _, _ = db.upsert_job(
+        {
+            "titolo": titolo,
+            "azienda": "A",
+            "link": f"l-{titolo}",
+            "sede": sede,
+            "modalita": modalita,
+            "descrizione": descrizione,
+        }
+    )
+    db.conn.execute(
+        "UPDATE jobs SET analysis_json = ?, punteggio_ai = 9, consiglio = 'Candidati subito', "
+        "analysis_v = 2 WHERE id = ?",
+        (json.dumps({"punteggio": 9, "consiglio": "Candidati subito", "scoring_v": 2}), job_id),
+    )
+    return int(job_id)
+
+
+def test_migration_019_hides_what_the_user_cannot_apply_to(tmp_path: Path) -> None:
+    """The three real cases from the 04/08/2026 archive.
+
+    All three had been recommended: an on-site role in another city, one asking
+    for years the profile does not have, one asking for a degree it does not
+    have. None of them could ever be applied to.
+    """
+    db = Database(tmp_path / "d.db")
+    try:
+        db.set_preference("onboarding_work_mode", "Remoto, Torino in sede oppure ibrido su Torino")
+        db.set_preference("last_scan_locations", json.dumps(["Torino"]))
+        db.save_candidate_profile(
+            source_name="cv.pdf",
+            markdown="Laurea Triennale in Informatica, votazione 95/110.",
+            summary={"years_experience": 0},
+        )
+        body = "Analisi funzionale e raccolta requisiti in team di prodotto. " * 8
+        elsewhere = _seed_019(db, "Analista Roma", "Rome, Latium, Italy", "In sede", body)
+        senior = _seed_019(
+            db, "Analista 3 anni", "Turin, Piedmont, Italy", "In sede",
+            body + " Richiesti almeno 3 anni di esperienza maturata nel ruolo.",
+        )
+        master = _seed_019(
+            db, "Analista magistrale", "Turin, Piedmont, Italy", "In sede",
+            body + " Richiesta laurea magistrale in informatica.",
+        )
+        ok = _seed_019(db, "Analista Torino", "Turin, Piedmont, Italy", "Ibrido", body)
+        # Stored "Full Remote" but the text says two days out of five: hybrid.
+        mislabelled = _seed_019(
+            db, "Consulente ERP", "Alba, Piedmont, Italy", "Full Remote",
+            body + " Possibilità di lavorare da remoto (fino a 2 giornate su 5 settimanali).",
+        )
+        _rewind_to_before_019(db)
+
+        apply_migrations(db.conn)
+
+        def _row(job_id: int) -> tuple:
+            return db.conn.execute(
+                "SELECT punteggio_ai, consiglio, analysis_json, modalita FROM jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+
+        for job_id, flag in (
+            (elsewhere, "sede_non_raggiungibile"),
+            (senior, "esperienza_richiesta"),
+            (master, "titolo_superiore"),
+        ):
+            score, consiglio, blob, _mode = _row(job_id)
+            assert score <= 3, flag
+            assert consiglio == "Salta", flag
+            assert flag in json.loads(blob)["blocchi"], flag
+
+        # The applicable one keeps its score: no false negatives.
+        assert _row(ok)[0] == 9
+        assert json.loads(_row(ok)[2]).get("blocchi", []) == []
+
+        # The false "Full Remote" is corrected, and that makes it out-of-area.
+        assert _row(mislabelled)[3] == "Ibrido"
+        assert "sede_non_raggiungibile" in json.loads(_row(mislabelled)[2])["blocchi"]
+    finally:
+        db.close()
+
+
+def test_migration_019_blocks_nothing_without_a_readable_cv(tmp_path: Path) -> None:
+    """No profile, no preferences: every offer must survive untouched."""
+    db = Database(tmp_path / "e.db")
+    try:
+        body = "Ruolo di analisi. " * 20
+        job_id = _seed_019(
+            db, "Analista Napoli", "Naples, Campania, Italy", "In sede",
+            body + " Richiesti almeno 5 anni di esperienza maturata.",
+        )
+        _rewind_to_before_019(db)
+
+        apply_migrations(db.conn)
+
+        row = db.conn.execute(
+            "SELECT punteggio_ai, analysis_json FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        assert row[0] == 9
+        assert json.loads(row[1]).get("blocchi", []) == []
+    finally:
+        db.close()

@@ -59,6 +59,10 @@ const FLAG_BADGES = [
   { code: "non_valutato", cls: "flag-info", icon: "help", key: "jobs.flag.notEvaluated" },
   { code: "geo_non_ue", cls: "flag-block", icon: "public_off", key: "jobs.flag.geo" },
   { code: "voto_minimo", cls: "flag-block", icon: "school", key: "jobs.flag.grade" },
+  // The three constraints the user declares and the app now enforces.
+  { code: "sede_non_raggiungibile", cls: "flag-block", icon: "wrong_location", key: "jobs.flag.location" },
+  { code: "esperienza_richiesta", cls: "flag-block", icon: "work_history", key: "jobs.flag.experience" },
+  { code: "titolo_superiore", cls: "flag-block", icon: "school", key: "jobs.flag.education" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
   { code: "ral_sotto_minima", cls: "flag-warn", icon: "payments", key: "jobs.flag.salary" },
   { code: "annuncio_aggregatore", cls: "flag-warn", icon: "content_copy", key: "jobs.flag.aggregator" },
@@ -167,6 +171,16 @@ export async function loadJobs() {
   const COLS = 9;
   const body = document.getElementById("jobsTableBody");
   const fullRow = (cls, msg) => `<tr><td colspan="${COLS}" class="${cls}">${msg}</td></tr>`;
+  // Discarding a job reloads the list, and emptying <tbody> collapses the page
+  // height — at which point the browser has nowhere to scroll to and jumps back
+  // to the top. Remember where the user was and put them back after the render.
+  const scroller = body.closest(".table-wrap");
+  const prevWindowY = window.scrollY;
+  const prevInnerY = scroller ? scroller.scrollTop : 0;
+  const restoreScroll = () => {
+    if (scroller && prevInnerY) scroller.scrollTop = prevInnerY;
+    if (prevWindowY) window.scrollTo({ top: prevWindowY, behavior: "instant" });
+  };
   body.innerHTML = fullRow("table-empty", "…");
 
   let jobs;
@@ -175,6 +189,7 @@ export async function loadJobs() {
   } catch (err) {
     console.error("loadJobs failed", err);
     body.innerHTML = fullRow("table-empty table-error", t("jobs.loadError") || "Couldn't load jobs.");
+    restoreScroll();
     return;
   }
 
@@ -196,6 +211,7 @@ export async function loadJobs() {
                : t("jobs.emptyNoJobs") || "No jobs yet — run your first scan.",
     );
     renderKanban(jobs);
+    restoreScroll();
     return;
   }
 
@@ -287,6 +303,7 @@ export async function loadJobs() {
   });
 
   renderKanban(jobs);
+  restoreScroll();
 }
 
 // Kanban status change (via drag-drop or the per-card select). Maps the target

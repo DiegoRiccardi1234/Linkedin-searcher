@@ -45,6 +45,7 @@ from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
 from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
 from app.services import local_models, quota
+from app.services.candidate_facts import candidate_facts
 from app.services.onboarding import onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
@@ -53,10 +54,13 @@ from app.services.scan.hard_requirements import (
     _MATCH_AXES_KEYS,
     BLOCKING_FLAGS,
     FLAG_AGGREGATOR,
+    FLAG_EDUCATION,
+    FLAG_EXPERIENCE,
     FLAG_GEO_BLOCKED,
     FLAG_GIG,
     FLAG_GRADE_BLOCKED,
     FLAG_HEURISTIC,
+    FLAG_LOCATION,
     FLAG_NOT_EVALUATED,
     FLAG_SALARY_BELOW,
     FLAG_SHORT_DESCRIPTION,
@@ -138,10 +142,13 @@ __all__ = [
     "BLACKLIST",
     "BLOCKING_FLAGS",
     "FLAG_AGGREGATOR",
+    "FLAG_EDUCATION",
+    "FLAG_EXPERIENCE",
     "FLAG_GEO_BLOCKED",
     "FLAG_GIG",
     "FLAG_GRADE_BLOCKED",
     "FLAG_HEURISTIC",
+    "FLAG_LOCATION",
     "FLAG_NOT_EVALUATED",
     "FLAG_SALARY_BELOW",
     "FLAG_SHORT_DESCRIPTION",
@@ -445,9 +452,11 @@ def analyze_offer(
     extra_context: str = "",
     candidate_name: str | None = None,
     sede: str = "",
+    modalita: str = "",
+    facts: Any = None,
 ) -> dict[str, Any]:
     """Score one offer, then apply the deterministic hard-requirement checks."""
-    blocked = hard_block_reason(profile_markdown, descrizione, sede)
+    blocked = hard_block_reason(profile_markdown, descrizione, sede, facts=facts, modalita=modalita)
     raw = (
         _blocked_analysis(profile_markdown, titolo, azienda, descrizione, blocked)
         if blocked
@@ -460,6 +469,8 @@ def analyze_offer(
             privacy=privacy,
             extra_context=extra_context,
             candidate_name=candidate_name,
+            sede=sede,
+            modalita=modalita,
         )
     )
     return enforce_hard_requirements(
@@ -469,6 +480,8 @@ def analyze_offer(
         sede=sede,
         azienda=azienda,
         extra_context=extra_context,
+        facts=facts,
+        modalita=modalita,
     )
 
 
@@ -530,6 +543,8 @@ def _analyze_offer_raw(
     privacy: bool = False,
     extra_context: str = "",
     candidate_name: str | None = None,
+    sede: str = "",
+    modalita: str = "",
 ) -> dict[str, Any]:
     # Missing or too-short description (LinkedIn blocked the retry, or served a
     # marketing blurb) -> don't LLM-score it blind; honest capped estimate.
@@ -541,7 +556,9 @@ def _analyze_offer_raw(
     prompt_markdown = profile_markdown
     if privacy:
         prompt_markdown, _ = redact_pii(profile_markdown, candidate_name)
-    prompt = _analysis_prompt(prompt_markdown, titolo, azienda, descrizione, extra_context)
+    prompt = _analysis_prompt(
+        prompt_markdown, titolo, azienda, descrizione, extra_context, sede=sede, modalita=modalita
+    )
     call_kwargs = _scoring_call_kwargs(provider_manager)
     try:
         result = provider_manager.complete_json(
@@ -574,6 +591,65 @@ def _analyze_offer_raw(
         )
 
 
+#: Never re-score more than this at the end of a scan. A silent cap would read
+#: as "everything checked out", so the number actually re-scored is reported.
+_MAX_AUDIT_RESCORES = 8
+
+
+def audit_scan(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Look at the run as a whole and name what smells wrong.
+
+    Deterministic, no model call. The per-offer checks and the batch clone guard
+    each see one answer at a time, so a model that answered badly across EVERY
+    batch — one score for everything, the same summary pasted over unrelated
+    postings, a recommendation carrying a blocker — produced a clean-looking
+    scan. This is the pass that says otherwise.
+
+    Returns the anomaly codes found and the job ids worth asking again about.
+    """
+    scored = [
+        r
+        for r in results
+        if isinstance(r.get("analysis"), dict) and isinstance(r["analysis"].get("punteggio"), int)
+    ]
+    anomalie: list[dict[str, Any]] = []
+    sospetti: list[int] = []
+    if len(scored) < 4:
+        return {"anomalie": anomalie, "sospetti": sospetti}
+
+    # 1. Every offer got (nearly) the same score: the scale stopped discriminating.
+    scores = [r["analysis"]["punteggio"] for r in scored]
+    top = max(set(scores), key=scores.count)
+    same = scores.count(top)
+    if same / len(scores) >= 0.8:
+        anomalie.append(
+            {"codice": "voti_piatti", "voto": top, "quota": round(same / len(scores), 2)}
+        )
+        sospetti.extend(r["job_id"] for r in scored if r["analysis"]["punteggio"] == top)
+
+    # 2. The same summary on different postings — a clone the batch guard missed
+    #    because it crossed two separate calls.
+    by_text: dict[str, list[int]] = {}
+    for r in scored:
+        text = str(r["analysis"].get("riassunto") or "").strip().lower()
+        if len(text) >= 40:
+            by_text.setdefault(text, []).append(r["job_id"])
+    for ids in by_text.values():
+        if len(ids) > 1:
+            anomalie.append({"codice": "riassunti_clonati", "job_ids": ids})
+            sospetti.extend(ids)
+
+    # 3. Recommended AND blocked. enforce_hard_requirements caps these, so one
+    #    surviving means a path skipped the single enforcement point.
+    for r in scored:
+        flags = set(r["analysis"].get("blocchi") or [])
+        if r["analysis"]["punteggio"] >= 8 and (flags & BLOCKING_FLAGS):
+            anomalie.append({"codice": "consigliata_ma_bloccata", "job_id": r["job_id"]})
+            sospetti.append(r["job_id"])
+
+    return {"anomalie": anomalie, "sospetti": list(dict.fromkeys(sospetti))}
+
+
 def _cloned_slots(parsed: list[Any]) -> set[int]:
     """Indexes of batch slots that share their ``match_axes`` with another slot.
 
@@ -587,11 +663,22 @@ def _cloned_slots(parsed: list[Any]) -> set[int]:
     for i, item in enumerate(parsed):
         if not isinstance(item, dict):
             continue
+        # Identical axes were the first tell, but not the only one: a model can
+        # vary one digit in the axes and still hand back the SAME summary and
+        # the same strengths sentence for two unrelated postings. Any of those
+        # three matching is enough to distrust the slot.
+        fingerprints = []
         axes = item.get("match_axes")
-        if not isinstance(axes, dict) or not axes:
-            continue
-        seen.setdefault(json.dumps(axes, sort_keys=True), []).append(i)
-    cloned = {i for slots in seen.values() if len(slots) > 1 for i in slots}
+        if isinstance(axes, dict) and axes:
+            fingerprints.append("axes:" + json.dumps(axes, sort_keys=True))
+        for key in ("riassunto", "punti_forza"):
+            text = str(item.get(key) or "").strip().lower()
+            # Short boilerplate ("ottima opportunità") is not evidence of a clone.
+            if len(text) >= 40:
+                fingerprints.append(f"{key}:{text}")
+        for fingerprint in fingerprints:
+            seen.setdefault(fingerprint, []).append(i)
+    cloned = {i for slots in seen.values() if len(set(slots)) > 1 for i in slots}
     if cloned:
         log.warning("BATCH_CLONE: %d slots share match_axes; re-scoring them singly", len(cloned))
     return cloned
@@ -605,6 +692,7 @@ def analyze_offers_batch(
     privacy: bool = False,
     extra_context: str = "",
     candidate_name: str | None = None,
+    facts: Any = None,
 ) -> list[dict[str, Any]]:
     """Score N offers in one LLM call, returning exactly ``len(offers)`` analyses
     in order. A batch that fails, returns non-JSON, or yields too few / invalid
@@ -626,7 +714,11 @@ def analyze_offers_batch(
     scorable: list[tuple[int, dict[str, Any]]] = []
     for i, off in enumerate(offers):
         reason = hard_block_reason(
-            profile_markdown, str(off.get("descrizione", "") or ""), str(off.get("sede", "") or "")
+            profile_markdown,
+            str(off.get("descrizione", "") or ""),
+            str(off.get("sede", "") or ""),
+            facts=facts,
+            modalita=str(off.get("modalita", "") or ""),
         )
         if reason:
             blocked[i] = reason
@@ -681,6 +773,8 @@ def analyze_offers_batch(
             sede=sede_i,
             azienda=str(off.get("azienda", "") or ""),
             extra_context=extra_context,
+            facts=facts,
+            modalita=str(off.get("modalita", "") or ""),
         )
         if i in blocked:
             out.append(
@@ -851,6 +945,18 @@ def run_scan(
         _tokenize(" ".join(str(s) for s in _skills)) if isinstance(_skills, list) else set()
     )
     relevance_vocab = _DOMAIN_VOCAB | skill_tokens
+
+    # What the user declared about themselves (years, degree, grade, where they
+    # can work), manual corrections first. Resolved once per scan and passed to
+    # every scoring call: these are the checks that keep an offer demanding two
+    # years, or a master's, or presence in another city, out of the shortlist.
+    # None of them blocks when the underlying fact is unknown.
+    user_facts = candidate_facts(db)
+    # Every scored offer of this run, kept for the end-of-scan audit below. The
+    # per-offer checks and the batch clone guard both look at one answer at a
+    # time; nothing looked at the scan as a whole, so a model having a bad day
+    # across every batch went unnoticed.
+    audit_pool: list[dict[str, Any]] = []
 
     linkedin_url = db.get_preference("linkedin_url", "")
     if linkedin_url:
@@ -1051,6 +1157,8 @@ def run_scan(
             extra_context=onboarding,
             candidate_name=candidate_name,
             sede=item.get("sede", ""),
+            modalita=item.get("modalita", ""),
+            facts=user_facts,
         )
         return _finalize_scored(item, analysis)
 
@@ -1064,6 +1172,7 @@ def run_scan(
             privacy=privacy,
             extra_context=onboarding,
             candidate_name=candidate_name,
+            facts=user_facts,
         )
         return [
             _finalize_scored(item, analysis) for item, analysis in zip(chunk, analyses, strict=True)
@@ -1294,7 +1403,7 @@ def run_scan(
             if not _row_job_type_ok(row, job_types):
                 totale_scartati += 1
                 continue
-            if not _row_work_mode_ok(row, work_types):
+            if not _row_work_mode_ok(row, work_types, descrizione):
                 totale_scartati += 1
                 continue
 
@@ -1335,6 +1444,9 @@ def run_scan(
                     "descrizione": descrizione,
                     # Carried into scoring: the geo-eligibility check needs it.
                     "sede": sede,
+                    # Same reason, for the location check and the prompt: without
+                    # it the model judged every posting not knowing where it was.
+                    "modalita": payload_job["modalita"],
                     "row": row,
                     "link": link,
                     # DB read done here on the generator thread so workers in
@@ -1378,6 +1490,7 @@ def run_scan(
                         continue
                     for result in results:
                         db.update_job_analysis(job_id=result["job_id"], analysis=result["analysis"])
+                        audit_pool.append(result)
                         if result["recruiter"]:
                             db.upsert_recruiter(result["job_id"], result["recruiter"])
                         # "Analysed" must mean judged. An offer that came back
@@ -1453,6 +1566,34 @@ def run_scan(
         time.sleep(settings.delay_tra_ricerche)
 
     was_cancelled = cancelled()
+
+    # Final pass over the whole run. Anything it flags is asked again, one offer
+    # per call so the model has its full attention on it — the same remedy the
+    # batch clone guard uses. Capped, and the cap is reported rather than hidden.
+    audit = {"anomalie": [], "sospetti": []} if was_cancelled else audit_scan(audit_pool)
+    rivalutate = 0
+    sospetti_totali = len(audit["sospetti"])
+    if audit["sospetti"] and not was_cancelled:
+        by_id = {r["job_id"]: r for r in audit_pool}
+        for job_id in audit["sospetti"][:_MAX_AUDIT_RESCORES]:
+            item = by_id.get(job_id)
+            if not item:
+                continue
+            try:
+                fresh = _score_job(item)
+            except Exception as exc:
+                log.warning("audit re-score failed for job %s: %s", job_id, exc)
+                continue
+            db.update_job_analysis(job_id=job_id, analysis=fresh["analysis"])
+            rivalutate += 1
+        if audit["anomalie"]:
+            log.warning(
+                "scan audit: %s; %d/%d offerte ri-valutate",
+                audit["anomalie"],
+                rivalutate,
+                sospetti_totali,
+            )
+
     # Skip retention archiving on a cancelled run (partial data — don't prune).
     archiviati = (
         0
@@ -1485,4 +1626,12 @@ def run_scan(
         "duration_ms": duration_ms,
         "percent": 100,
         "cancelled": was_cancelled,
+        # What the end-of-scan audit found, and what it did about it. Reported
+        # even when empty: "no anomalies" is information, and a cap that hid how
+        # many were left unchecked would read as "everything was verified".
+        "audit": {
+            "anomalie": audit["anomalie"],
+            "sospetti": sospetti_totali,
+            "rivalutate": rivalutate,
+        },
     }

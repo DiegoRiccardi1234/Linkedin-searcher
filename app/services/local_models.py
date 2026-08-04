@@ -130,6 +130,13 @@ class Recommendation:
     reason: str
 
 
+#: Windows opens a console window for every child process unless told not to.
+#: The probe shells out up to four times (nvidia-smi plus three PowerShell
+#: queries), so the user saw two black windows flash on top of the app — and,
+#: before the snapshot was cached, on every single page reload.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _run(cmd: list[str], timeout: float = 6.0) -> str:
     """Run a short informational command. Never raises: absent tools are normal."""
     try:
@@ -139,6 +146,7 @@ def _run(cmd: list[str], timeout: float = 6.0) -> str:
             text=True,
             timeout=timeout,
             check=False,
+            creationflags=_NO_WINDOW,
         )
         return out.stdout.strip()
     except (OSError, subprocess.SubprocessError) as exc:

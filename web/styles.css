@@ -51,14 +51,20 @@
      1536 CSS px) got spacing and type sized for a 2560px monitor. That is what
      "everything looks zoomed in" was. Smaller offsets + a bigger vw share keep
      the scale moving across the whole laptop range. */
-  --fs-xs: clamp(11px, 0.18vw + 8.6px, 13px);
-  --fs-sm: clamp(12px, 0.19vw + 9.5px, 14px);
-  --fs-base: clamp(13px, 0.2vw + 10.4px, 15px);
-  --fs-md: clamp(14px, 0.2vw + 11.4px, 16px);
-  --fs-lg: clamp(16px, 0.3vw + 12.4px, 19px);
-  --fs-xl: clamp(19px, 0.4vw + 14.6px, 23px);
-  --fs-2xl: clamp(22px, 0.8vw + 14.4px, 30px);
-  --fs-3xl: clamp(26px, 1.2vw + 16.4px, 38px);
+  /* Density is one multiplier over the responsive scale, never a replacement
+     for it. The old "compact" theme swapped every clamp() for a fixed px value,
+     so choosing it ALSO switched off the adaptation to screen width — and it
+     bottomed out at 10.5px, below what is comfortable to read. The floor below
+     keeps the smallest text at 12px whatever the density. */
+  --density: 1;
+  --fs-xs: max(12px, calc(clamp(11px, 0.18vw + 8.6px, 13px) * var(--density)));
+  --fs-sm: max(12.5px, calc(clamp(12px, 0.19vw + 9.5px, 14px) * var(--density)));
+  --fs-base: max(13px, calc(clamp(13px, 0.2vw + 10.4px, 15px) * var(--density)));
+  --fs-md: calc(clamp(14px, 0.2vw + 11.4px, 16px) * var(--density));
+  --fs-lg: calc(clamp(16px, 0.3vw + 12.4px, 19px) * var(--density));
+  --fs-xl: calc(clamp(19px, 0.4vw + 14.6px, 23px) * var(--density));
+  --fs-2xl: calc(clamp(22px, 0.8vw + 14.4px, 30px) * var(--density));
+  --fs-3xl: calc(clamp(26px, 1.2vw + 16.4px, 38px) * var(--density));
 
   --lh-tight: 1.2;
   --lh-base: 1.55;
@@ -68,13 +74,13 @@
   --sticky-offset: 72px;
 
   /* spacing (4px base) — same reasoning as the type scale above */
-  --space-1: clamp(3px, 0.2vw + 1.9px, 5px);
-  --space-2: clamp(6px, 0.3vw + 3.9px, 9px);
-  --space-3: clamp(9px, 0.5vw + 5.2px, 14px);
-  --space-4: clamp(12px, 0.6vw + 7.4px, 18px);
-  --space-5: clamp(18px, 1vw + 10.4px, 28px);
-  --space-6: clamp(22px, 1.4vw + 12.4px, 36px);
-  --space-7: clamp(32px, 2vw + 17.6px, 52px);
+  --space-1: calc(clamp(3px, 0.2vw + 1.9px, 5px) * var(--density));
+  --space-2: calc(clamp(6px, 0.3vw + 3.9px, 9px) * var(--density));
+  --space-3: calc(clamp(9px, 0.5vw + 5.2px, 14px) * var(--density));
+  --space-4: calc(clamp(12px, 0.6vw + 7.4px, 18px) * var(--density));
+  --space-5: calc(clamp(18px, 1vw + 10.4px, 28px) * var(--density));
+  --space-6: calc(clamp(22px, 1.4vw + 12.4px, 36px) * var(--density));
+  --space-7: calc(clamp(32px, 2vw + 17.6px, 52px) * var(--density));
 
   /* radii */
   --r-sm: 6px;
@@ -148,23 +154,10 @@ html, body {
 /* Compact density (Settings). Windows display scaling at 125-150% shrinks the
    CSS viewport without shrinking the design, so a 1920 screen behaves like a
    1536 or 1280 one: this gives back a step of room on demand, on any screen. */
-:root[data-density="compact"] {
-  --fs-xs: 10.5px;
-  --fs-sm: 11.5px;
-  --fs-base: 12.5px;
-  --fs-md: 13.5px;
-  --fs-lg: 15px;
-  --fs-xl: 17px;
-  --fs-2xl: 20px;
-  --fs-3xl: 24px;
-  --space-1: 3px;
-  --space-2: 5px;
-  --space-3: 8px;
-  --space-4: 11px;
-  --space-5: 15px;
-  --space-6: 18px;
-  --space-7: 24px;
-}
+:root[data-density="compact"] { --density: 0.92; }
+:root[data-density="normal"] { --density: 1; }
+:root[data-density="comfortable"] { --density: 1.08; }
+:root[data-density="large"] { --density: 1.16; }
 :root[data-density="compact"] .analytics-card { min-height: 220px; }
 :root[data-density="compact"] .table-wrap td { padding: 7px 10px; }
 :root[data-density="compact"] .table-wrap th { padding: 6px 10px; }

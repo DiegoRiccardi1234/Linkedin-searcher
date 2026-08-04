@@ -100,7 +100,24 @@
     "cancel": "Abbrechen",
     "roles": "Rollen",
     "cvParsed": "Lebenslauf gelesen — siehe Profil unten.",
-    "uploadAnother": "Weiteren Lebenslauf hochladen"
+    "uploadAnother": "Weiteren Lebenslauf hochladen",
+    "matching": {
+      "title": "Matching-Daten",
+      "hint": "Blenden Stellen aus, auf die du dich nicht bewerben kannst. Fehlt etwas oder stimmt etwas nicht, korrigiere es hier.",
+      "years": "Jahre Berufserfahrung",
+      "education": "Höchster Abschluss",
+      "grade": "Abschlussnote (von 110)",
+      "cities": "Städte, in die du pendeln kannst (kommagetrennt)",
+      "modes": "Akzeptierte Arbeitsmodelle",
+      "onsite": "Vor Ort",
+      "hybrid": "Hybrid",
+      "remote": "Vollständig remote",
+      "rule": "Standortregel",
+      "fromCv": "aus dem CV",
+      "fromYou": "von dir eingegeben",
+      "missing": "fehlt",
+      "saved": "Daten aktualisiert"
+    }
   },
   "jobSearch": {
     "title": "Job",
@@ -235,7 +252,10 @@
       "heuristic": "Lokale Schätzung",
       "notEvaluated": "Nicht bewertet",
       "aggregator": "Aggregator",
-      "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein"
+      "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein",
+      "location": "Standort außerhalb",
+      "experience": "Verlangt Erfahrung",
+      "education": "Höherer Abschluss"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
@@ -370,7 +390,9 @@
       "density": "Dichte",
       "densityNormal": "Normal",
       "densityCompact": "Kompakt",
-      "densitySaved": "Dichte aktualisiert"
+      "densitySaved": "Dichte aktualisiert",
+      "densityComfortable": "Komfortabel",
+      "densityLarge": "Groß"
     },
     "usage": {
       "limitLabel": "Tägliches Anfragelimit (0 = kein Limit)",

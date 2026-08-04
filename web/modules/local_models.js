@@ -27,7 +27,7 @@ async function _use(model) {
       body: JSON.stringify({ model, for_scoring: true }),
     });
     showToast(t("local.nowUsing", { model: res.scoring_model || model }), "info");
-    loadLocalModels();
+    loadLocalModels(true);
   } catch (err) {
     showToast(`${t("toast.actionError")}: ${err.message}`, "error");
   }
@@ -75,7 +75,7 @@ function _pull(tag, button) {
       }
       if (progress) progress.textContent = t("local.pullDone", { model: tag });
       showToast(t("local.pullDone", { model: tag }), "info");
-      loadLocalModels();
+      loadLocalModels(true);
     })
     .catch((err) => {
       if (progress) progress.textContent = "";
@@ -188,11 +188,14 @@ function _clearProbeSections() {
   }
 }
 
-export async function loadLocalModels() {
+// `refresh` is what makes the server look at the machine again. Without it the
+// answer comes from the DB, so opening or reloading the app starts no processes
+// and flashes no console windows — the probe runs when the user asks for it.
+export async function loadLocalModels(force = false) {
   const card = document.getElementById("localModelsCard");
   if (!card) return;
   try {
-    _snapshot = await api("/api/local/status");
+    _snapshot = await api(`/api/local/status${force === true ? "?refresh=true" : ""}`);
   } catch {
     return;
   }
@@ -227,7 +230,8 @@ async function _probe(button) {
 }
 
 export function initLocalModels() {
-  document.getElementById("localRefresh")?.addEventListener("click", loadLocalModels);
+  // The Refresh button is a request to look again: it forces a real probe.
+  document.getElementById("localRefresh")?.addEventListener("click", () => loadLocalModels(true));
   const probeBtn = document.getElementById("localProbeBtn");
   probeBtn?.addEventListener("click", () => _probe(probeBtn));
 }

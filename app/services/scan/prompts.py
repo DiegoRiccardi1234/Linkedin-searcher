@@ -129,7 +129,30 @@ _SCORING_RULES = (
     'scrivi "ral_stimata": "Non stimabile" e NON inventare una cifra.\n'
     '- "tipo_ingaggio": distingui un\'assunzione da un lavoro a task/piattaforma '
     "(pagamento a task o a ora, nessun monte ore garantito) e dalla partita IVA.\n"
+    "- SEDE E MODALITA: confronta la sede dell'offerta e la modalita di lavoro con la "
+    "modalita preferita indicata nelle preferenze del candidato. Un ruolo in sede o "
+    "ibrido in una citta che il candidato non ha indicato NON e' praticabile: "
+    '"punteggio" massimo 3 e "consiglio" = "Salta", anche se il contenuto del ruolo '
+    "e' perfetto. Un ruolo full remote va valutato sul contenuto, non sulla citta "
+    "dell'ufficio.\n"
 )
+
+
+def _offer_place(sede: str = "", modalita: str = "") -> str:
+    """The "Sede"/"Modalita" lines of an offer block.
+
+    These were missing from both prompts, so the model judged every posting with
+    no idea where it was: an on-site role in another city could be scored 9 and
+    nobody could tell it apart from one round the corner. The work mode comes
+    from ``_detect_work_mode``, which reads the posting rather than the search
+    flag, so it is a fact and not an assumption.
+    """
+    lines = ""
+    if str(sede or "").strip():
+        lines += f"Sede: {sede}\n"
+    if str(modalita or "").strip():
+        lines += f"Modalita di lavoro: {modalita}\n"
+    return lines
 
 
 def _analysis_prompt(
@@ -138,13 +161,16 @@ def _analysis_prompt(
     azienda: str,
     descrizione: str,
     extra_context: str = "",
+    sede: str = "",
+    modalita: str = "",
 ) -> str:
     extra = f"\nPREFERENZE CANDIDATO:\n{extra_context}\n" if extra_context.strip() else ""
     return (
         "Analizza questa offerta IT e rispondi SOLO con JSON valido, senza testo extra.\n\n"
         f"CV candidato:\n{profile_markdown[:3500]}\n{extra}\n"
         f"OFFERTA:\nTitolo: {titolo}\nAzienda: {azienda}\n"
-        f"Descrizione: {_prep_description(descrizione, 2600)}\n\n"
+        + _offer_place(sede, modalita)
+        + f"Descrizione: {_prep_description(descrizione, 2600)}\n\n"
         + _SCORING_RULES
         + "\nJSON richiesto:\n"
         + _PER_OFFER_SCHEMA
@@ -169,7 +195,8 @@ def _batch_analysis_prompt(
     blocks = [
         f"--- OFFERTA {i} ---\n"
         f"Titolo: {off['titolo']}\nAzienda: {off['azienda']}\n"
-        f"Descrizione: {_prep_description(str(off['descrizione']), 2200)}"
+        + _offer_place(str(off.get("sede", "") or ""), str(off.get("modalita", "") or ""))
+        + f"Descrizione: {_prep_description(str(off['descrizione']), 2200)}"
         for i, off in enumerate(offers, 1)
     ]
     offers_text = "\n\n".join(blocks)

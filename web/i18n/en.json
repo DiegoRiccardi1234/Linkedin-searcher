@@ -100,7 +100,24 @@
     "cancel": "Cancel",
     "roles": "Roles",
     "cvParsed": "CV read — see the profile below.",
-    "uploadAnother": "Upload another CV"
+    "uploadAnother": "Upload another CV",
+    "matching": {
+      "title": "Matching data",
+      "hint": "Used to hide offers you cannot apply to. If something is missing or wrong, fix it here.",
+      "years": "Years of professional experience",
+      "education": "Highest degree",
+      "grade": "Degree grade (out of 110)",
+      "cities": "Cities you can commute to (comma separated)",
+      "modes": "Work modes you accept",
+      "onsite": "On-site",
+      "hybrid": "Hybrid",
+      "remote": "Full remote",
+      "rule": "Location rule",
+      "fromCv": "from CV",
+      "fromYou": "entered by you",
+      "missing": "missing",
+      "saved": "Matching data updated"
+    }
   },
   "jobSearch": {
     "title": "Job",
@@ -235,7 +252,10 @@
       "heuristic": "Local estimate",
       "notEvaluated": "Not evaluated",
       "aggregator": "Aggregator",
-      "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring"
+      "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring",
+      "location": "Out-of-area location",
+      "experience": "Wants experience",
+      "education": "Higher degree"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
@@ -370,7 +390,9 @@
       "density": "Density",
       "densityNormal": "Normal",
       "densityCompact": "Compact",
-      "densitySaved": "Density updated"
+      "densitySaved": "Density updated",
+      "densityComfortable": "Comfortable",
+      "densityLarge": "Large"
     },
     "usage": {
       "limitLabel": "Daily request limit (0 = no limit)",

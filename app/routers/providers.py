@@ -62,6 +62,9 @@ def _stats_row(model: str, health: dict[str, dict[str, Any]]) -> dict[str, Any]:
 #: Where the user's answer to "may I look at this machine?" is kept. A
 #: preference, not a secret, and per-install like the machine it describes.
 _HARDWARE_PROBE_PREFERENCE = "local_hardware_probe"
+#: The last probe result. Hardware does not change between page loads, so the
+#: answer is read from here instead of shelling out again (see ``local_status``).
+_HARDWARE_SNAPSHOT_PREFERENCE = "local_hardware_snapshot"
 
 
 def build_router(container: AppContainer) -> APIRouter:
@@ -233,8 +236,32 @@ def build_router(container: AppContainer) -> APIRouter:
 
     # ── Local models: what this machine can run, and what it already has ─────
 
+    def _fresh_snapshot() -> dict[str, Any]:
+        """Probe the machine and remember the answer."""
+        snap = local_models.snapshot()
+        with contextlib.suppress(Exception):  # a cache miss is not worth an error
+            container.db.set_preference(
+                _HARDWARE_SNAPSHOT_PREFERENCE,
+                json.dumps(
+                    {"ts": datetime.now(UTC).isoformat(timespec="seconds"), "snapshot": snap},
+                    ensure_ascii=False,
+                ),
+            )
+        return snap
+
+    def _cached_snapshot() -> dict[str, Any] | None:
+        raw = container.db.get_preference(_HARDWARE_SNAPSHOT_PREFERENCE, "")
+        if not raw:
+            return None
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        snap = data.get("snapshot") if isinstance(data, dict) else None
+        return snap if isinstance(snap, dict) else None
+
     @router.get("/api/local/status")
-    def local_status() -> dict[str, Any]:
+    def local_status(refresh: bool = False) -> dict[str, Any]:
         """Hardware, the model sizes it can sustain, and what Ollama already has.
 
         Nothing is read until the user has said yes. Answering this used to mean
@@ -243,10 +270,20 @@ def build_router(container: AppContainer) -> APIRouter:
         from ``bootstrap()`` on every single launch, before anyone had opened
         Settings. Inspecting someone's machine is a thing to ask for, not a side
         effect of starting an app.
+
+        Consent alone was not enough: once granted, the full probe ran again on
+        every page load, flashing console windows over the app each time. The
+        answer is now remembered, so a reload reads the DB and starts no
+        processes. ``refresh=true`` (the Refresh button, and after a download
+        changes what is installed) is the only thing that probes again.
         """
         if not _hardware_probe_allowed():
             return {"consent": False}
-        return {"consent": True, **local_models.snapshot()}
+        if not refresh:
+            cached = _cached_snapshot()
+            if cached is not None:
+                return {"consent": True, "cached": True, **cached}
+        return {"consent": True, "cached": False, **_fresh_snapshot()}
 
     @router.post("/api/local/probe")
     def local_probe() -> dict[str, Any]:
@@ -257,7 +294,7 @@ def build_router(container: AppContainer) -> APIRouter:
         the answer would be theatre. Remembered from here on.
         """
         container.db.set_preference(_HARDWARE_PROBE_PREFERENCE, "1")
-        return {"consent": True, **local_models.snapshot()}
+        return {"consent": True, "cached": False, **_fresh_snapshot()}
 
     @router.post("/api/local/pull")
     def local_pull(payload: LocalPullRequest) -> StreamingResponse:
