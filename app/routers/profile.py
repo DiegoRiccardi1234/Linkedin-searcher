@@ -25,6 +25,7 @@ from app.models import (
     ProfileUpdate,
     RoleShortlistRequest,
 )
+from app.services import candidate_facts as cf
 from app.services import market_snapshot
 from app.services import roles_shortlist as roles_shortlist_svc
 from app.services.generation import CV_POLICY, generate_with_profile
@@ -439,6 +440,65 @@ def build_router(container: AppContainer) -> APIRouter:
         container.db.set_active_profile(profile_id)
         return {"ok": True, "profile_id": profile_id, "active_profile_id": str(profile_id)}
 
+    def _save_matching_facts(payload: ProfileUpdate) -> None:
+        """Persist the user's corrections to the facts that gate an offer.
+
+        Written as preferences rather than into ``summary_json`` on purpose: a
+        re-uploaded CV rewrites the summary, and a correction the user made by
+        hand must outlive that. An empty string clears the override and hands the
+        fact back to the CV.
+        """
+        for value, key in (
+            (payload.years_experience, cf.FACT_YEARS),
+            (payload.grade, cf.FACT_GRADE),
+        ):
+            if value is not None:
+                container.db.set_preference(key, str(max(0, int(value))))
+        if payload.education_level is not None:
+            level = payload.education_level.strip()
+            container.db.set_preference(
+                cf.FACT_EDUCATION, level if level in cf.EDUCATION_LEVELS else ""
+            )
+        if payload.base_cities is not None:
+            cities = [c.strip() for c in payload.base_cities if c and c.strip()]
+            container.db.set_preference(cf.FACT_BASE_CITIES, ",".join(cities))
+        if payload.work_modes is not None:
+            modes = [m.strip().lower() for m in payload.work_modes if m and m.strip()]
+            container.db.set_preference(
+                cf.FACT_WORK_MODES,
+                ",".join(m for m in modes if m in ("onsite", "hybrid", "remote")),
+            )
+
+    @router.get("/api/profile/matching-facts")
+    def matching_facts() -> dict[str, Any]:
+        """The facts that decide applicability, and where each one came from.
+
+        The profile page used to render these read-only, straight out of the CV
+        summary, while nothing in the scoring path ever read them. Now they gate
+        offers, so the user has to be able to see which are missing and fix them.
+        """
+        facts = cf.candidate_facts(container.db)
+        rule = facts.work_rule
+        return {
+            "years_experience": facts.years_experience,
+            "education_level": facts.education_level,
+            "education_levels": list(cf.EDUCATION_LEVELS),
+            "grade": facts.grade,
+            "base_cities": list(rule.cities),
+            "work_modes": [
+                mode
+                for mode, on in (
+                    ("onsite", rule.allow_onsite),
+                    ("hybrid", rule.allow_hybrid),
+                    ("remote", rule.allow_remote),
+                )
+                if on
+            ],
+            "rule_summary": cf.describe_work_rule(rule),
+            "sources": facts.sources,
+            "missing": facts.missing(),
+        }
+
     @router.patch("/api/profile")
     def update_profile(payload: ProfileUpdate) -> dict[str, Any]:
         profile = container.db.get_active_candidate_profile()
@@ -458,6 +518,7 @@ def build_router(container: AppContainer) -> APIRouter:
         if payload.name is not None and payload.name.strip():
             summary["name"] = payload.name.strip()
         container.db.update_candidate_profile_summary(int(profile["id"]), summary)
+        _save_matching_facts(payload)
         # Manual edits to the display name / raw CV text (the latter feeds scoring).
         if (payload.name is not None and payload.name.strip()) or payload.markdown is not None:
             container.db.update_candidate_profile_fields(

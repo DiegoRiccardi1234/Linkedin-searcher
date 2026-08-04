@@ -118,14 +118,39 @@ def _grade_status(profile_markdown: str, descrizione: str) -> tuple[str, str | N
     return label, f"Voto minimo {required}/110 (CV: {candidate}/110)"
 
 
-def hard_block_reason(profile_markdown: str, descrizione: str, sede: str) -> str | None:
+def hard_block_reason(
+    profile_markdown: str,
+    descrizione: str,
+    sede: str,
+    *,
+    facts: Any = None,
+    modalita: str = "",
+) -> str | None:
     """Why this offer is a non-starter for the candidate, or None.
 
-    Both blockers are decidable from the text alone, so the caller can skip the
-    LLM entirely instead of paying a call and capping the answer afterwards
+    Every blocker here is decidable from the text alone, so the caller can skip
+    the LLM entirely instead of paying a call and capping the answer afterwards
     (measured on a real scan: 12 offers out of 44 — ~27% of the scoring quota).
+
+    ``facts`` carries what the user declared about themselves (years, degree,
+    where they can work). It is optional and defaults to "unknown", which blocks
+    nothing: a CV the parser misread must never hide jobs.
     """
-    return _geo_status(sede, descrizione)[1] or _grade_status(profile_markdown, descrizione)[1]
+    reason = _geo_status(sede, descrizione)[1] or _grade_status(profile_markdown, descrizione)[1]
+    if reason:
+        return reason
+    for _code, detail in _declared_constraint_breaks(descrizione, sede, modalita, facts):
+        return detail
+    return None
+
+
+def _declared_constraint_breaks(
+    descrizione: str, sede: str, modalita: str, facts: Any
+) -> list[tuple[str, str]]:
+    """User-declared constraints this offer breaks. Imported late to stay acyclic."""
+    from app.services.candidate_facts import blocking_reasons
+
+    return blocking_reasons(descrizione, sede, modalita, facts)
 
 
 # ── declared salary vs the candidate's floor ─────────────────────────────────
@@ -331,11 +356,22 @@ FLAG_GIG = "lavoro_a_task"  # platform/gig work, not employment
 FLAG_SALARY_BELOW = "ral_sotto_minima"  # declared pay under the user's floor
 FLAG_NOT_EVALUATED = "non_valutato"  # no model judged this: there is no score
 FLAG_AGGREGATOR = "annuncio_aggregatore"  # a job board reposting someone else's ad
+FLAG_EXPERIENCE = "esperienza_richiesta"  # asks for more years than the CV shows
+FLAG_EDUCATION = "titolo_superiore"  # demands a degree above the candidate's
+FLAG_LOCATION = "sede_non_raggiungibile"  # on-site/hybrid outside the accepted cities
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
 #: "you cannot apply" — the offer may well be the best one in the archive.
-BLOCKING_FLAGS = frozenset({FLAG_GEO_BLOCKED, FLAG_GRADE_BLOCKED})
+BLOCKING_FLAGS = frozenset(
+    {
+        FLAG_GEO_BLOCKED,
+        FLAG_GRADE_BLOCKED,
+        FLAG_EXPERIENCE,
+        FLAG_EDUCATION,
+        FLAG_LOCATION,
+    }
+)
 
 
 def is_unevaluated(analysis: Mapping[str, Any]) -> bool:
@@ -400,6 +436,36 @@ def _cap_score(analysis: dict[str, Any], cap: int, weakness: str) -> None:
     flags = analysis.get("blocchi")
     if isinstance(flags, list) and FLAG_NOT_EVALUATED in flags:
         flags.remove(FLAG_NOT_EVALUATED)
+
+
+#: Same ceiling as the geo/grade caps: an offer the user cannot take must never
+#: outrank one they can, but it stays visible instead of vanishing.
+_DECLARED_CONSTRAINT_CAP = 3
+
+#: Short sentence prepended to ``punti_deboli`` per flag, so the list view says
+#: why in the user's language instead of showing a bare code.
+_CONSTRAINT_WEAKNESS = {
+    FLAG_EXPERIENCE: "Chiede più anni di esperienza di quelli dichiarati nel profilo.",
+    FLAG_EDUCATION: "Chiede un titolo di studio superiore a quello del profilo.",
+    FLAG_LOCATION: "Sede e modalità fuori da quelle accettate.",
+}
+
+
+def _apply_declared_constraints(
+    analysis: dict[str, Any], descrizione: str, sede: str, modalita: str, facts: Any
+) -> None:
+    """Cap offers that break what the USER declared, not what we assumed.
+
+    Years, degree and location were asked of the model in prose and ignored: on a
+    real scan 8 offers out of 35 scored >=8 while their own
+    ``anni_esperienza_richiesti`` field said 1 or 2, and one demanding a master's
+    scored 8 against a bachelor. Reading the same fields deterministically is the
+    only thing that made those stop being recommended.
+    """
+    for code, reason in _declared_constraint_breaks(descrizione, sede, modalita, facts):
+        _add_flag(analysis, code, reason)
+        _add_missing(analysis, reason)
+        _cap_score(analysis, _DECLARED_CONSTRAINT_CAP, _CONSTRAINT_WEAKNESS.get(code, reason))
 
 
 def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str) -> None:
@@ -553,18 +619,25 @@ def enforce_hard_requirements(
     sede: str = "",
     azienda: str = "",
     extra_context: str = "",
+    facts: Any = None,
+    modalita: str = "",
 ) -> dict[str, Any]:
     """Normalise the schema, then apply the deterministic checks.
 
     Single post-processing point for EVERY scoring path — single offer, batch
     slot and heuristic fallback — so an offer can never be recommended over a
-    hard blocker just because a given path skipped the check. Caps (geo, grade)
-    can only lower a score; the salary and engagement checks only annotate, and
-    every check records a flag code so the UI can say WHY (see ``_add_flag``).
+    hard blocker just because a given path skipped the check. Caps (geo, grade,
+    experience, degree, location) can only lower a score; the salary and
+    engagement checks only annotate, and every check records a flag code so the
+    UI can say WHY (see ``_add_flag``).
+
+    ``facts``/``modalita`` carry what the user declared about themselves and how
+    the posting is worked. Both default to "unknown", which blocks nothing.
     """
     out = _normalize_analysis(analysis)
     _apply_grade_requirement(out, profile_markdown, descrizione)
     _apply_geo_eligibility(out, sede, descrizione)
+    _apply_declared_constraints(out, descrizione, sede, modalita, facts)
     _apply_salary_expectation(out, _ral_min_from_context(extra_context))
     engagement = _detect_engagement(azienda, f"{descrizione} {out.get('contratto', '')}")
     if engagement:

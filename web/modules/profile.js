@@ -694,3 +694,110 @@ export function bindProfileEvents() {
   document.getElementById("goalsSuggestBtn")?.addEventListener("click", _suggestGoals);
   _prefillOnboarding();
 }
+
+// ── Matching facts: the four things that decide applicability ────────────────
+// Rendered with their provenance (from the CV / entered by you / MISSING) because
+// a fact the parser failed to read now silently stops blocking, and the user has
+// to be able to see that and fix it.
+let _facts = null;
+
+const _FACT_ROWS = [
+  { key: "years_experience", i18n: "profile.matching.years" },
+  { key: "education_level", i18n: "profile.matching.education" },
+  { key: "grade", i18n: "profile.matching.grade" },
+];
+
+function _sourceTag(origin) {
+  const key =
+    origin === "manuale"
+      ? "profile.matching.fromYou"
+      : origin === "cv"
+        ? "profile.matching.fromCv"
+        : "profile.matching.missing";
+  const cls = origin === "mancante" ? "flag-block" : "flag-info";
+  return `<span class="job-flag ${cls}">${escapeHtml(t(key))}</span>`;
+}
+
+export async function loadMatchingFacts() {
+  const view = document.getElementById("matchingFactsView");
+  if (!view) return;
+  try {
+    _facts = await api("/api/profile/matching-facts");
+  } catch {
+    return;
+  }
+  const rows = _FACT_ROWS.map((row) => {
+    const value = _facts[row.key];
+    const shown = value === null || value === undefined || value === "" ? "—" : value;
+    return (
+      `<div class="profile-experience-row"><span>${escapeHtml(t(row.i18n))}</span>` +
+      `<strong>${escapeHtml(String(shown))}</strong> ${_sourceTag(_facts.sources?.[row.key])}</div>`
+    );
+  });
+  rows.push(
+    `<div class="profile-experience-row"><span>${escapeHtml(t("profile.matching.rule"))}</span>` +
+      `<strong>${escapeHtml(_facts.rule_summary || "—")}</strong> ${_sourceTag(_facts.sources?.work_rule)}</div>`,
+  );
+  view.innerHTML = rows.join("");
+}
+
+function _openFactsEditor() {
+  if (!_facts) return;
+  const sel = document.getElementById("factEducation");
+  if (sel) {
+    sel.innerHTML =
+      `<option value=""></option>` +
+      (_facts.education_levels || [])
+        .map((lvl) => `<option value="${escapeHtml(lvl)}">${escapeHtml(lvl)}</option>`)
+        .join("");
+    sel.value = _facts.education_level || "";
+  }
+  const years = document.getElementById("factYears");
+  if (years) years.value = _facts.years_experience ?? "";
+  const grade = document.getElementById("factGrade");
+  if (grade) grade.value = _facts.grade ?? "";
+  const cities = document.getElementById("factCities");
+  if (cities) cities.value = (_facts.base_cities || []).join(", ");
+  const modes = new Set(_facts.work_modes || []);
+  document
+    .querySelectorAll("#factModes input[type=checkbox]")
+    .forEach((el) => (el.checked = modes.has(el.value)));
+  document.getElementById("matchingFactsEdit")?.classList.remove("hidden");
+  document.getElementById("matchingFactsView")?.classList.add("hidden");
+}
+
+function _closeFactsEditor() {
+  document.getElementById("matchingFactsEdit")?.classList.add("hidden");
+  document.getElementById("matchingFactsView")?.classList.remove("hidden");
+}
+
+async function _saveFacts() {
+  const num = (id) => {
+    const raw = document.getElementById(id)?.value.trim();
+    return raw === "" || raw === undefined ? null : Number(raw);
+  };
+  const body = {
+    years_experience: num("factYears"),
+    grade: num("factGrade"),
+    education_level: document.getElementById("factEducation")?.value || "",
+    base_cities: (document.getElementById("factCities")?.value || "")
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean),
+    work_modes: [...document.querySelectorAll("#factModes input:checked")].map((el) => el.value),
+  };
+  try {
+    await api("/api/profile", { method: "PATCH", body: JSON.stringify(body) });
+    showToast(t("profile.matching.saved"), "info");
+    _closeFactsEditor();
+    await loadMatchingFacts();
+  } catch (err) {
+    showToast(`${t("toast.actionError")}: ${err.message}`, "error");
+  }
+}
+
+export function initMatchingFacts() {
+  document.getElementById("factsEditBtn")?.addEventListener("click", _openFactsEditor);
+  document.getElementById("factsCancelBtn")?.addEventListener("click", _closeFactsEditor);
+  document.getElementById("factsSaveBtn")?.addEventListener("click", _saveFacts);
+}

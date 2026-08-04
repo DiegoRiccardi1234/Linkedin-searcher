@@ -3,7 +3,13 @@ import { initTheme } from "./modules/theme.js";
 import { initLayout, syncStickyOffset } from "./modules/layout.js";
 import { loadShortlist as _loadShortlistApi, addToShortlist as _addToShortlistApi, removeFromShortlist as _removeFromShortlistApi } from "./modules/shortlist.js";
 import { initI18n, t, loadLanguage, getCurrentLang, onLanguageChange } from "./modules/i18n.js";
-import { loadProfile as loadProfileView, bindProfileEvents, addRolesToProfile } from "./modules/profile.js";
+import {
+  loadProfile as loadProfileView,
+  bindProfileEvents,
+  addRolesToProfile,
+  loadMatchingFacts,
+  initMatchingFacts,
+} from "./modules/profile.js";
 import { appState } from "./modules/state.js";
 import { loadAnalytics, loadUsage } from "./modules/analytics.js";
 import {
@@ -315,6 +321,8 @@ async function loadKeysStatus() {
 
 async function loadProfiles() {
   const payload = await api("/api/profiles");
+  // The matching facts belong to the ACTIVE profile: refresh them together.
+  loadMatchingFacts();
   const select = document.getElementById("profileSelect");
   select.innerHTML = "";
 
@@ -1186,6 +1194,7 @@ async function bootstrap() {
   await loadWatchlist();
   // Probes the GPU and asks Ollama: slow enough to keep off the critical path,
   // and useless until the user opens Settings anyway.
+  initMatchingFacts();
   loadLocalModels();
   await loadSchedulerStatus();
   await loadChatPrompts();

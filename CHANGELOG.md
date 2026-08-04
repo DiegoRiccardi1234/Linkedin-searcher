@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-08-04
+
+The app now enforces what you told it about yourself, instead of asking a model to remember.
+
+### Fixed
+- **Offers you cannot apply to no longer top the list.** On a real archive of 128 postings, 40 scored 8 or more — and among them eight demanded one or two years of experience against a CV declaring none, one demanded a master's against a bachelor, and on-site roles in Rome, Savona and Reggio Emilia were recommended to someone who had written "Turin, on-site or hybrid, or full remote". The demand was sitting in the analysis' own `anni_esperienza_richiesti` field the whole time: the model extracted it and then scored as if it had not. Years, degree and location are now checked deterministically, before the model is even called, and an offer that breaks one is capped and hidden. Same archive after the change: 82 offers hidden as inapplicable, 16 left.
+- **"Full Remote" now means full remote.** A posting offering "possibilità di lavorare da remoto (fino a 2 giornate su 5 settimanali)" was stored as fully remote, and so was one offering "soluzioni ibride di smart working" — the hybrid pattern missed Italian plurals, and "smart working", which in Italy means a couple of days from home, was listed as a full-remote phrase. 20 postings in the archive were mislabelled this way. The posting's own words now outrank the job board's flag in both directions.
+- **Ticking "Hybrid" filters again.** The work-mode filter returned true for every row whenever hybrid was among the selections, on the grounds that job boards cannot express hybrid — so choosing it switched the whole filter off while looking applied. The filter and the stored label now read the posting with the same code.
+- **The hardware probe stopped running behind your back.** Consent, once given, was taken as licence to re-probe on every page load: four child processes, two visible console windows flashing over the app, and a request to Hugging Face, every single time. The result is remembered now, and only the Refresh button looks again. The probe also no longer opens console windows at all.
+- **The list stops jumping to the top.** Discarding a job rebuilt the whole table, which collapsed the page height and sent the browser back to the top of the list.
+- **CV reading.** A graduation year is no longer taken from the end of a certification course when the degree line's own dates sit on the next line, and "Italiano madrelingua · Inglese B2" is read as two languages rather than one.
+
+### Added
+- **Matching data you can correct.** Years of experience, degree, grade and where you can work are shown with where each came from — the CV, you, or missing — and every one of them is editable. Until now a mis-parsed year could only be fixed by rewriting the CV text, and nothing in the scoring path read those fields anyway.
+- **An end-of-scan check.** The per-offer rules and the batch clone guard each see one answer at a time, so a model answering badly across every batch produced a clean-looking scan. A final pass, with no model call, looks for a collapsed score distribution, the same summary on unrelated postings, and anything recommended while carrying a blocker — then asks again about what it found, one offer at a time, and reports how many it re-checked.
+- **Four display densities instead of two.** "Compact" used to replace the responsive type scale with fixed sizes, bottoming out at 10.5px and switching off adaptation to screen width. Density is now one multiplier over the same scale, with a 12px floor.
+
+### Changed
+- **The location and work mode of an offer reach the model.** Neither was in the prompt, so no model — of any size — could tell an on-site role in another city from one round the corner. Measured across the same postings, adding them raised how well the models separate applicable offers from blocked ones by about a third.
+- **The clone guard looks at more than the match axes.** Two slots could carry the same summary and the same strengths sentence while differing by one digit in the axes, and slip through.
+
+
 ## [1.7.10] — 2026-07-28
 
 The scan knows when it is talking to your own machine, and the app asks before looking at it.

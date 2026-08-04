@@ -30,9 +30,25 @@ def test_work_mode_remote_and_onsite() -> None:
     assert _row_work_mode_ok({"is_remote": True}, ["onsite"]) is False
 
 
-def test_work_mode_both_hybrid_unknown_and_none() -> None:
-    assert _row_work_mode_ok({"is_remote": True}, ["remote", "onsite"]) is True  # both → all
-    assert _row_work_mode_ok({"is_remote": True}, ["hybrid"]) is True  # can't distinguish → all
-    assert _row_work_mode_ok({}, ["onsite"]) is True  # unknown is_remote → keep
+def test_work_mode_hybrid_selection_actually_filters() -> None:
+    """Ticking Hybrid used to switch the whole filter off.
+
+    The old rule was "jobspy can't express hybrid, so keep everything", which
+    meant selecting Hybrid returned on-site and remote rows alike — the filter
+    looked applied and wasn't. The posting text decides now, so Hybrid keeps
+    hybrid postings and drops the ones that are plainly remote or on-site.
+    """
+    hybrid = "Lavoro ibrido, 2 giorni in ufficio a settimana."
+    assert _row_work_mode_ok({}, ["hybrid"], hybrid) is True
+    assert _row_work_mode_ok({"is_remote": True}, ["hybrid"]) is False  # remote ≠ hybrid
+    assert _row_work_mode_ok({}, ["remote"], hybrid) is False
+    assert _row_work_mode_ok({}, ["onsite"], hybrid) is False
+    # The description outranks the board flag in both directions.
+    assert _row_work_mode_ok({"is_remote": True}, ["hybrid"], hybrid) is True
+
+
+def test_work_mode_keeps_the_undecidable() -> None:
+    assert _row_work_mode_ok({"is_remote": True}, ["remote", "onsite", "hybrid"]) is True  # all
+    assert _row_work_mode_ok({}, ["onsite"]) is True  # nothing known → keep
     assert _row_work_mode_ok({"is_remote": float("nan")}, ["onsite"]) is True
     assert _row_work_mode_ok({"is_remote": True}, []) is True  # no filter

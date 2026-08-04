@@ -154,6 +154,16 @@ class ProfileUpdate(BaseModel):
     languages: list[str] | None = None
     name: str | None = None
     markdown: str | None = None
+    # The facts that decide whether an offer is applicable at all. The CV parser
+    # gets them wrong often enough — a graduation year read off a certification
+    # date, a degree it never found — and until now the only way to correct one
+    # was to rewrite the whole CV text by hand. They are stored as preferences,
+    # not in summary_json, so a correction survives re-uploading the CV.
+    years_experience: int | None = None
+    education_level: str | None = None
+    grade: int | None = None
+    base_cities: list[str] | None = None
+    work_modes: list[str] | None = None
 
 
 class ProfileFromTextRequest(BaseModel):

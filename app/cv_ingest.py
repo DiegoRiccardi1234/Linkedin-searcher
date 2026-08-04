@@ -432,8 +432,20 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
         "graduation_year": graduation_year,
         "years_experience": years_experience,
         "experience_level": experience_level,
+        # Normalised degree level, not the free-text "education" the LLM writes.
+        # An offer demanding a master's is now compared against THIS, so it has
+        # to be one of the ordered levels rather than a sentence.
+        "education_level": _degree_level(markdown_text),
         "languages": languages,
     }
+
+
+def _degree_level(text: str) -> str:
+    """The highest degree the CV shows, as one of the ordered levels."""
+    from app.services.scan.heuristics import EDUCATION_LEVELS, education_requirement
+
+    level, _preferred = education_requirement(text or "")
+    return level if level in EDUCATION_LEVELS else ""
 
 
 # Match date ranges with hyphen, en dash, or em dash separators.
@@ -486,11 +498,22 @@ def _estimate_graduation_year(text: str) -> str:
     def years_in(s: str) -> list[int]:
         return [int(y) for y in _YEAR_TOKEN_RE.findall(s)]
 
-    for line in text.splitlines():
-        if _DEGREE_LINE_RE.search(line):
-            ys = years_in(line)
-            if ys:
-                return str(max(ys))
+    lines = text.splitlines()
+    degree_lines = [i for i, line in enumerate(lines) if _DEGREE_LINE_RE.search(line)]
+
+    # 1. A year written on the degree line itself is the strongest signal.
+    own = [y for i in degree_lines for y in years_in(lines[i])]
+    if own:
+        return str(max(own))
+    # 2. None there: PDF layouts right-align dates and extraction often drops
+    #    them onto the next line. Only reached when step 1 found nothing, so a
+    #    CV that does put the year on the degree line is unaffected — without
+    #    this ordering "Università di Helsinki" borrowed the internship's year.
+    windowed = [y for i in degree_lines for y in years_in(" ".join(lines[i : i + 2]))]
+    if windowed:
+        return str(max(windowed))
+    # 3. Last resort. This is what used to return the end of a certification
+    #    course as the graduation year (measured: 2026 for a 2025 degree).
     ys = years_in(text)
     return str(max(ys)) if ys else ""
 
@@ -532,7 +555,12 @@ def _extract_languages(text: str) -> list[str]:
 
     found: list[str] = []
     seen: set[str] = set()
-    lines = [raw.strip(" \t*-•·•") for raw in scope.splitlines()]  # noqa: B005
+    # A one-line "Italiano madrelingua · Inglese livello intermedio (B2)" is a
+    # single line holding TWO languages: splitting only on newlines produced the
+    # whole sentence as one bogus entry ("Italiano (madrelingua · Inglese …)").
+    # The bullet separators CVs use for this are treated as line breaks.
+    flattened = re.sub(r"\s*[·•|]\s*", "\n", scope)
+    lines = [raw.strip(" \t*-•·•") for raw in flattened.splitlines()]  # noqa: B005
     for idx, line in enumerate(lines):
         if not line:
             continue

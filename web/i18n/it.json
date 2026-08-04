@@ -100,7 +100,24 @@
     "cancel": "Annulla",
     "roles": "Ruoli",
     "cvParsed": "CV letto — vedi il profilo qui sotto.",
-    "uploadAnother": "Carica un altro CV"
+    "uploadAnother": "Carica un altro CV",
+    "matching": {
+      "title": "Dati per il matching",
+      "hint": "Servono a nascondere le offerte a cui non puoi candidarti. Se manca qualcosa o è sbagliato, correggilo qui.",
+      "years": "Anni di esperienza professionale",
+      "education": "Titolo di studio più alto",
+      "grade": "Voto di laurea (su 110)",
+      "cities": "Città in cui puoi spostarti (separate da virgola)",
+      "modes": "Modalità di lavoro che accetti",
+      "onsite": "In sede",
+      "hybrid": "Ibrido",
+      "remote": "Full remote",
+      "rule": "Regola di sede",
+      "fromCv": "dal CV",
+      "fromYou": "inserito da te",
+      "missing": "manca",
+      "saved": "Dati aggiornati"
+    }
   },
   "jobSearch": {
     "title": "Cerca",
@@ -235,7 +252,10 @@
       "heuristic": "Stima locale",
       "notEvaluated": "Da valutare",
       "aggregator": "Aggregatore",
-      "aggregatorLong": "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume"
+      "aggregatorLong": "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume",
+      "location": "Sede fuori zona",
+      "experience": "Chiede esperienza",
+      "education": "Titolo superiore"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",
@@ -370,7 +390,9 @@
       "density": "Densità",
       "densityNormal": "Normale",
       "densityCompact": "Compatta",
-      "densitySaved": "Densità aggiornata"
+      "densitySaved": "Densità aggiornata",
+      "densityComfortable": "Comoda",
+      "densityLarge": "Grande"
     },
     "usage": {
       "limitLabel": "Limite richieste al giorno (0 = nessun limite)",

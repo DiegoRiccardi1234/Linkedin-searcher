@@ -56,13 +56,29 @@ def _norm_remote(val: Any) -> bool | None:
     return bool(val)
 
 
-_HYBRID_RE = re.compile(r"\bibrid[ao]|\bhybrid\b|lavoro ibrido", re.IGNORECASE)
+# "\bibrid[ao]" missed the plurals: a posting offering "soluzioni ibride di
+# smart working" fell through to the remote branch and was stored Full Remote.
+_HYBRID_RE = re.compile(
+    r"\bibrid\w*|\bhybrid\b|lavoro ibrido"
+    # In Italy "smart working" means a couple of days from home, not full remote.
+    # It used to live in _REMOTE_RE, which is how a hybrid role became remote.
+    r"|smart working"
+    # "possibilità di lavorare da remoto (fino a 2 giornate su 5 settimanali)":
+    # a countable number of remote days is the definition of hybrid.
+    r"|\d+\s*(?:giorn[ie]|giornate|days?)[^.\n]{0,40}(?:settiman|su\s*\d|a\s*week|week)",
+    re.IGNORECASE,
+)
 _ONSITE_RE = re.compile(
     r"\bin sede\b|\bon[- ]site\b|\bonsite\b|\bin presenza\b|presenza in sede|\bin office\b",
     re.IGNORECASE,
 )
+# Only phrasings that claim the WHOLE job is remote. A bare "da remoto" is not
+# one of them: "possibilità di lavorare da remoto (fino a 2 giornate su 5)" says
+# the opposite, and it was being stored as Full Remote.
 _REMOTE_RE = re.compile(
-    r"full remote|100% remot|\bda remoto\b|\bfully remote\b|\bremote[- ]first\b|smart working",
+    r"full[- ]remote|100%\s*remot|totalmente\s+da\s+remoto|interamente\s+da\s+remoto"
+    r"|completamente\s+da\s+remoto|\bfully remote\b|\bremote[- ]first\b"
+    r"|remote\s*:\s*(?:yes|s[iì])|sede di lavoro\s*:\s*(?:da\s+)?remoto",
     re.IGNORECASE,
 )
 
@@ -79,12 +95,17 @@ def _detect_work_mode(row: Any, descrizione: str, scan_default: str) -> str:
     text = descrizione or ""
     if _HYBRID_RE.search(text):
         return "Ibrido"
-    is_remote = _norm_remote(row.get("is_remote") if hasattr(row, "get") else None)
-    if is_remote is True:
-        return "Full Remote"
     if _REMOTE_RE.search(text):
         return "Full Remote"
-    if is_remote is False or _ONSITE_RE.search(text):
+    is_remote = _norm_remote(row.get("is_remote") if hasattr(row, "get") else None)
+    # The posting's own words outrank the board's flag in BOTH directions. The
+    # flag used to win over an explicit "in sede", which is how on-site roles at
+    # a named plant were labelled remote.
+    if _ONSITE_RE.search(text):
+        return "In sede"
+    if is_remote is True:
+        return "Full Remote"
+    if is_remote is False:
         return "In sede"
     # No evidence either way. The scan flag is a SEARCH filter, not a fact about
     # the posting — asserting "Full Remote" from it is how an on-site plant role
@@ -109,20 +130,26 @@ def _row_job_type_ok(row: Any, job_types: list[str]) -> bool:
     return not types or bool(types & selected)
 
 
-def _row_work_mode_ok(row: Any, work_types: list[str]) -> bool:
-    """Best-effort work-mode filter from jobspy's ``is_remote``.
+#: Work mode as detected -> the UI code the user ticks. Keeps the filter and the
+#: stored label in agreement; they used to be two different implementations.
+_MODE_TO_CODE = {"Full Remote": "remote", "Ibrido": "hybrid", "In sede": "onsite"}
 
-    'hybrid' isn't distinguishable in jobspy output, so any selection including
-    it (or both remote+onsite) keeps everything. Unknown is_remote is kept.
+
+def _row_work_mode_ok(row: Any, work_types: list[str], descrizione: str = "") -> bool:
+    """Whether a posting matches the work modes the user ticked.
+
+    Reads the posting with :func:`_detect_work_mode` instead of jobspy's boolean
+    ``is_remote``. The old version short-circuited to ``True`` whenever 'hybrid'
+    was among the selections — jobspy cannot express hybrid — so ticking Hybrid
+    silently turned the whole filter off and every on-site row survived.
+
+    An undecidable posting is kept: dropping on ignorance hides real jobs.
     """
     modes = {w.lower() for w in work_types}
-    if not modes or "hybrid" in modes or {"remote", "onsite"} <= modes:
+    if not modes or set(_MODE_TO_CODE.values()) <= modes:  # every mode ticked: nothing to narrow
         return True
-    is_remote = _norm_remote(row.get("is_remote"))
-    if is_remote is None:
+    detected = _detect_work_mode(row, descrizione, "")
+    code = _MODE_TO_CODE.get(detected)
+    if code is None:  # "Non specificato" / unknown
         return True
-    if "remote" in modes:
-        return is_remote
-    if "onsite" in modes:
-        return not is_remote
-    return True
+    return code in modes

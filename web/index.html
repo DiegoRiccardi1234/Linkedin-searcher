@@ -345,7 +345,7 @@
           <label class="filter-check"><input id="onlyFavorites" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">favorite</span> <span data-i18n="jobs.favorites">Favorites</span></label>
           <label class="filter-check"><input id="onlyNew" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">fiber_new</span> <span data-i18n="jobs.new">New</span></label>
           <label class="filter-check"><input id="remoteOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">home_work</span> <span data-i18n="jobs.remote">Remote</span></label>
-          <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
+          <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" checked /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
           <select id="statusFilter">
             <option value="" data-i18n="jobs.allStatuses">All statuses</option>
             <option value="open" data-i18n="jobs.open">Open</option>
@@ -684,6 +684,39 @@
           <div id="profileExperience" class="profile-experience"></div>
         </article>
 
+        <!-- The four facts that decide whether an offer is applicable at all.
+             They were extracted from the CV and shown read-only while nothing
+             in the scoring path read them; now they gate offers, so a parser
+             mistake has to be correctable without rewriting the whole CV. -->
+        <article class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.matching.title">Matching data</h3>
+            <button type="button" class="ghost-btn micro" id="factsEditBtn" data-i18n="profile.edit">Edit</button>
+          </header>
+          <p class="micro" data-i18n="profile.matching.hint">Used to hide offers you cannot apply to. If something is missing or wrong, fix it here.</p>
+          <div id="matchingFactsView" class="profile-experience"></div>
+          <div id="matchingFactsEdit" class="cv-edit-wrap hidden">
+            <label class="micro" data-i18n="profile.matching.years">Years of professional experience</label>
+            <input type="number" min="0" max="50" id="factYears" class="profile-add-input" />
+            <label class="micro" data-i18n="profile.matching.education">Highest degree</label>
+            <select id="factEducation" class="settings-select"></select>
+            <label class="micro" data-i18n="profile.matching.grade">Degree grade (out of 110)</label>
+            <input type="number" min="60" max="110" id="factGrade" class="profile-add-input" />
+            <label class="micro" data-i18n="profile.matching.cities">Cities you can commute to (comma separated)</label>
+            <input type="text" id="factCities" class="profile-add-input" placeholder="Torino" />
+            <label class="micro" data-i18n="profile.matching.modes">Work modes you accept</label>
+            <div class="filter-pills" id="factModes">
+              <label class="filter-check"><input type="checkbox" value="onsite" /> <span data-i18n="profile.matching.onsite">On-site</span></label>
+              <label class="filter-check"><input type="checkbox" value="hybrid" /> <span data-i18n="profile.matching.hybrid">Hybrid</span></label>
+              <label class="filter-check"><input type="checkbox" value="remote" /> <span data-i18n="profile.matching.remote">Full remote</span></label>
+            </div>
+            <div class="cv-edit-actions">
+              <button type="button" class="secondary" id="factsSaveBtn" data-i18n="profile.save">Save</button>
+              <button type="button" class="ghost-btn" id="factsCancelBtn" data-i18n="profile.cancel">Cancel</button>
+            </div>
+          </div>
+        </article>
+
         <article class="profile-block profile-cv">
           <header class="profile-block-head">
             <h3 data-i18n="profile.originalCv">CV (markdown)</h3>
@@ -817,8 +850,10 @@
           <label class="settings-field">
             <span class="micro" data-i18n="settings.appearance.density">Density</span>
             <select id="densitySelect" class="settings-select">
-              <option value="normal" data-i18n="settings.appearance.densityNormal">Normal</option>
               <option value="compact" data-i18n="settings.appearance.densityCompact">Compact</option>
+              <option value="normal" data-i18n="settings.appearance.densityNormal">Normal</option>
+              <option value="comfortable" data-i18n="settings.appearance.densityComfortable">Comfortable</option>
+              <option value="large" data-i18n="settings.appearance.densityLarge">Large</option>
             </select>
           </label>
         </article>
