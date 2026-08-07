@@ -272,7 +272,9 @@
     "rescoreDone": "{n} offres réévaluées, {c} notes modifiées.",
     "rescoreNothing": "Aucune offre ne correspond à ce critère.",
     "rescoreFailed": "Échec de la réévaluation",
-    "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées."
+    "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées.",
+    "applyPending": "En attente de confirmation",
+    "notApplied": "Je n'ai pas postulé"
   },
   "kanbanCols": {
     "open": "Ouvert",

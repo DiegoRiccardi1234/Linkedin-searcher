@@ -265,6 +265,10 @@
           <a id="detailLinkBtn" target="_blank" class="button secondary" style="display:none;align-items:center;justify-content:center;gap:4px;">
             <span class="material-symbols-outlined" style="font-size:18px">open_in_new</span> <span data-i18n="offcanvas.viewListing">Vedi Annuncio</span>
           </a>
+          <!-- Only while the app is waiting to hear about this posting. Without
+               it an open could only be resolved by moving the offer along the
+               funnel, which says something the user may not mean. -->
+          <button id="detailNotAppliedBtn" class="secondary" style="display:none;" data-i18n="jobs.notApplied">Non mi sono candidato</button>
         </div>
         <div id="jobDetailContainer"></div>
         <div class="cover-letter-section">

@@ -272,7 +272,9 @@
     "rescoreDone": "Rivalutate {n} offerte, {c} punteggi cambiati.",
     "rescoreNothing": "Nessuna offerta da rivalutare con questo criterio.",
     "rescoreFailed": "Rivalutazione non riuscita",
-    "rescoreInterrupted": "Rivalutazione interrotta: le offerte gia' fatte sono salvate."
+    "rescoreInterrupted": "Rivalutazione interrotta: le offerte gia' fatte sono salvate.",
+    "applyPending": "In attesa di conferma",
+    "notApplied": "Non mi sono candidato"
   },
   "kanbanCols": {
     "open": "Aperto",

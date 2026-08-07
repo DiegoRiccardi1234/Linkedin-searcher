@@ -494,6 +494,27 @@ def build_router(container: AppContainer) -> APIRouter:
         container.db.set_job_action(job_id=job_id, action=payload.action.value, notes=payload.notes)
         return {"ok": True}
 
+    @router.post("/api/jobs/{job_id}/link-opened")
+    def mark_link_opened(job_id: int) -> dict[str, Any]:
+        """The user just opened this posting, so an application may follow.
+
+        Not behind a feature flag: the fact is worth recording even with no
+        mailbox connected — "opened seven postings, applied to none" is an
+        answer in itself — and a flag checked here would silently produce a
+        history with holes in it the day the mail check is switched on.
+        """
+        if not container.db.get_job(job_id):
+            raise HTTPException(status_code=404, detail="Job not found")
+        return {"ok": True, "pending_since": container.db.mark_link_opened(job_id)}
+
+    @router.post("/api/jobs/{job_id}/link-opened/clear")
+    def clear_link_opened(job_id: int) -> dict[str, Any]:
+        """ "I did not apply after all" — stop waiting for a confirmation."""
+        if not container.db.get_job(job_id):
+            raise HTTPException(status_code=404, detail="Job not found")
+        container.db.clear_link_opened(job_id)
+        return {"ok": True}
+
     @router.get("/api/jobs/{job_id}/timeline")
     def job_timeline(job_id: int) -> dict[str, Any]:
         """Chronological status changes + notes for a job (F3)."""

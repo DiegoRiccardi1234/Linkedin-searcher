@@ -272,7 +272,9 @@
     "rescoreDone": "{n} Angebote neu bewertet, {c} Bewertungen geändert.",
     "rescoreNothing": "Kein Angebot entspricht diesem Kriterium.",
     "rescoreFailed": "Neubewertung fehlgeschlagen",
-    "rescoreInterrupted": "Neubewertung abgebrochen: bereits bewertete Angebote sind gespeichert."
+    "rescoreInterrupted": "Neubewertung abgebrochen: bereits bewertete Angebote sind gespeichert.",
+    "applyPending": "Warte auf Bestätigung",
+    "notApplied": "Ich habe mich nicht beworben"
   },
   "kanbanCols": {
     "open": "Offen",

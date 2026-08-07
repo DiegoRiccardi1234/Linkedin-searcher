@@ -272,7 +272,9 @@
     "rescoreDone": "Re-scored {n} offers, {c} scores changed.",
     "rescoreNothing": "No offer matches this scope.",
     "rescoreFailed": "Re-scoring failed",
-    "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved."
+    "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved.",
+    "applyPending": "Waiting for confirmation",
+    "notApplied": "I did not apply"
   },
   "kanbanCols": {
     "open": "Open",

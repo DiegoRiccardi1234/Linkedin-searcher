@@ -105,6 +105,19 @@ export function freshnessHtml(lastSeenAt) {
   );
 }
 
+// The posting was opened and nothing has come back yet. Not a flag from
+// analysis_json like the badges above — those describe the OFFER, this one
+// describes what the user did — so it lives beside them rather than in the list.
+export function pendingBadgeHtml(job) {
+  if (!job || !job.link_opened_at || normalizeJobStatus(job.status) !== "open") return "";
+  const label = t("jobs.applyPending");
+  return (
+    `<span class="job-flag flag-warn" title="${escapeHtml(label)}">` +
+    `<span class="material-symbols-outlined">hourglass_top</span>` +
+    `<span>${escapeHtml(label)}</span></span>`
+  );
+}
+
 // Client-side ordering. The server always returns score-desc; the table had no
 // way to answer "what came in most recently" or "who is hiring" without
 // re-reading every row by eye.
@@ -131,7 +144,10 @@ function _paintSortHeaders() {
 }
 
 function _kanbanBadges(job) {
-  const badges = flagBadgesHtml(job.flags, { compact: true }) + freshnessHtml(job.last_seen_at);
+  const badges =
+    flagBadgesHtml(job.flags, { compact: true }) +
+    freshnessHtml(job.last_seen_at) +
+    pendingBadgeHtml(job);
   return badges ? `<div class="job-flags">${badges}</div>` : "";
 }
 
@@ -221,7 +237,10 @@ export async function loadJobs() {
   for (const job of jobs) {
     const newBadge = job.is_new ? `<span class="pill-new">${t("jobs.newBadge")}</span>` : "";
     const sc = scoreCell(job.punteggio_ai);
-    const badges = flagBadgesHtml(job.flags, { compact: true }) + freshnessHtml(job.last_seen_at);
+    const badges =
+      flagBadgesHtml(job.flags, { compact: true }) +
+      freshnessHtml(job.last_seen_at) +
+      pendingBadgeHtml(job);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><span class="${sc.cls}">${sc.text}</span> ${newBadge}</td>
@@ -234,7 +253,7 @@ export async function loadJobs() {
       <td>
         <label class="compare-pick" title="${escapeHtml(t("compare.pick"))}"><input type="checkbox" class="compare-check" data-compare-id="${job.id}"${_deps.isCompareSelected(job.id) ? " checked" : ""} /><span class="material-symbols-outlined">compare_arrows</span></label>
         <button data-detail-id="${job.id}" class="secondary">${t("jobs.details")}</button>
-        ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" style="margin-left: 8px;" title="${t("jobs.openPosting")}" aria-label="${t("jobs.openPosting")}">🔗</a>` : ""}
+        ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" data-job-link="${job.id}" style="margin-left: 8px;" title="${t("jobs.openPosting")}" aria-label="${t("jobs.openPosting")}">🔗</a>` : ""}
       </td>
       <td>
         <div class="mini">

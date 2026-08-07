@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **The app now notices when you open a posting.** Applying happens on LinkedIn or on the company's own form, so the last thing this app ever saw was the click — and it did not see that either: every link was a plain anchor, and the archive could not tell "never looked at it" from "applied three weeks ago". `applied_at` was empty on all 21 shortlisted offers. An opened posting is now marked as waiting for an answer, with a badge in the list and a button to say you did not apply after all. It is also the groundwork for recognising the confirmation email: knowing which four companies you opened this week is the difference between a match and a guess.
+
 ### Changed
 - **A requirement you do not meet no longer makes the offer disappear.** Years of experience and degree level used to cap a posting to 3 and hide it behind "applicable only", exactly like an office you cannot reach without a car. Those two are the requirements every junior is told to apply for anyway, so they now lower a ceiling instead: 6 for the first unmet one and one less for each further one, never below 3. The offer stays in the list, says why on its badge, and can never outrank one you fully match. The other four blockers — outside the EU, a degree grade an ATS filters on, an unreachable office, a register you are not on — are not arguable and still cap and hide.
 - A weighted constraint no longer skips the model. The check that decides whether to call the AI at all reads only the non-arguable blockers now, because a ceiling needs a real score to lower — otherwise the ceiling itself becomes the verdict, which is the invented number this app stopped producing in 1.7.9.

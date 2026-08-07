@@ -372,6 +372,10 @@ class Database:
                 "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
                 (status_map[action], now_iso(), job_id),
             )
+            # The answer is in: whatever the funnel now says, there is nothing
+            # left to watch the inbox for.
+            if status_map[action] != "open":
+                self.conn.execute("UPDATE jobs SET link_opened_at = NULL WHERE id = ?", (job_id,))
         # Applying is the one event worth denormalising out of the timeline: the
         # date and the CV that went with it are what the user asks about months
         # later, and the active profile is only knowable NOW (it changes).
@@ -394,6 +398,51 @@ class Database:
             (job_id, action, notes, now_iso()),
         )
         self.conn.commit()
+
+    @_synchronized
+    def mark_link_opened(self, job_id: int) -> str | None:
+        """Record that the posting was opened, and return when the wait started.
+
+        COALESCE keeps the FIRST unresolved open: re-reading a posting a week
+        later must not push the window past a confirmation that already arrived.
+        The counter still moves, because "opened three times, never applied" and
+        "opened once by mistake" are different things.
+
+        Does nothing once the offer has left ``open``: the user has already said
+        what happened, and there is nothing left to wait for.
+        """
+        self.conn.execute(
+            "UPDATE jobs SET link_opened_at = COALESCE(link_opened_at, ?), "
+            "link_open_count = COALESCE(link_open_count, 0) + 1 "
+            "WHERE id = ? AND status = 'open'",
+            (now_iso(), job_id),
+        )
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT link_opened_at FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        return str(row[0]) if row and row[0] else None
+
+    @_synchronized
+    def clear_link_opened(self, job_id: int) -> None:
+        """Stop waiting for a confirmation about this offer."""
+        self.conn.execute("UPDATE jobs SET link_opened_at = NULL WHERE id = ?", (job_id,))
+        self.conn.commit()
+
+    def list_pending_applications(self, ttl_days: int = 14) -> list[dict[str, Any]]:
+        """Offers opened recently and still unanswered, newest first.
+
+        The TTL is what keeps the question answerable: a confirmation arrives in
+        minutes, so an open from three weeks ago is not evidence of anything and
+        would only widen the window a match is drawn from.
+        """
+        rows = self.conn.execute(
+            "SELECT id, titolo, azienda, link, link_opened_at FROM jobs "
+            "WHERE link_opened_at IS NOT NULL AND status = 'open' "
+            "AND link_opened_at > datetime('now', ?) ORDER BY link_opened_at DESC",
+            (f"-{max(1, int(ttl_days))} days",),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def _active_profile_id(self) -> int | None:
         """Id of the CV profile in use right now, for stamping an application."""
