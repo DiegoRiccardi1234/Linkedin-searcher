@@ -97,9 +97,26 @@ def test_a_cloud_chain_keeps_the_cloud_budget() -> None:
 
 def test_batch_budget_scales_with_offer_count() -> None:
     assert ss._scoring_max_tokens(3) > ss._scoring_max_tokens(1)
-    assert ss._scoring_max_tokens(3) == 500 * 3 + 1600
     # A batch of one must not be cheaper than the single path it replaces.
     assert ss._scoring_max_tokens(0) == ss._scoring_max_tokens(1)
+
+
+def test_cloud_budget_clears_what_a_reasoning_model_actually_spends() -> None:
+    """Measured on Cerebras gpt-oss-120b against real postings (06/08/2026).
+
+    One offer, one JSON: 1828, 1896, 1936, 2011, 2059, 2138, 2300 and 2377
+    completion tokens. The old ceiling was 2100, so the budget sat INSIDE the
+    spread — three answers in ten came back truncated, and a truncation costs
+    the whole generation plus a failover, which is more expensive than the
+    headroom it was saving. max_tokens is a ceiling, not a charge: a model that
+    finishes early is billed for what it wrote.
+    """
+    assert ss._scoring_max_tokens(1) >= 2377 * 1.4
+    # Batches were measured too, and cost less per offer because the CV, the
+    # preferences and the rubric are written once: 2791 tokens for two offers,
+    # 4352 for three. Same margin over the worst case actually seen.
+    assert ss._scoring_max_tokens(2) >= 2791 * 1.4
+    assert ss._scoring_max_tokens(3) >= 4352 * 1.3
 
 
 # --- salary axis ---------------------------------------------------------------

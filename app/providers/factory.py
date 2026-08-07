@@ -843,6 +843,25 @@ def _is_forbidden(exc: Exception) -> bool:
     return "403" in text or "forbidden" in text or "key limit exceeded" in text
 
 
+#: An exhausted account, whatever HTTP status the provider dresses it in. The
+#: distinction that matters: a throttle clears by waiting, an empty balance does
+#: not, so the two must not share a penalty.
+_NO_CREDIT_MARKERS = (
+    "insufficient balance",
+    "no resource package",
+    "please recharge",
+    "insufficient_quota",
+    "insufficient credits",
+    "exceeded your current quota",
+    "billing",
+)
+
+
+def _is_out_of_credit(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in _NO_CREDIT_MARKERS)
+
+
 def _classify_failure(exc: Exception) -> str | None:
     """Map a failed LLM call to an empirical-penalty reason, or None when the
     failure shouldn't de-rank the model (transient network/5xx — retry handles
@@ -854,6 +873,14 @@ def _classify_failure(exc: Exception) -> str | None:
     if isinstance(exc, EmptyCompletionError):
         # Also a ValueError subclass — must precede the json_fail branch.
         return "malformed"
+    if _is_out_of_credit(exc):
+        # Checked BEFORE the rate-limit branch, which it would otherwise hide:
+        # GLM answers an empty account with HTTP 429 and "Insufficient balance
+        # or no resource package. Please recharge." Read as throttling, that is
+        # a promise the next call might work — so every offer in a run paid the
+        # same round trip to the same empty account, and six of them ended up
+        # unevaluated with that message as their stated reason.
+        return "forbidden"
     if _is_rate_limited(exc):
         return "rate_limit"
     if _is_forbidden(exc):

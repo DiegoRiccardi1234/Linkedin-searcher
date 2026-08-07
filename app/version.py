@@ -14,7 +14,7 @@ from app.log import get_logger
 
 log = get_logger(__name__)
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 GITHUB_REPO = "DiegoRiccardi1234/job-finder"
 RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -23,27 +24,22 @@ from app.models import (
 from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
 from app.services.onboarding import onboarding_context
+from app.services.rescore_service import (
+    SCOPES,
+    build_context,
+    rescore_job,
+    rescore_jobs,
+    select_job_ids,
+)
+from app.services.rescore_service import (
+    linkedin_suffix as _linkedin_suffix,
+)
 from app.services.scan.companies import WATCHLIST_SUGGESTIONS, canonical_company
 from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer, is_unevaluated
 from app.services.skill_gap import compute_skill_gap, suggest_learning
 
 if TYPE_CHECKING:
     from app.container import AppContainer
-
-
-def _linkedin_suffix(db: Any) -> str:
-    """CV-context suffix from the saved LinkedIn data (F7).
-
-    Prefers the fetched/pasted profile text over the bare URL. Truncated; PII is
-    scrubbed downstream by Privacy Mode since this is appended to the CV markdown.
-    """
-    text = db.get_preference("linkedin_profile_text", "")
-    if text and text.strip():
-        return f"\n\nProfilo LinkedIn (estratto):\n{text.strip()[:2000]}"
-    url = db.get_preference("linkedin_url", "")
-    if url:
-        return f"\n\nProfilo LinkedIn: {url}"
-    return ""
 
 
 def build_router(container: AppContainer) -> APIRouter:
@@ -111,22 +107,8 @@ def build_router(container: AppContainer) -> APIRouter:
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        profile = container.db.get_active_candidate_profile()
-        profile_markdown = profile["markdown"] if profile else "Profile not loaded"
-        profile_markdown += _linkedin_suffix(container.db)
-
-        analysis = analyze_offer(
-            provider_manager=container.providers,
-            profile_markdown=profile_markdown,
-            titolo=job.get("titolo", ""),
-            azienda=job.get("azienda", ""),
-            descrizione=job.get("descrizione") or "",
-            privacy=container.feature_enabled("privacy_mode", True),
-            extra_context=onboarding_context(container.db),
-            candidate_name=(profile.get("name") if profile else None),
-            # Without the location the geo-eligibility cap is structurally dead.
-            sede=job.get("sede") or "",
-        )
+        ctx = build_context(container.db, privacy=container.feature_enabled("privacy_mode", True))
+        analysis = rescore_job(container.providers, job, ctx)
         container.db.update_job_analysis(job_id=job_id, analysis=analysis)
         return {
             "job_id": job_id,
@@ -134,6 +116,63 @@ def build_router(container: AppContainer) -> APIRouter:
             "punteggio": analysis.get("punteggio"),
             "evaluated": not is_unevaluated(analysis),
         }
+
+    @router.get("/api/jobs/reanalyze/stream")
+    def reanalyze_stream(
+        request: Request,
+        scope: str = Query(default="unscored"),
+        ids: str = Query(default=""),
+    ) -> StreamingResponse:
+        """Re-score a whole slice of the archive, streaming progress.
+
+        Needed because the per-offer button only ever appeared on offers nobody
+        had judged: an archive scored by a model that turned out to be wrong — or
+        judged before a fix to the blocking rules — could not be refreshed at all
+        without waiting for the same postings to reappear in a scan.
+        """
+        rate_limit.check(request, bucket="rescore_bulk", limit=4, window_seconds=300)
+        container.require_provider()
+        if scope not in SCOPES:
+            raise HTTPException(status_code=400, detail="unknown_scope")
+        id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+        if container.rescore_control.running:
+            raise HTTPException(status_code=409, detail="rescore_in_progress")
+        job_ids = select_job_ids(container.db, scope, id_list)
+
+        def event_generator() -> Iterator[str]:
+            import json
+
+            if not container.rescore_control.try_begin():
+                yield f"data: {json.dumps({'error': 'rescore_in_progress'})}\n\n"
+                return
+            try:
+                for event in rescore_jobs(
+                    container.db,
+                    container.providers,
+                    job_ids=job_ids,
+                    privacy=container.feature_enabled("privacy_mode", True),
+                    cancel_check=container.rescore_control.is_cancelled,
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            finally:
+                container.rescore_control.end()
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    @router.post("/api/jobs/reanalyze/cancel")
+    def reanalyze_cancel() -> dict[str, Any]:
+        was_running = container.rescore_control.running
+        container.rescore_control.cancel()
+        return {"cancelling": was_running}
+
+    @router.get("/api/jobs/reanalyze/preview")
+    def reanalyze_preview(scope: str = Query(default="unscored")) -> dict[str, Any]:
+        """How many offers a scope covers — so the UI can say it before spending."""
+        if scope not in SCOPES:
+            raise HTTPException(status_code=400, detail="unknown_scope")
+        return {"scope": scope, "count": len(select_job_ids(container.db, scope))}
 
     @router.post("/api/jobs/{job_id}/cover-letter")
     def generate_cover_letter(job_id: int) -> dict[str, Any]:

@@ -255,13 +255,24 @@
       "aggregatorLong": "Republicado por un agregador: la empresa mostrada no es la que contrata",
       "location": "Ubicación fuera de zona",
       "experience": "Pide experiencia",
-      "education": "Título superior"
+      "education": "Título superior",
+      "protected": "Reservada a categorías protegidas"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
       "likelyExpired": "Probablemente caducada"
     },
-    "adviceToEvaluate": "Por evaluar"
+    "adviceToEvaluate": "Por evaluar",
+    "rescoreBulk": "Reevaluar",
+    "rescoreScopeHint": "Qué ofertas reevaluar con la IA",
+    "rescoreScopeUnscored": "Solo sin evaluar",
+    "rescoreScopeApplicable": "Candidables",
+    "rescoreScopeAll": "Todas",
+    "rescoreConfirm": "¿Reevaluar {n} ofertas con la IA? Puede tardar unos minutos.",
+    "rescoreDone": "Reevaluadas {n} ofertas, {c} puntuaciones cambiadas.",
+    "rescoreNothing": "Ninguna oferta coincide con este criterio.",
+    "rescoreFailed": "La reevaluación ha fallado",
+    "rescoreInterrupted": "Reevaluación interrumpida: las ofertas ya hechas se han guardado."
   },
   "kanbanCols": {
     "open": "Abierto",

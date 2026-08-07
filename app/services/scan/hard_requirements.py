@@ -359,6 +359,7 @@ FLAG_AGGREGATOR = "annuncio_aggregatore"  # a job board reposting someone else's
 FLAG_EXPERIENCE = "esperienza_richiesta"  # asks for more years than the CV shows
 FLAG_EDUCATION = "titolo_superiore"  # demands a degree above the candidate's
 FLAG_LOCATION = "sede_non_raggiungibile"  # on-site/hybrid outside the accepted cities
+FLAG_PROTECTED_CATEGORY = "categorie_protette"  # reserved to the L. 68/99 register
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
@@ -370,6 +371,7 @@ BLOCKING_FLAGS = frozenset(
         FLAG_EXPERIENCE,
         FLAG_EDUCATION,
         FLAG_LOCATION,
+        FLAG_PROTECTED_CATEGORY,
     }
 )
 

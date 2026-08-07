@@ -318,15 +318,18 @@ export async function showJobDetail(jobId) {
     if (engagement && engagement !== "Non specificato") {
       engagementSpan = `<div class="info-tag"><strong>${t("offcanvas.engagement")}:</strong> ${escapeHtml(engagement)}</div>`;
     }
-    // Nobody judged this offer. Offer the retry — unless the posting itself is
-    // the problem, in which case another model call would come back just as
-    // empty and the only useful action is opening the ad.
+    // The retry is offered on ANY offer, judged or not. Restricting it to
+    // unscored ones meant a verdict could never be revisited: a score written by
+    // a model that turned out to be too generous, or before a fix to the
+    // blocking rules, was frozen for as long as the posting stayed in the
+    // archive. The one exception stays: when the posting itself carries no
+    // description, another call comes back just as empty.
     const unscored = job.punteggio_ai === null || job.punteggio_ai === undefined;
     const shortDesc = (analysis?.blocchi || []).includes("descrizione_breve");
     let rescoreRow = "";
     if (unscored && shortDesc) {
       rescoreRow = `<p class="micro mt-8 text-center">${t("offcanvas.shortDescHint")}</p>`;
-    } else if (unscored) {
+    } else {
       rescoreRow =
         `<button type="button" id="detailReanalyzeBtn" data-id="${job.id}" class="secondary mt-8">` +
         `<span class="material-symbols-outlined">refresh</span> ${t("offcanvas.reanalyze")}</button>`;

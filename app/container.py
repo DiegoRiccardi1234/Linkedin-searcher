@@ -40,6 +40,11 @@ class AppContainer:
         from app.services.scan_control import ScanControl
 
         self.scan_control = ScanControl()
+        # Bulk re-scoring gets its OWN lock. Sharing the scan's would mean a
+        # re-score left the "scan in progress" flag stuck — the failure mode that
+        # already cost a restart once — and would block a scan for no reason:
+        # the two touch different work, they just must not each run twice.
+        self.rescore_control = ScanControl()
 
         # In-process scheduler for the optional auto-scan feature. Created
         # inert; started by the app lifespan, stopped on shutdown.

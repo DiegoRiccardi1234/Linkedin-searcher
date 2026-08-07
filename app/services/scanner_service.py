@@ -404,10 +404,23 @@ def _scoring_max_tokens(n_offers: int, local: bool = False) -> int:
     than the hosted ones — a 12B wrote past this ceiling on the first real offer
     it was given and had its JSON cut off. Being generous there is free; being
     tight there just re-creates the truncation this budget exists to prevent.
+
+    The cloud figure used to be 500·n+1600, and measuring it against real
+    postings (Cerebras ``gpt-oss-120b``, 06/08/2026) showed the ceiling landing
+    in the MIDDLE of what one answer costs: 1828 to 2377 completion tokens for a
+    single offer, against a budget of 2100. Three replies in ten were cut off —
+    and each one wastes the whole generation, then a failover, then usually a
+    second model. The headroom it was protecting is imaginary: ``max_tokens`` is
+    a ceiling, not a charge, so a model that stops at 1900 is billed for 1900.
+
+    Batches were measured the same day and cost LESS per offer than the singles
+    they replace, because the CV, the preferences and the rubric are written once
+    for the whole call: 2669-2791 tokens for two offers, 3631-4352 for three. The
+    coefficients below clear every one of those figures with room left over.
     """
     if local:
         return 1200 * max(1, n_offers) + 3000
-    return 500 * max(1, n_offers) + 1600
+    return 1100 * max(1, n_offers) + 2600
 
 
 def _scoring_call_kwargs(provider_manager: ProviderManager) -> dict[str, Any]:
@@ -618,19 +631,30 @@ def audit_scan(results: list[dict[str, Any]]) -> dict[str, Any]:
         return {"anomalie": anomalie, "sospetti": sospetti}
 
     # 1. Every offer got (nearly) the same score: the scale stopped discriminating.
-    scores = [r["analysis"]["punteggio"] for r in scored]
-    top = max(set(scores), key=scores.count)
-    same = scores.count(top)
-    if same / len(scores) >= 0.8:
-        anomalie.append(
-            {"codice": "voti_piatti", "voto": top, "quota": round(same / len(scores), 2)}
-        )
-        sospetti.extend(r["job_id"] for r in scored if r["analysis"]["punteggio"] == top)
+    #    Offers capped by a hard block are left out of this count. Their 3 is
+    #    CALCULATED by the cap, not chosen by the model, so on a real archive —
+    #    where most postings are correctly out of reach — the check denounced the
+    #    app for working exactly as designed, and sent those offers to be scored
+    #    again only to be capped back to 3.
+    judged = [r for r in scored if not (set(r["analysis"].get("blocchi") or []) & BLOCKING_FLAGS)]
+    if len(judged) >= 4:
+        scores = [r["analysis"]["punteggio"] for r in judged]
+        top = max(set(scores), key=scores.count)
+        same = scores.count(top)
+        if same / len(scores) >= 0.8:
+            anomalie.append(
+                {"codice": "voti_piatti", "voto": top, "quota": round(same / len(scores), 2)}
+            )
+            sospetti.extend(r["job_id"] for r in judged if r["analysis"]["punteggio"] == top)
 
     # 2. The same summary on different postings — a clone the batch guard missed
-    #    because it crossed two separate calls.
+    #    because it crossed two separate calls. Blocked offers are excluded here
+    #    for the same reason as above: their summary is a SENTENCE THE APP WROTE
+    #    ("Non candidabile: richiede 3+ anni di esperienza"), so on a real archive
+    #    34 of them were identical by construction and the audit reported a clone
+    #    epidemic every single scan.
     by_text: dict[str, list[int]] = {}
-    for r in scored:
+    for r in judged:
         text = str(r["analysis"].get("riassunto") or "").strip().lower()
         if len(text) >= 40:
             by_text.setdefault(text, []).append(r["job_id"])
@@ -1488,9 +1512,14 @@ def run_scan(
                     except Exception as exc:  # analyze_offer(s) degrade internally
                         log.warning("scoring task failed: %s", exc)
                         continue
+                    # The audit may want to ask about an offer again, and asking
+                    # needs the OFFER (title, description, location) — a result
+                    # does not carry one. Without this the re-score raised
+                    # KeyError on every suspect and silently corrected nothing.
+                    origin = {o["job_id"]: o for o in futures[fut]}
                     for result in results:
                         db.update_job_analysis(job_id=result["job_id"], analysis=result["analysis"])
-                        audit_pool.append(result)
+                        audit_pool.append({**result, "source": origin.get(result["job_id"])})
                         if result["recruiter"]:
                             db.upsert_recruiter(result["job_id"], result["recruiter"])
                         # "Analysed" must mean judged. An offer that came back
@@ -1576,7 +1605,7 @@ def run_scan(
     if audit["sospetti"] and not was_cancelled:
         by_id = {r["job_id"]: r for r in audit_pool}
         for job_id in audit["sospetti"][:_MAX_AUDIT_RESCORES]:
-            item = by_id.get(job_id)
+            item = (by_id.get(job_id) or {}).get("source")
             if not item:
                 continue
             try:

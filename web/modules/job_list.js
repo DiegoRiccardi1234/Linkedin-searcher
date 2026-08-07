@@ -63,6 +63,7 @@ const FLAG_BADGES = [
   { code: "sede_non_raggiungibile", cls: "flag-block", icon: "wrong_location", key: "jobs.flag.location" },
   { code: "esperienza_richiesta", cls: "flag-block", icon: "work_history", key: "jobs.flag.experience" },
   { code: "titolo_superiore", cls: "flag-block", icon: "school", key: "jobs.flag.education" },
+  { code: "categorie_protette", cls: "flag-block", icon: "accessible", key: "jobs.flag.protected" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
   { code: "ral_sotto_minima", cls: "flag-warn", icon: "payments", key: "jobs.flag.salary" },
   { code: "annuncio_aggregatore", cls: "flag-warn", icon: "content_copy", key: "jobs.flag.aggregator" },

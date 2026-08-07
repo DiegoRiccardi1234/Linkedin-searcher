@@ -255,13 +255,24 @@
       "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring",
       "location": "Out-of-area location",
       "experience": "Wants experience",
-      "education": "Higher degree"
+      "education": "Higher degree",
+      "protected": "Reserved to protected categories"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
       "likelyExpired": "Probably expired"
     },
-    "adviceToEvaluate": "To evaluate"
+    "adviceToEvaluate": "To evaluate",
+    "rescoreBulk": "Re-score",
+    "rescoreScopeHint": "Which offers to re-score with AI",
+    "rescoreScopeUnscored": "Unscored only",
+    "rescoreScopeApplicable": "Applicable",
+    "rescoreScopeAll": "Everything",
+    "rescoreConfirm": "Re-score {n} offers with AI? This can take a few minutes.",
+    "rescoreDone": "Re-scored {n} offers, {c} scores changed.",
+    "rescoreNothing": "No offer matches this scope.",
+    "rescoreFailed": "Re-scoring failed",
+    "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved."
   },
   "kanbanCols": {
     "open": "Open",

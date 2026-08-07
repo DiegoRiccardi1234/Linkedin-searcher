@@ -255,13 +255,24 @@
       "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein",
       "location": "Standort außerhalb",
       "experience": "Verlangt Erfahrung",
-      "education": "Höherer Abschluss"
+      "education": "Höherer Abschluss",
+      "protected": "Geschützten Kategorien vorbehalten"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
       "likelyExpired": "Wahrscheinlich abgelaufen"
     },
-    "adviceToEvaluate": "Zu bewerten"
+    "adviceToEvaluate": "Zu bewerten",
+    "rescoreBulk": "Neu bewerten",
+    "rescoreScopeHint": "Welche Angebote neu bewertet werden sollen",
+    "rescoreScopeUnscored": "Nur unbewertete",
+    "rescoreScopeApplicable": "Bewerbbare",
+    "rescoreScopeAll": "Alle",
+    "rescoreConfirm": "{n} Angebote mit KI neu bewerten? Das kann einige Minuten dauern.",
+    "rescoreDone": "{n} Angebote neu bewertet, {c} Bewertungen geändert.",
+    "rescoreNothing": "Kein Angebot entspricht diesem Kriterium.",
+    "rescoreFailed": "Neubewertung fehlgeschlagen",
+    "rescoreInterrupted": "Neubewertung abgebrochen: bereits bewertete Angebote sind gespeichert."
   },
   "kanbanCols": {
     "open": "Offen",

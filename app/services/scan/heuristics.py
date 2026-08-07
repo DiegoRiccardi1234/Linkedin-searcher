@@ -48,6 +48,39 @@ _EXPERIENCE_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Job boards hand us markdown-escaped punctuation ("almeno **1\-2 anni**"). The
+# backslash sat between the two halves of the range, so _YEARS_RE could not join
+# "1" to "anni" and matched the SECOND number instead — reading every escaped
+# range at its UPPER bound. Measured on the real archive: "3\-5 anni" demanded
+# five, and "1\-2 anni" demanded two, which is exactly the blocking threshold.
+_MD_ESCAPE_RE = re.compile(r"\\([-–—/+*_.])")  # noqa: RUF001
+
+# "sei mesi maturati negli ultimi 2 anni" says WHEN the experience was earned,
+# not how much of it is demanded. Read as a requirement it hid an apprenticeship.
+_TIME_WINDOW_RE = re.compile(r"ultim[oi]\s*$", re.IGNORECASE)
+
+# "una realtà con oltre 30 anni di esperienza nel settore" is the COMPANY's age.
+# It needs all three signals to be dismissed: something introducing the company,
+# no wording that turns the number into a demand, and the "oltre/più di" shape
+# these boasts always take — otherwise "l'azienda cerca almeno 3 anni" would be
+# thrown away too.
+_COMPANY_SUBJECT_RE = re.compile(
+    r"azienda|realt|societ|gruppo|impresa|studio|siamo|fondat|nasce|opera|player|leader",
+    re.IGNORECASE,
+)
+_DEMAND_RE = re.compile(
+    r"almeno|minimo|richie|cerchiamo|ricerchiamo|candidat|profilo|risorsa|maturat"
+    r"|possiedi|requisit|must have|we (?:are looking|require)|you have",
+    re.IGNORECASE,
+)
+# Matched against the lead INCLUDING the number: _YEARS_RE swallows "oltre" as
+# its own optional prefix, so looking only at what precedes the match never sees
+# the boast that gives the company's age away.
+_BOAST_RE = re.compile(
+    r"(?:oltre|pi[uù] di|over|more than)\s*\d{1,2}\s*(?:[-–—/+]\s*\d{1,2})?\s*(?:ann|year)",  # noqa: RUF001
+    re.IGNORECASE,
+)
+
 
 def _estimate_experience_band(offer_text: str) -> str:
     """Years of experience the posting demands: ``0|1|2|3+|Non specificato``.
@@ -57,11 +90,25 @@ def _estimate_experience_band(offer_text: str) -> str:
     reading only the first number let it through as a one-year role. Ranges are
     read at their lower bound, and every number must sit near a word that means
     "experience" or it is not a seniority requirement at all.
+
+    Three shapes name a number of years without demanding it, and each one was
+    hiding real jobs: an escaped range, a time window, and the company boasting
+    about its own age.
     """
+    offer_text = _MD_ESCAPE_RE.sub(r"\1", offer_text)
     best: int | None = None
     for match in _YEARS_RE.finditer(offer_text):
         window = offer_text[max(0, match.start() - 70) : match.end() + 70]
         if not _EXPERIENCE_CONTEXT_RE.search(window):
+            continue
+        before = offer_text[max(0, match.start() - 80) : match.start()]
+        if _TIME_WINDOW_RE.search(before):
+            continue
+        if (
+            _COMPANY_SUBJECT_RE.search(before)
+            and not _DEMAND_RE.search(before)
+            and _BOAST_RE.search(before + match.group(0))
+        ):
             continue
         low = int(match.group(1))
         # group(2) is the top of a range; the lower bound is what must be cleared.
@@ -155,9 +202,24 @@ EDUCATION_LEVELS: tuple[str, ...] = ("Nessuno", "Diploma", "Triennale", "Magistr
 
 # "laurea magistrale gradita" is a wish, not a gate. Without this an offer that
 # explicitly says the bachelor is enough was read as demanding a master's.
+# A degree listed under "elementi con attribuzione di punteggio" is the same
+# thing said in the language of public-sector rankings: it earns points, it does
+# not close the door — and reading it as a gate hid an apprenticeship.
 _PREFERRED_RE = re.compile(
     r"preferib|gradit|costituisce\s+(?:un\s+)?(?:titolo\s+)?preferenziale|plus\b"
-    r"|nice\s+to\s+have|apprezzat|desiderabil|a\s+plus\b",
+    r"|nice\s+to\s+have|apprezzat|desiderabil|a\s+plus\b"
+    r"|attribuzione\s+di\s+punteggio|titolo\s+preferenziale|costituir[àa]\s+titolo",
+    re.IGNORECASE,
+)
+
+# "bachelor's or master's degree" and "laurea triennale o magistrale" are open to
+# BOTH: the master's pattern matched first and the "bachelor's or" in front of it
+# was never read, so a posting that spelled out its openness to a three-year
+# degree was treated as closed to one.
+_EDU_EITHER = re.compile(
+    r"(?:laurea\s+)?(?:triennale|bachelor'?s?(?:\s+degree)?|primo\s+livello|\bbsc\b)"
+    r"\s*(?:(?:,\s*)?(?:o|od|or|e/o|and/or|oppure)\s+|\s*/\s*)"
+    r"(?:laurea\s+)?(?:magistrale|specialistica|master'?s?(?:\s+degree)?|\bmsc\b)",
     re.IGNORECASE,
 )
 
@@ -176,6 +238,9 @@ def education_requirement(offer_text: str) -> tuple[str, bool]:
         match = pattern.search(offer_text)
         if match:
             window = offer_text[max(0, match.start() - 90) : match.end() + 90]
+            if level == "Magistrale" and _EDU_EITHER.search(window):
+                # The same sentence offers the bachelor as an alternative.
+                return "Triennale", bool(_PREFERRED_RE.search(window))
             return level, bool(_PREFERRED_RE.search(window))
     if _EDU_ANY_DEGREE.search(offer_text):
         # "laurea in informatica" with no level: a bachelor clears it.
