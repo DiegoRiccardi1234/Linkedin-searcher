@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from app import rate_limit
 from app.mail import config as mail_config
-from app.mail.auth import begin_device_code, poll_device_code
+from app.mail.auth import begin_device_code, poll_device_code, scope_for
 from app.mail.errors import MailAuthPending, MailError, safe_error
 from app.models import MailConfigRequest, MailReviewResolveRequest
 
@@ -44,10 +44,14 @@ def build_router(container: AppContainer) -> APIRouter:
         if "@" not in address:
             raise HTTPException(status_code=400, detail="invalid_address")
         auth, default_host, default_port = mail_config.default_host_for(address)
-        if payload.auth in ("password", "graph"):
+        if payload.auth in ("password", "graph", "imap_oauth"):
             auth = payload.auth  # type: ignore[assignment]
         host = (payload.host or default_host).strip()
-        if auth == "password" and not host:
+        if auth == "imap_oauth" and not host:
+            # Microsoft has no host in the Graph default, so fill it in here
+            # rather than making the user know outlook.office365.com by heart.
+            host = mail_config.imap_host_for(address)
+        if auth in ("password", "imap_oauth") and not host:
             raise HTTPException(status_code=400, detail="host_required")
         mail_config.save_account(
             container.db,
@@ -86,13 +90,20 @@ def build_router(container: AppContainer) -> APIRouter:
         rate_limit.check(request, bucket="mail_oauth", limit=10, window_seconds=60)
         client_id = str((payload or {}).get("client_id") or "").strip() or _client_id(container)
         if not client_id:
+            # Nothing is shipped as a default: since June 2024 a personal
+            # Microsoft account cannot register an application, so any id in
+            # this field belongs to a registration the user actually has.
             raise HTTPException(status_code=400, detail="client_id_required")
+        account = container.mailwatch.account()
+        auth = str((payload or {}).get("auth") or (account.auth if account else "graph"))
+        scope = scope_for(auth)
         try:
-            start = begin_device_code(client_id)
+            start = begin_device_code(client_id, scope)
         except MailError as exc:
             raise HTTPException(status_code=502, detail=safe_error(exc)) from exc
         flow["device_code"] = start.device_code
         flow["client_id"] = client_id
+        flow["auth"] = auth if auth in ("graph", "imap_oauth") else "graph"
         return {
             "user_code": start.user_code,
             "verification_uri": start.verification_uri,
@@ -117,7 +128,7 @@ def build_router(container: AppContainer) -> APIRouter:
             secret=bundle.refresh_token,
             client_id=flow["client_id"],
         )
-        container.db.set_preference(mail_config.PREF_AUTH, "graph")
+        container.db.set_preference(mail_config.PREF_AUTH, flow.get("auth", "graph"))
         flow.clear()
         return {"status": "complete", "state": container.mailwatch.status()["state"]}
 

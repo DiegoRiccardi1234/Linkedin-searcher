@@ -938,7 +938,8 @@
     "provider": {
       "label": "Connexion",
       "other": "Autre fournisseur (mot de passe d'application)",
-      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+      "microsoftGraph": "Microsoft — lecture seule (nécessite votre propre inscription d'application)",
+      "microsoftImap": "Microsoft — IMAP (pour un id d'application que vous avez déjà)"
     },
     "appPassword": "Mot de passe d'application",
     "appPasswordHelp": "Générez un mot de passe d'application chez votre fournisseur, jamais le principal. Il est stocké en clair sur ce PC, comme vos clés API.",
@@ -980,6 +981,13 @@
       "intro": "Ils ressemblent à des confirmations mais n'ont pas pu être attribués seuls. Rien n'a été modifié.",
       "apply": "Marquer la sélection comme envoyée",
       "dismiss": "Tout ignorer"
+    },
+    "whereIdFrom": "Où trouver un id d'application ?",
+    "idSource": {
+      "work": "Compte Microsoft professionnel ou scolaire : inscrivez l'application dans l'annuaire de votre organisation (Entra → Inscriptions d'applications), si votre service informatique l'autorise. Demandez l'autorisation déléguée Mail.Read et activez « Autoriser les flux client public ».",
+      "azure": "Un compte Azure : mêmes étapes. Le plan gratuit ne coûte rien mais demande une carte pour vérifier votre identité.",
+      "none": "Ni l'un ni l'autre : un Outlook personnel ne peut pas être connecté. Créez une règle qui transfère les mails de confirmation vers une boîte qui fonctionne — Gmail, ou toute boîte IMAP — et connectez celle-là.",
+      "other": "Certains clients de messagerie open source publient leur propre id d'application, que l'on peut coller ici. Cela fonctionne, mais l'écran de consentement affichera leur nom au lieu de Job Finder, et révoquer l'accès concerne les deux."
     }
   }
 }

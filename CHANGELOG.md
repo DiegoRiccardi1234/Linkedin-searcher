@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.8.3] — 2026-08-07
+
+### Added
+- **A second way to connect a Microsoft mailbox, for the app id you can actually get.** Reaching Outlook needs an app registration, and since June 2024 a personal Microsoft account cannot create one: the portal answers 401 and the button to create a directory is disabled. So Microsoft now offers two modes — Graph with the read-only `Mail.Read` permission, still the right choice whenever your registration can ask for it, and IMAP with an OAuth token, for a registration that only carries the IMAP scope. Same consent flow, same read-only behaviour in this app; the IMAP scope is simply wider than what gets used.
+- **The mailbox card says where an app id comes from**, instead of leaving an empty field and a shrug: a work or school directory, an Azure account, or — if you have neither — a forwarding rule to a mailbox that does work. No app id is shipped with the app: any id in that field belongs to a registration you genuinely have.
+
+### Fixed
+- The end-to-end suite ran on port 8000, which is the port the installed app listens on. With `reuseExistingServer`, a suite launched while Job Finder was open silently tested the installed bundle instead of the working tree — and wrote its test data into the real archive.
+
 ## [1.8.2] — 2026-08-07
 
 ### Added

@@ -938,7 +938,8 @@
     "provider": {
       "label": "Accesso",
       "other": "Altro provider (app password)",
-      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+      "microsoftGraph": "Microsoft — sola lettura (serve una registrazione tua)",
+      "microsoftImap": "Microsoft — IMAP (per un id applicazione che hai già)"
     },
     "appPassword": "App password",
     "appPasswordHelp": "Genera una app password dal tuo provider, mai la password principale. Viene salvata in chiaro su questo PC, come le chiavi API.",
@@ -980,6 +981,13 @@
       "intro": "Sembrano conferme ma non è stato possibile assegnarli da soli. Non è stato cambiato nulla.",
       "apply": "Segna i selezionati come candidatura",
       "dismiss": "Ignora tutti"
+    },
+    "whereIdFrom": "Dove si prende un id applicazione?",
+    "idSource": {
+      "work": "Account Microsoft di lavoro o scuola: registra l'app nella directory dell'organizzazione (Entra → Registrazioni app), se l'IT lo consente. Chiedi l'autorizzazione delegata Mail.Read e attiva «Consenti flussi client pubblici».",
+      "azure": "Un account Azure: stessi passi. Il piano gratuito non costa nulla ma chiede una carta per verificare l'identità.",
+      "none": "Nessuno dei due: un Outlook personale non si può collegare. Crea una regola che inoltri le mail di conferma a una casella che funziona — Gmail, Libero, una qualsiasi IMAP — e collega quella.",
+      "other": "Alcuni client di posta open source pubblicano il proprio id applicazione, e si può incollare qui. Funziona, ma la schermata di consenso mostrerà il loro nome al posto di Job Finder, e revocare l'accesso vale per entrambi."
     }
   }
 }

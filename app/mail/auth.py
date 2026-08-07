@@ -1,20 +1,26 @@
-"""Getting a read-only Microsoft token, and keeping it alive.
+"""Getting a Microsoft token, and keeping it alive.
 
 Outlook.com stopped accepting a password over IMAP on 16/09/2024, app passwords
-included, so a Microsoft mailbox needs OAuth whichever way it is read. Given
-that, this asks for ``Mail.Read`` on Microsoft Graph rather than the IMAP scope:
-``IMAP.AccessAsUser.All`` is the only delegated IMAP scope Microsoft publishes
-and it grants write access too, which this app has no use for and no business
-holding on someone else's mailbox.
+included, so a Microsoft mailbox needs OAuth whichever way it is read. Two scopes
+are offered because the choice is not ours to make:
 
-The device-code flow is used because it needs no redirect URI registered
-anywhere: the app shows a short code, the user types it on Microsoft's own page,
-and the consent screen is Microsoft's, not ours. That also means the whole
-consent step lives inside this app and is versioned with it.
+* ``Mail.Read`` on Microsoft Graph — **read-only, enforced by the server**. This
+  is what to ask for whenever the registration allows it.
+* ``IMAP.AccessAsUser.All`` — the only delegated IMAP scope Microsoft publishes,
+  and it grants write access this app never uses. It exists here because most
+  registrations that people can actually get their hands on are IMAP-scoped.
 
-``client_id`` identifies the registered application. It is not a secret — public
-clients are not issued one — and it is configurable so a user whose employer
-blocks third-party apps can point this at their own registration.
+Why that matters: since June 2024 an app registration must live in a directory,
+and a personal Microsoft account has none — the portal answers 401 and the
+"create a tenant" button is disabled. So a user with a personal Outlook cannot
+register an app at all without a paid Azure account. No ``client_id`` is shipped
+with this app: the field is theirs to fill, and the UI says plainly where one
+comes from instead of leaving them in front of an empty box.
+
+The device-code flow needs no redirect URI registered anywhere: the app shows a
+short code, the user types it on Microsoft's own page, and the consent screen is
+Microsoft's. The whole consent step therefore lives inside this app and is
+versioned with it.
 """
 
 from __future__ import annotations
@@ -32,9 +38,28 @@ TOKEN_URL = f"{AUTHORITY}/token"
 
 #: Read, and only read. ``offline_access`` is what makes the grant survive the
 #: hour-long access token.
-SCOPE = "offline_access https://graph.microsoft.com/Mail.Read"
+SCOPE_GRAPH = "offline_access https://graph.microsoft.com/Mail.Read"
+#: Wider than this app needs, and the only one IMAP has. Used only when the
+#: registration in hand cannot ask for the read-only one.
+SCOPE_IMAP = "offline_access https://outlook.office.com/IMAP.AccessAsUser.All"
+
+#: ``auth`` value -> scope. Keys match ``MailAccount.auth``.
+SCOPES = {"graph": SCOPE_GRAPH, "imap_oauth": SCOPE_IMAP}
 
 _TIMEOUT = 15.0
+
+
+def scope_for(auth: str) -> str:
+    return SCOPES.get(auth, SCOPE_GRAPH)
+
+
+def xoauth2_string(address: str, access_token: str) -> bytes:
+    """The SASL blob IMAP wants in place of a password.
+
+    ``imaplib`` base64-encodes whatever the callback returns, so this is the raw
+    form: ``user=<addr>\\x01auth=Bearer <token>\\x01\\x01``.
+    """
+    return f"user={address}\x01auth=Bearer {access_token}\x01\x01".encode()
 
 
 @dataclass(frozen=True)
@@ -78,8 +103,8 @@ def _post(url: str, data: dict[str, str]) -> dict[str, Any]:
     raise MailAuthError(f"{error or response.status_code}")
 
 
-def begin_device_code(client_id: str) -> DeviceCodeStart:
-    payload = _post(DEVICE_CODE_URL, {"client_id": client_id, "scope": SCOPE})
+def begin_device_code(client_id: str, scope: str = SCOPE_GRAPH) -> DeviceCodeStart:
+    payload = _post(DEVICE_CODE_URL, {"client_id": client_id, "scope": scope})
     return DeviceCodeStart(
         device_code=str(payload.get("device_code") or ""),
         user_code=str(payload.get("user_code") or ""),
@@ -102,7 +127,9 @@ def poll_device_code(client_id: str, device_code: str) -> TokenBundle:
     return _bundle(payload)
 
 
-def refresh_access_token(client_id: str, refresh_token: str) -> TokenBundle:
+def refresh_access_token(
+    client_id: str, refresh_token: str, scope: str = SCOPE_GRAPH
+) -> TokenBundle:
     """A fresh access token, and possibly a NEW refresh token.
 
     Microsoft rotates the refresh token, and the caller MUST persist the one
@@ -116,7 +143,7 @@ def refresh_access_token(client_id: str, refresh_token: str) -> TokenBundle:
             "grant_type": "refresh_token",
             "client_id": client_id,
             "refresh_token": refresh_token,
-            "scope": SCOPE,
+            "scope": scope,
         },
     )
     return _bundle(payload, fallback_refresh=refresh_token)

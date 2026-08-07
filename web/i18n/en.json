@@ -938,7 +938,8 @@
     "provider": {
       "label": "Sign-in",
       "other": "Other provider (app password)",
-      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+      "microsoftGraph": "Microsoft — read-only (needs your own app registration)",
+      "microsoftImap": "Microsoft — IMAP (for an app id you already have)"
     },
     "appPassword": "App password",
     "appPasswordHelp": "Generate an app password from your provider — never your main password. It is stored in clear text on this PC, like your API keys.",
@@ -980,6 +981,13 @@
       "intro": "These look like confirmations but could not be assigned on their own. Nothing has been changed.",
       "apply": "Mark selected as applied",
       "dismiss": "Ignore all"
+    },
+    "whereIdFrom": "Where do I get an app id?",
+    "idSource": {
+      "work": "Work or school Microsoft account: register the app in your organisation's directory (Entra → App registrations), if your IT allows it. Ask for the delegated Mail.Read permission and turn on \"Allow public client flows\".",
+      "azure": "An Azure account: same steps. The free plan costs nothing but asks for a card to verify your identity.",
+      "none": "Neither of the two: a personal Outlook cannot be connected. Set up a rule that forwards confirmation emails to a mailbox that works — Gmail, Libero, any IMAP one — and connect that instead.",
+      "other": "Some open-source mail clients publish their own app id, and it can be pasted here. It works, but the consent screen will show their name instead of Job Finder, and revoking access affects both."
     }
   }
 }
