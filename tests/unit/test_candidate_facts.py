@@ -12,6 +12,7 @@ from __future__ import annotations
 from app.db import Database
 from app.services import candidate_facts as cf
 from app.services.scan.heuristics import _estimate_experience_band, education_requirement
+from app.services.scan.hard_requirements import WEIGHTED_FLAGS, hard_block_reason
 from app.services.scanner_service import (
     FLAG_EDUCATION,
     FLAG_EXPERIENCE,
@@ -184,6 +185,30 @@ def test_education_treats_a_scored_title_as_preferential() -> None:
     assert reason is None
 
 
+def test_education_ignores_a_preference_stated_about_something_else() -> None:
+    """"gradita" in the NEXT bullet is not about the degree.
+
+    Real posting (EY, Junior Consultant Technology Risk), which scored 9/10 with
+    no blocker against a three-year degree: the proximity window took 90
+    characters blindly and ran 68 of them into the following bullet, where
+    "Fortemente gradita" qualifies the *experience*, not the master's.
+    """
+    facts = _facts(education_level="Triennale")
+    text = (
+        "Cerchiamo una persona che abbia:\n"
+        "* Laurea magistrale STEM (Ingegneria Gestionale, Informatica, Cybersecurity e affini);\n"
+        "* Fortemente gradita una minima esperienza professionale con coinvolgimento diretto "
+        "in progetti di cybersecurity governance;\n"
+    )
+    level, reason = cf.education_status(text, facts)
+    assert level == "Magistrale"
+    assert reason is not None, "the master's is required here, only the experience is preferred"
+    # The wish must still be read as a wish when it IS about the degree.
+    same_clause = "Laurea magistrale gradita, in informatica o affini;\n* Ottimo inglese"
+    _level, reason = cf.education_status(same_clause, facts)
+    assert reason is None
+
+
 def test_education_requirement_reads_every_level() -> None:
     assert education_requirement("Laurea in Ingegneria Informatica")[0] == "Triennale"
     assert education_requirement("diploma di perito informatico")[0] == "Diploma"
@@ -238,24 +263,75 @@ def test_parse_work_rule_without_modes_constrains_nothing() -> None:
 # ── end to end through the single enforcement point ──────────────────────────
 
 
-def test_enforce_caps_and_flags_each_broken_constraint() -> None:
-    for descrizione, sede, modalita, flag in (
-        (_JD + " Richiesti almeno 2 anni di esperienza maturata.", "Turin", "In sede", FLAG_EXPERIENCE),
-        (_JD + " Richiesta laurea magistrale.", "Turin", "In sede", FLAG_EDUCATION),
-        (_JD, "Rome, Latium, Italy", "In sede", FLAG_LOCATION),
+def _enforced(descrizione: str, sede: str = "Turin", punteggio: int = 9) -> dict[str, object]:
+    return enforce_hard_requirements(
+        {"punteggio": punteggio, "consiglio": "Candidati subito"},
+        profile_markdown=_CV,
+        descrizione=descrizione,
+        sede=sede,
+        modalita="In sede",
+        facts=_facts(),
+    )
+
+
+def test_enforce_caps_and_hides_a_constraint_that_cannot_be_argued_with() -> None:
+    out = _enforced(_JD, sede="Rome, Latium, Italy")
+    assert FLAG_LOCATION in out["blocchi"]  # type: ignore[operator]
+    assert out["punteggio"] == 3
+    assert out["consiglio"] == "Salta"
+    assert FLAG_LOCATION in BLOCKING_FLAGS, "must be hidden by the 'applicable only' filter"
+
+
+def test_enforce_weighs_a_negotiable_constraint_instead_of_hiding_it() -> None:
+    """Years and degree lower the ceiling; they no longer make the offer vanish.
+
+    An on-site role in another city is not reachable without a car. A posting
+    asking for a master's is one you can still apply to and sometimes get — so
+    capping it to 3 and hiding it behind "applicable only" threw away real
+    chances, while leaving it at the model's 9 (EY, "Laurea magistrale STEM")
+    put a requirement the candidate does not meet at the top of the shortlist.
+    """
+    for descrizione, flag in (
+        (_JD + " Richiesti almeno 2 anni di esperienza maturata.", FLAG_EXPERIENCE),
+        (_JD + " Richiesta laurea magistrale.", FLAG_EDUCATION),
     ):
-        out = enforce_hard_requirements(
-            {"punteggio": 9, "consiglio": "Candidati subito"},
-            profile_markdown=_CV,
-            descrizione=descrizione,
-            sede=sede,
-            modalita=modalita,
-            facts=_facts(),
-        )
-        assert flag in out["blocchi"], flag
-        assert out["punteggio"] <= 3, flag
-        assert out["consiglio"] == "Salta", flag
-        assert flag in BLOCKING_FLAGS, "must be hidden by the 'applicable only' filter"
+        out = _enforced(descrizione)
+        assert flag in out["blocchi"], flag  # type: ignore[operator]
+        assert out["punteggio"] == 6, flag
+        assert out["consiglio"] != "Salta", flag
+        assert flag in WEIGHTED_FLAGS and flag not in BLOCKING_FLAGS, flag
+
+
+def test_each_further_unmet_requirement_lowers_the_ceiling_by_one() -> None:
+    out = _enforced(_JD + " Richiesta laurea magistrale e almeno 2 anni di esperienza maturata.")
+    assert {FLAG_EDUCATION, FLAG_EXPERIENCE} <= set(out["blocchi"])  # type: ignore[arg-type]
+    assert out["punteggio"] == 5
+
+
+def test_a_weighted_constraint_never_raises_a_score() -> None:
+    """A ceiling is a ceiling: an offer already below it keeps its own number."""
+    out = _enforced(_JD + " Richiesta laurea magistrale.", punteggio=4)
+    assert out["punteggio"] == 4
+
+
+def test_a_hard_block_still_wins_over_a_weighted_one() -> None:
+    out = _enforced(_JD + " Richiesta laurea magistrale.", sede="Rome, Latium, Italy")
+    assert out["punteggio"] == 3
+    assert out["consiglio"] == "Salta"
+
+
+def test_the_model_is_still_asked_about_a_weighted_constraint() -> None:
+    """Wiring, not logic: a ceiling needs a score to lower.
+
+    ``hard_block_reason`` runs BEFORE the model and skips the call entirely.
+    Leaving the weighted constraints in it would mean no offer asking for a
+    master's ever reaches a model, and its 6 would be the ceiling itself rather
+    than a judgement — the invented number this app stopped producing in 1.7.9.
+    """
+    facts = _facts()
+    weighted = _JD + " Richiesta laurea magistrale e almeno 2 anni di esperienza maturata."
+    assert hard_block_reason(_CV, weighted, "Turin", facts=facts, modalita="In sede") is None
+    assert hard_block_reason(_CV, _JD, "Rome, Latium, Italy", facts=facts, modalita="In sede")
 
 
 def test_enforce_leaves_a_clean_offer_alone() -> None:

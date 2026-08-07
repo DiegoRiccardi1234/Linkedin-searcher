@@ -64,6 +64,7 @@ from app.services.scan.hard_requirements import (
     FLAG_NOT_EVALUATED,
     FLAG_SALARY_BELOW,
     FLAG_SHORT_DESCRIPTION,
+    WEIGHTED_FLAGS,
     _add_flag,
     _add_missing,
     _annual_amount,
@@ -155,6 +156,7 @@ __all__ = [
     "MIN_DESCRIPTION_CHARS",
     "STOPWORDS",
     "TECH_KEYWORDS",
+    "WEIGHTED_FLAGS",
     "_MATCH_AXES_KEYS",
     "_PER_OFFER_SCHEMA",
     "_SCORING_RULES",
@@ -636,7 +638,10 @@ def audit_scan(results: list[dict[str, Any]]) -> dict[str, Any]:
     #    where most postings are correctly out of reach — the check denounced the
     #    app for working exactly as designed, and sent those offers to be scored
     #    again only to be capped back to 3.
-    judged = [r for r in scored if not (set(r["analysis"].get("blocchi") or []) & BLOCKING_FLAGS)]
+    #    Weighted constraints count as calculated too: their ceiling and their
+    #    prepended sentence are written by this app just as a cap is.
+    decided = BLOCKING_FLAGS | WEIGHTED_FLAGS
+    judged = [r for r in scored if not (set(r["analysis"].get("blocchi") or []) & decided)]
     if len(judged) >= 4:
         scores = [r["analysis"]["punteggio"] for r in judged]
         top = max(set(scores), key=scores.count)

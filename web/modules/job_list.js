@@ -59,11 +59,13 @@ const FLAG_BADGES = [
   { code: "non_valutato", cls: "flag-info", icon: "help", key: "jobs.flag.notEvaluated" },
   { code: "geo_non_ue", cls: "flag-block", icon: "public_off", key: "jobs.flag.geo" },
   { code: "voto_minimo", cls: "flag-block", icon: "school", key: "jobs.flag.grade" },
-  // The three constraints the user declares and the app now enforces.
+  // The constraints the user declares and the app enforces. Location and the
+  // protected-categories register are not arguable, so they read as blockers;
+  // years and degree only lower a ceiling (see WEIGHTED_FLAGS), so they warn.
   { code: "sede_non_raggiungibile", cls: "flag-block", icon: "wrong_location", key: "jobs.flag.location" },
-  { code: "esperienza_richiesta", cls: "flag-block", icon: "work_history", key: "jobs.flag.experience" },
-  { code: "titolo_superiore", cls: "flag-block", icon: "school", key: "jobs.flag.education" },
   { code: "categorie_protette", cls: "flag-block", icon: "accessible", key: "jobs.flag.protected" },
+  { code: "esperienza_richiesta", cls: "flag-warn", icon: "work_history", key: "jobs.flag.experience" },
+  { code: "titolo_superiore", cls: "flag-warn", icon: "school", key: "jobs.flag.education" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
   { code: "ral_sotto_minima", cls: "flag-warn", icon: "payments", key: "jobs.flag.salary" },
   { code: "annuncio_aggregatore", cls: "flag-warn", icon: "content_copy", key: "jobs.flag.aggregator" },
