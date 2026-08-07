@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.log import get_logger
 from app.mail import config as mail_config
-from app.mail.auth import refresh_access_token
+from app.mail.auth import refresh_access_token, scope_for
 from app.mail.config import MailAccount
 from app.mail.errors import (
     MailAuthError,
@@ -168,7 +168,7 @@ class MailWatcher:
 
     # ── the mailbox ─────────────────────────────────────────────────────────
 
-    def _graph_token(self, account: MailAccount) -> str:
+    def _oauth_token(self, account: MailAccount) -> str:
         """A valid access token, refreshing when it is about to run out.
 
         A rotated refresh token is written back immediately. Not doing so works
@@ -179,7 +179,7 @@ class MailWatcher:
             return self._access_token
         if not account.client_id or not account.secret:
             raise MailConfigError("Microsoft mailbox not connected")
-        bundle = refresh_access_token(account.client_id, account.secret)
+        bundle = refresh_access_token(account.client_id, account.secret, scope_for(account.auth))
         if bundle.refresh_token and bundle.refresh_token != account.secret:
             mail_config.write_secrets(self._data_dir, secret=bundle.refresh_token)
         self._access_token = bundle.access_token
@@ -188,11 +188,17 @@ class MailWatcher:
 
     def _headers_since(self, account: MailAccount, since: datetime, limit: int) -> list[MailHeader]:
         if account.auth == "graph":
-            token = self._graph_token(account)
+            token = self._oauth_token(account)
             factory = self._graph_factory or GraphMailbox
             with factory(token, folder=account.folder.lower() or "inbox") as box:
                 return list(box.fetch_since(since, limit=limit))
-        factory = self._imap_factory or (lambda acc: ImapMailbox(acc))
+        if account.auth == "imap_oauth":
+            token = self._oauth_token(account)
+            factory = self._imap_factory or (
+                lambda acc: ImapMailbox(acc, token_provider=lambda: token)
+            )
+        else:
+            factory = self._imap_factory or (lambda acc: ImapMailbox(acc))
         with factory(account) as box:
             box.select_readonly(account.folder or "INBOX")
             uids = box.search_since(since.date())

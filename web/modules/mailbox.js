@@ -35,9 +35,11 @@ function _showOutput(text) {
 }
 
 function _toggleAuthBlocks() {
-  const graph = $("mailAuth")?.value === "graph";
-  $("mailPasswordBlock")?.classList.toggle("hidden", graph);
-  $("mailGraphBlock")?.classList.toggle("hidden", !graph);
+  // Both Microsoft modes need an app id and the device-code flow; only the
+  // scope and the transport differ, so they share the same block.
+  const oauth = ["graph", "imap_oauth"].includes($("mailAuth")?.value);
+  $("mailPasswordBlock")?.classList.toggle("hidden", oauth);
+  $("mailGraphBlock")?.classList.toggle("hidden", !oauth);
 }
 
 const _STATE_KEYS = {
@@ -121,7 +123,15 @@ async function _save() {
 }
 
 async function _connectMicrosoft() {
-  const start = await api("/api/mail/oauth/start", { method: "POST", body: "{}" });
+  // Save first: the flow needs the app id and the chosen mode on the server.
+  await _save();
+  const start = await api("/api/mail/oauth/start", {
+    method: "POST",
+    body: JSON.stringify({
+      client_id: $("mailClientId")?.value.trim() || "",
+      auth: $("mailAuth")?.value || "graph",
+    }),
+  });
   const box = $("mailDeviceCode");
   if (box) box.classList.remove("hidden");
   if ($("mailUserCode")) $("mailUserCode").textContent = start.user_code || "";

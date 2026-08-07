@@ -29,6 +29,7 @@ from types import TracebackType
 from typing import Any
 
 from app.log import get_logger
+from app.mail.auth import xoauth2_string
 from app.mail.config import MailAccount
 from app.mail.errors import MailAuthError, MailConfigError, MailTransientError, safe_error
 from app.mail.matcher import MailHeader
@@ -69,16 +70,23 @@ class ImapMailbox:
         *,
         timeout: float = 20.0,
         imap_factory: Callable[..., Any] = imaplib.IMAP4_SSL,
+        token_provider: Callable[[], str] | None = None,
     ) -> None:
         self._account = account
         self._timeout = timeout
         self._factory = imap_factory
+        # Present when the server wants an OAuth token instead of a password.
+        # Microsoft closed password sign-in on Outlook.com in 2024, so a
+        # Microsoft mailbox reached over IMAP can only authenticate this way.
+        self._token_provider = token_provider
         self._conn: Any = None
         self.uidvalidity = 0
 
     def __enter__(self) -> ImapMailbox:
         account = self._account
-        if not account.host or not account.address or not account.secret:
+        if not account.host or not account.address:
+            raise MailConfigError("mailbox not configured")
+        if self._token_provider is None and not account.secret:
             raise MailConfigError("mailbox not configured")
         try:
             self._conn = self._factory(
@@ -87,7 +95,12 @@ class ImapMailbox:
                 ssl_context=ssl.create_default_context(),
                 timeout=self._timeout,
             )
-            self._conn.login(account.address, account.secret)
+            if self._token_provider is not None:
+                blob = xoauth2_string(account.address, self._token_provider())
+                # imaplib base64-encodes whatever the callback returns.
+                self._conn.authenticate("XOAUTH2", lambda _challenge: blob)
+            else:
+                self._conn.login(account.address, account.secret)
         except imaplib.IMAP4.error as exc:
             # The server said no. A network problem raises OSError instead, and
             # the two must not be reported the same way: one needs a new app

@@ -938,7 +938,8 @@
     "provider": {
       "label": "Acceso",
       "other": "Otro proveedor (contraseña de aplicación)",
-      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+      "microsoftGraph": "Microsoft — solo lectura (requiere tu propio registro de aplicación)",
+      "microsoftImap": "Microsoft — IMAP (para un id de aplicación que ya tengas)"
     },
     "appPassword": "Contraseña de aplicación",
     "appPasswordHelp": "Genera una contraseña de aplicación en tu proveedor, nunca la principal. Se guarda en texto plano en este PC, igual que tus claves API.",
@@ -980,6 +981,13 @@
       "intro": "Parecen confirmaciones pero no se pudieron asignar por sí solos. No se ha cambiado nada.",
       "apply": "Marcar seleccionados como enviados",
       "dismiss": "Ignorar todos"
+    },
+    "whereIdFrom": "¿De dónde saco un id de aplicación?",
+    "idSource": {
+      "work": "Cuenta Microsoft de trabajo o estudios: registra la aplicación en el directorio de tu organización (Entra → Registros de aplicaciones), si tu departamento de TI lo permite. Pide el permiso delegado Mail.Read y activa «Permitir flujos de cliente público».",
+      "azure": "Una cuenta de Azure: los mismos pasos. El plan gratuito no cuesta nada pero pide una tarjeta para verificar tu identidad.",
+      "none": "Ninguna de las dos: un Outlook personal no se puede conectar. Crea una regla que reenvíe los correos de confirmación a un buzón que funcione — Gmail, cualquiera con IMAP — y conecta ese.",
+      "other": "Algunos clientes de correo de código abierto publican su propio id de aplicación, y se puede pegar aquí. Funciona, pero la pantalla de consentimiento mostrará su nombre en lugar de Job Finder, y revocar el acceso afecta a ambos."
     }
   }
 }

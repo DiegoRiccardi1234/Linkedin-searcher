@@ -129,6 +129,10 @@ class FakeIMAP4:
         self.calls.append(("login", user))
         return ("OK", [])
 
+    def authenticate(self, mechanism: str, authobj) -> tuple[str, list]:  # noqa: ANN001
+        self.calls.append(("authenticate", mechanism, authobj(b"")))
+        return ("OK", [])
+
     def select(self, folder: str, readonly: bool = False) -> tuple[str, list]:
         self.calls.append(("select", folder, readonly))
         return ("OK", [b"1"])
@@ -183,6 +187,36 @@ def test_the_mailbox_is_opened_read_only_and_bodies_are_never_fetched() -> None:
     assert ("logout",) in fake.calls
     assert headers[0].subject.startswith("La tua candidatura")
     assert headers[0].key == "imap:42:7"
+
+
+def test_microsoft_over_imap_authenticates_with_a_token_never_a_password() -> None:
+    """The only way into outlook.office365.com since September 2024.
+
+    A password is not merely discouraged there, it is refused — so if this ever
+    fell back to ``login`` the failure would look like a wrong app password and
+    send the user hunting for a setting that no longer exists.
+    """
+    from app.mail.config import MailAccount
+    from app.mail.imap_client import ImapMailbox
+
+    fake = FakeIMAP4("h", 993)
+    fake.messages[1] = _RAW
+    account = MailAccount(
+        address="me@outlook.com",
+        auth="imap_oauth",
+        host="outlook.office365.com",
+        secret="refresh-token",
+        client_id="cid",
+    )
+
+    with ImapMailbox(account, imap_factory=lambda *a, **k: fake, token_provider=lambda: "AT") as box:
+        box.select_readonly("INBOX")
+
+    assert not [c for c in fake.calls if c[0] == "login"], "a password must never be sent"
+    auth_calls = [c for c in fake.calls if c[0] == "authenticate"]
+    assert auth_calls and auth_calls[0][1] == "XOAUTH2"
+    assert auth_calls[0][2] == b"user=me@outlook.com\x01auth=Bearer AT\x01\x01"
+    assert ("select", "INBOX", True) in fake.calls, "read-only holds on this path too"
 
 
 def test_this_package_cannot_send_mail() -> None:
@@ -380,18 +414,17 @@ def test_a_rotated_refresh_token_is_written_back(tmp_path: Path, monkeypatch) ->
             db, data_dir, address="me@outlook.com", auth="graph",
             secret="old-refresh", client_id="cid",
         )
-        monkeypatch.setattr(
-            mail_auth,
-            "refresh_access_token",
-            lambda cid, rt: mail_auth.TokenBundle("access", "new-refresh", 3600),
-        )
         import app.mail.watcher as watcher_mod
 
-        monkeypatch.setattr(watcher_mod, "refresh_access_token", mail_auth.refresh_access_token)
+        monkeypatch.setattr(
+            watcher_mod,
+            "refresh_access_token",
+            lambda cid, rt, scope: mail_auth.TokenBundle("access", "new-refresh", 3600),
+        )
         watcher = MailWatcher(db, data_dir, ScanControl())
         account = watcher.account()
         assert account is not None
-        assert watcher._graph_token(account) == "access"
+        assert watcher._oauth_token(account) == "access"
         stored = json.loads((data_dir / "local_secrets.json").read_text(encoding="utf-8"))
         assert stored["mail_secret"] == "new-refresh"
     finally:

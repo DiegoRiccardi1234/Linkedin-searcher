@@ -28,7 +28,12 @@ from typing import Any, Literal
 
 from app.config import LOCAL_SECRETS_FILE, _load_optional_json
 
-MailAuth = Literal["password", "graph"]
+#: ``password`` — plain IMAP with an app password.
+#: ``graph`` — Microsoft Graph with the read-only ``Mail.Read`` scope. Preferred
+#: whenever the registration in hand can ask for it.
+#: ``imap_oauth`` — IMAP with an OAuth token, for registrations that only carry
+#: the IMAP scope. Same mailbox, wider permission than this app wants.
+MailAuth = Literal["password", "graph", "imap_oauth"]
 
 IMAP_SSL_PORT = 993
 
@@ -83,12 +88,31 @@ def domain_of(address: str) -> str:
     return str(address or "").strip().lower().rpartition("@")[2]
 
 
-def default_host_for(address: str) -> tuple[MailAuth, str, int]:
-    """``(auth, host, port)`` to start from for this address."""
+#: Microsoft's IMAP endpoint. Only reachable with an OAuth token since 2024.
+MICROSOFT_IMAP_HOST = "outlook.office365.com"
+
+
+def is_microsoft(address: str) -> bool:
+    return domain_of(address) in _MICROSOFT_DOMAINS
+
+
+def imap_host_for(address: str) -> str:
+    """The IMAP server for this address, Microsoft included."""
     domain = domain_of(address)
     if domain in _MICROSOFT_DOMAINS:
+        return MICROSOFT_IMAP_HOST
+    return _IMAP_HOSTS.get(domain, f"imap.{domain}" if domain else "")
+
+
+def default_host_for(address: str) -> tuple[MailAuth, str, int]:
+    """``(auth, host, port)`` to start from for this address.
+
+    Microsoft defaults to Graph rather than IMAP: both need OAuth, and only Graph
+    can ask for a read-only permission.
+    """
+    if is_microsoft(address):
         return "graph", "", 0
-    return "password", _IMAP_HOSTS.get(domain, f"imap.{domain}" if domain else ""), IMAP_SSL_PORT
+    return "password", imap_host_for(address), IMAP_SSL_PORT
 
 
 @dataclass(frozen=True, repr=False)
@@ -117,8 +141,18 @@ class MailAccount:
         )
 
     @property
+    def uses_oauth(self) -> bool:
+        return self.auth in ("graph", "imap_oauth")
+
+    @property
     def configured(self) -> bool:
-        return bool(self.address and self.secret and (self.auth == "graph" or self.host))
+        if not self.address or not self.secret:
+            return False
+        if self.auth == "graph":
+            return bool(self.client_id)
+        if self.auth == "imap_oauth":
+            return bool(self.client_id and self.host)
+        return bool(self.host)
 
 
 def load_account(db: Any, data_dir: Path) -> MailAccount | None:
@@ -129,7 +163,9 @@ def load_account(db: Any, data_dir: Path) -> MailAccount | None:
     secrets = _load_optional_json(data_dir / LOCAL_SECRETS_FILE)
     auth_raw = str(db.get_preference(PREF_AUTH, "") or "").strip()
     fallback_auth, fallback_host, fallback_port = default_host_for(address)
-    auth: MailAuth = "graph" if auth_raw == "graph" else ("password" if auth_raw else fallback_auth)
+    auth: MailAuth = (
+        auth_raw if auth_raw in ("password", "graph", "imap_oauth") else fallback_auth  # type: ignore[assignment]
+    )
     try:
         port = int(str(db.get_preference(PREF_PORT, "") or fallback_port))
     except (TypeError, ValueError):

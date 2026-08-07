@@ -938,7 +938,8 @@
     "provider": {
       "label": "Anmeldung",
       "other": "Anderer Anbieter (App-Passwort)",
-      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+      "microsoftGraph": "Microsoft — nur lesen (erfordert eine eigene App-Registrierung)",
+      "microsoftImap": "Microsoft — IMAP (für eine App-ID, die du bereits hast)"
     },
     "appPassword": "App-Passwort",
     "appPasswordHelp": "Erzeuge ein App-Passwort bei deinem Anbieter, niemals das Hauptpasswort. Es wird im Klartext auf diesem PC gespeichert, wie deine API-Schlüssel.",
@@ -980,6 +981,13 @@
       "intro": "Sie sehen wie Bestätigungen aus, konnten aber nicht allein zugeordnet werden. Nichts wurde geändert.",
       "apply": "Ausgewählte als beworben markieren",
       "dismiss": "Alle ignorieren"
+    },
+    "whereIdFrom": "Woher bekomme ich eine App-ID?",
+    "idSource": {
+      "work": "Microsoft-Konto von Arbeit oder Schule: registriere die App im Verzeichnis deiner Organisation (Entra → App-Registrierungen), sofern eure IT es erlaubt. Fordere die delegierte Berechtigung Mail.Read an und aktiviere „Öffentliche Clientflows zulassen“.",
+      "azure": "Ein Azure-Konto: dieselben Schritte. Der kostenlose Tarif kostet nichts, verlangt aber eine Karte zur Identitätsprüfung.",
+      "none": "Keines von beiden: ein privates Outlook lässt sich nicht verbinden. Richte eine Regel ein, die Bestätigungsmails an ein funktionierendes Postfach weiterleitet — Gmail oder ein beliebiges IMAP-Postfach — und verbinde dieses.",
+      "other": "Manche Open-Source-Mailprogramme veröffentlichen ihre eigene App-ID, die man hier einfügen kann. Das funktioniert, aber der Zustimmungsdialog zeigt deren Namen statt Job Finder, und ein Widerruf betrifft beide."
     }
   }
 }
