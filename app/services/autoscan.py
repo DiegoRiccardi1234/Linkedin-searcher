@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from app.db import Database
@@ -54,11 +54,18 @@ class AutoScanScheduler:
         run_scan_fn: Callable[..., Any] = _default_run_scan,
         tick_seconds: float = _TICK_SECONDS,
         clock: Callable[[], float] = time.time,
+        extra_tasks: Sequence[Callable[[], None]] = (),
     ) -> None:
         self._container = container
         self._run_scan = run_scan_fn
         self._tick = tick_seconds
         self._clock = clock
+        # Other things that want to happen on a timer, run on this same thread.
+        # A second daemon thread would buy nothing: the tick is already a minute,
+        # and everything hanging off it decides its own interval. The cost is
+        # that a long scan delays these — delays, not drops, since each one
+        # compares its own last-run stamp on the next tick.
+        self._extra_tasks = tuple(extra_tasks)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -112,6 +119,13 @@ class AutoScanScheduler:
                 self._maybe_run()
             except Exception as exc:  # pragma: no cover - defensive
                 log.warning("autoscan tick failed: %s", exc)
+            for task in self._extra_tasks:
+                # Each in its own guard: one failing task must not stop the
+                # others, nor the scan check above.
+                try:
+                    task()
+                except Exception as exc:  # pragma: no cover - defensive
+                    log.warning("scheduled task failed: %s", exc)
 
     def _maybe_run(self) -> None:
         if not self.enabled():

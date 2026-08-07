@@ -8,6 +8,7 @@ block_cipher = None
 hiddenimports: list[str] = []
 hiddenimports += collect_submodules("app.migrations")
 hiddenimports += collect_submodules("app.providers")
+hiddenimports += collect_submodules("app.mail")
 hiddenimports += [
     "openai",
     "groq",

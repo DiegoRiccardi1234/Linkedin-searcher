@@ -592,7 +592,13 @@
     "cvAlreadyUploaded": "Este CV ya se había subido: reutilizo el análisis guardado.",
     "reanalyzeDone": "Oferta evaluada.",
     "reanalyzeStillUnscored": "Ningún modelo respondió: inténtalo más tarde.",
-    "reanalyzeFailed": "La reevaluación ha fallado"
+    "reanalyzeFailed": "La reevaluación ha fallado",
+    "mail": {
+      "saved": "Ajustes del buzón guardados",
+      "connected": "Buzón conectado",
+      "disconnected": "Buzón desconectado",
+      "applied": "Marcada como enviada"
+    }
   },
   "update": {
     "title": "Nueva versión disponible",
@@ -924,5 +930,56 @@
     "fromHub": "Populares en Hugging Face y compatibles con tu tarjeta:",
     "consentBody": "Para decirte qué modelo aguanta esta máquina, la app necesita leer la tarjeta gráfica, la memoria de vídeo y la RAM. Todo ocurre aquí: no se envía nada.",
     "probe": "Analizar este PC"
+  },
+  "mail": {
+    "title": "Buzón de correo",
+    "subtitle": "Conecta la dirección con la que te postulas: la app reconoce los correos de confirmación y marca esas ofertas como enviadas.",
+    "address": "Dirección de correo",
+    "provider": {
+      "label": "Acceso",
+      "other": "Otro proveedor (contraseña de aplicación)",
+      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+    },
+    "appPassword": "Contraseña de aplicación",
+    "appPasswordHelp": "Genera una contraseña de aplicación en tu proveedor, nunca la principal. Se guarda en texto plano en este PC, igual que tus claves API.",
+    "graphHelp": "Microsoft cerró el acceso con contraseña por IMAP en 2024. Al conectar se abre una página de Microsoft donde autorizas solo lectura: la app nunca puede escribir en tu buzón.",
+    "connect": "Conectar Microsoft",
+    "deviceCodeIntro": "Abre la página de abajo y escribe este código:",
+    "advanced": "Avanzado",
+    "host": "Servidor IMAP",
+    "folder": "Carpeta",
+    "clientId": "Id de aplicación de Microsoft",
+    "save": "Guardar",
+    "test": "Probar conexión",
+    "testing": "Conectando…",
+    "testFailed": "Conexión fallida",
+    "disconnect": "Desconectar",
+    "disconnectConfirm": "¿Desconectar el buzón y borrar la credencial guardada?",
+    "auto": "Comprobar automáticamente mientras la app está abierta",
+    "intervalMinutes": "Cada (minutos)",
+    "checkNow": "Comprobar ahora",
+    "checking": "Comprobando el buzón…",
+    "dryRun": "Probar reconocimiento (no escribe nada)",
+    "dryRunResult": "{checked} mensajes leídos: {matched} se marcarían como enviados, {ambiguous} por confirmar. No se ha cambiado nada.",
+    "pendingCount": "{n} esperando respuesta",
+    "state": {
+      "ok": "Conectado",
+      "unconfigured": "Ningún buzón conectado",
+      "reauthRequired": "Consentimiento caducado: vuelve a conectar el buzón",
+      "authFailed": "Acceso rechazado: revisa la contraseña de aplicación",
+      "error": "No se pudo acceder al buzón"
+    },
+    "recovery": {
+      "start": "Buscar en los últimos 90 días",
+      "running": "Buscando en los últimos 90 días…",
+      "done": "{n} mensajes por confirmar. No se ha cambiado nada.",
+      "truncated": "Solo se leyeron los mensajes más recientes."
+    },
+    "review": {
+      "title": "Mensajes por confirmar",
+      "intro": "Parecen confirmaciones pero no se pudieron asignar por sí solos. No se ha cambiado nada.",
+      "apply": "Marcar seleccionados como enviados",
+      "dismiss": "Ignorar todos"
+    }
   }
 }

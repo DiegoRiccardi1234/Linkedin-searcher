@@ -46,11 +46,21 @@ class AppContainer:
         # the two touch different work, they just must not each run twice.
         self.rescore_control = ScanControl()
 
+        # Checking the mailbox is unrelated work, so it gets its own lock: a
+        # scan must not be blocked by it, and neither must leave the other's
+        # flag stuck. Same reasoning as rescore_control above.
+        self.mail_control = ScanControl()
+
+        from app.mail.watcher import MailWatcher
+
+        self.mailwatch = MailWatcher(self.db, self.settings.data_dir, self.mail_control)
+
         # In-process scheduler for the optional auto-scan feature. Created
-        # inert; started by the app lifespan, stopped on shutdown.
+        # inert; started by the app lifespan, stopped on shutdown. The mailbox
+        # check rides the same tick rather than opening a second thread.
         from app.services.autoscan import AutoScanScheduler
 
-        self.autoscan = AutoScanScheduler(self)
+        self.autoscan = AutoScanScheduler(self, extra_tasks=[self.mailwatch.tick])
 
         cv_path = workspace_dir / "cv.md"
         if cv_path.exists() and not self.db.get_latest_candidate_profile():

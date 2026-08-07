@@ -592,7 +592,13 @@
     "cvAlreadyUploaded": "Dieser Lebenslauf wurde bereits hochgeladen — gespeicherte Analyse wird genutzt.",
     "reanalyzeDone": "Angebot bewertet.",
     "reanalyzeStillUnscored": "Kein Modell hat geantwortet: später erneut versuchen.",
-    "reanalyzeFailed": "Neubewertung fehlgeschlagen"
+    "reanalyzeFailed": "Neubewertung fehlgeschlagen",
+    "mail": {
+      "saved": "Postfach-Einstellungen gespeichert",
+      "connected": "Postfach verbunden",
+      "disconnected": "Postfach getrennt",
+      "applied": "Als beworben markiert"
+    }
   },
   "update": {
     "title": "Neue Version verfügbar",
@@ -924,5 +930,56 @@
     "fromHub": "Beliebt auf Hugging Face und passend für deine Karte:",
     "consentBody": "Um zu sagen, welches Modell dieser Rechner schafft, muss die App Grafikkarte, Grafikspeicher und RAM auslesen. Das passiert hier: es wird nichts verschickt.",
     "probe": "Diesen PC prüfen"
+  },
+  "mail": {
+    "title": "Postfach",
+    "subtitle": "Verbinde die Adresse, mit der du dich bewirbst: die App erkennt Bestätigungsmails und markiert diese Stellen als beworben.",
+    "address": "E-Mail-Adresse",
+    "provider": {
+      "label": "Anmeldung",
+      "other": "Anderer Anbieter (App-Passwort)",
+      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+    },
+    "appPassword": "App-Passwort",
+    "appPasswordHelp": "Erzeuge ein App-Passwort bei deinem Anbieter, niemals das Hauptpasswort. Es wird im Klartext auf diesem PC gespeichert, wie deine API-Schlüssel.",
+    "graphHelp": "Microsoft hat 2024 die Passwort-Anmeldung über IMAP geschlossen. Beim Verbinden öffnet sich eine Microsoft-Seite, auf der du nur Lesezugriff erlaubst: die App kann nie in dein Postfach schreiben.",
+    "connect": "Microsoft verbinden",
+    "deviceCodeIntro": "Öffne die Seite unten und gib diesen Code ein:",
+    "advanced": "Erweitert",
+    "host": "IMAP-Server",
+    "folder": "Ordner",
+    "clientId": "Microsoft-Anwendungs-ID",
+    "save": "Speichern",
+    "test": "Verbindung testen",
+    "testing": "Verbinde…",
+    "testFailed": "Verbindung fehlgeschlagen",
+    "disconnect": "Trennen",
+    "disconnectConfirm": "Postfach trennen und die gespeicherten Zugangsdaten löschen?",
+    "auto": "Automatisch prüfen, solange die App offen ist",
+    "intervalMinutes": "Alle (Minuten)",
+    "checkNow": "Jetzt prüfen",
+    "checking": "Postfach wird geprüft…",
+    "dryRun": "Erkennung testen (schreibt nichts)",
+    "dryRunResult": "{checked} Nachrichten gelesen: {matched} würden als beworben markiert, {ambiguous} zu bestätigen. Nichts wurde geändert.",
+    "pendingCount": "{n} warten auf Antwort",
+    "state": {
+      "ok": "Verbunden",
+      "unconfigured": "Kein Postfach verbunden",
+      "reauthRequired": "Zustimmung abgelaufen – Postfach erneut verbinden",
+      "authFailed": "Anmeldung abgelehnt – App-Passwort prüfen",
+      "error": "Postfach nicht erreichbar"
+    },
+    "recovery": {
+      "start": "90 Tage zurückschauen",
+      "running": "Suche in den letzten 90 Tagen…",
+      "done": "{n} Nachrichten zu bestätigen. Nichts wurde geändert.",
+      "truncated": "Es wurden nur die neuesten Nachrichten gelesen."
+    },
+    "review": {
+      "title": "Nachrichten zum Bestätigen",
+      "intro": "Sie sehen wie Bestätigungen aus, konnten aber nicht allein zugeordnet werden. Nichts wurde geändert.",
+      "apply": "Ausgewählte als beworben markieren",
+      "dismiss": "Alle ignorieren"
+    }
   }
 }

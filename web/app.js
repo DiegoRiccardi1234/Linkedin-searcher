@@ -69,6 +69,7 @@ import {
 import { initScan, readScanConfig, applyScanConfig } from "./modules/scan.js";
 import { initRescore, wireRescoreBulk } from "./modules/rescore.js";
 import { initApplyWatch, wireApplyWatch } from "./modules/apply_watch.js";
+import { initMailbox, wireMailbox, loadMailboxStatus } from "./modules/mailbox.js";
 
 // Global safety nets: surface otherwise-silent async failures in the console.
 window.addEventListener("unhandledrejection", (e) => console.error("Unhandled promise rejection:", e.reason));
@@ -1194,6 +1195,8 @@ async function bootstrap() {
   // to be re-read once the open is recorded.
   initApplyWatch({ onOpened: () => loadJobs() });
   wireApplyWatch();
+  initMailbox({ loadJobs });
+  wireMailbox();
   initJobList({
     showJobDetail,
     performJobAction,
@@ -1207,6 +1210,7 @@ async function bootstrap() {
   activateView("dashboard");
   await loadHealth();
   await loadKeysStatus();
+  await loadMailboxStatus();
   await loadProfiles();
   await Promise.all([loadJobs(), loadRecommendations()]);
   await loadAnalytics();

@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
+## [1.8.2] — 2026-08-07
+
 ### Added
+- **The app can read your mailbox and mark the applications you actually sent.** Applying happens on LinkedIn or on the employer's form, so nothing ever came back and the archive had to be told by hand — which never happened: `applied_at` was empty on all 21 shortlisted offers. Connect the address you apply with and the confirmation emails are recognised and matched to the postings you opened. Gmail, Yahoo, iCloud, Libero, Virgilio, Aruba, Tiscali and corporate servers connect over IMAP with an app password; Microsoft accounts connect through Microsoft Graph, because Outlook.com stopped accepting a password over IMAP in September 2024.
+- **It cannot write to your mailbox, and that is enforced by the server, not by us.** On Microsoft the consent asks for `Mail.Read`, which is read-only — the alternative IMAP scope Microsoft publishes would have granted write access this app has no use for. On IMAP the folder is opened read-only, so not even the "read" flag can change. Only message headers are ever fetched: subjects and bodies are not downloaded, not stored and not logged. `smtplib` is not imported anywhere, and a test walks the source to keep it that way.
+- **No model ever sees your mail.** Recognition is deterministic: a subject that reads like a confirmation *and* a sender that is either a known hiring platform or the company you actually opened. Either signal alone was tried and rejected — the subject alone catches every job alert, the sender alone catches every LinkedIn notification. When a message could belong to two offers, nothing is changed and it goes to a review list.
+- **"Test recognition" runs the rules on your real mailbox and writes nothing**, reporting what it *would* have marked. How well the rules do is unknown until they meet real mail, and the cost of being wrong is a rewritten application history.
+- **A one-off look back over 90 days** finds applications sent before the mailbox was connected. Over that window the only link is the company name, so every hit is a proposal you confirm, never an automatic change. If the sweep hits its ceiling it says so.
+- Every automatic marking records that it was automatic, and can be undone.
+
 - **The app now notices when you open a posting.** Applying happens on LinkedIn or on the company's own form, so the last thing this app ever saw was the click — and it did not see that either: every link was a plain anchor, and the archive could not tell "never looked at it" from "applied three weeks ago". `applied_at` was empty on all 21 shortlisted offers. An opened posting is now marked as waiting for an answer, with a badge in the list and a button to say you did not apply after all. It is also the groundwork for recognising the confirmation email: knowing which four companies you opened this week is the difference between a match and a guess.
 
 ### Changed

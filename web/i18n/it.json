@@ -592,7 +592,13 @@
     "cvAlreadyUploaded": "Questo CV era già stato caricato — riuso l'analisi salvata.",
     "reanalyzeDone": "Offerta valutata.",
     "reanalyzeStillUnscored": "Nessun modello ha risposto: riprova più tardi.",
-    "reanalyzeFailed": "Rivalutazione non riuscita"
+    "reanalyzeFailed": "Rivalutazione non riuscita",
+    "mail": {
+      "saved": "Impostazioni casella salvate",
+      "connected": "Casella collegata",
+      "disconnected": "Casella scollegata",
+      "applied": "Segnata come candidatura"
+    }
   },
   "update": {
     "title": "Nuova versione disponibile",
@@ -924,5 +930,56 @@
     "fromHub": "Popolari su Hugging Face e compatibili con la tua scheda:",
     "consentBody": "Per dirti quale modello regge questa macchina, l'app deve leggere scheda video, memoria video e RAM. Succede tutto qui: non esce niente dal PC.",
     "probe": "Analizza questo PC"
+  },
+  "mail": {
+    "title": "Casella di posta",
+    "subtitle": "Collega l'indirizzo con cui ti candidi: l'app riconosce le mail di conferma e segna quelle offerte come candidate.",
+    "address": "Indirizzo email",
+    "provider": {
+      "label": "Accesso",
+      "other": "Altro provider (app password)",
+      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+    },
+    "appPassword": "App password",
+    "appPasswordHelp": "Genera una app password dal tuo provider, mai la password principale. Viene salvata in chiaro su questo PC, come le chiavi API.",
+    "graphHelp": "Microsoft ha chiuso l'accesso con password su IMAP nel 2024. Collegando si apre una pagina Microsoft dove autorizzi la sola lettura: l'app non può scrivere nella tua casella.",
+    "connect": "Collega Microsoft",
+    "deviceCodeIntro": "Apri la pagina qui sotto e digita questo codice:",
+    "advanced": "Avanzate",
+    "host": "Server IMAP",
+    "folder": "Cartella",
+    "clientId": "Id applicazione Microsoft",
+    "save": "Salva",
+    "test": "Prova connessione",
+    "testing": "Connessione in corso…",
+    "testFailed": "Connessione fallita",
+    "disconnect": "Scollega",
+    "disconnectConfirm": "Scollegare la casella ed eliminare la credenziale salvata?",
+    "auto": "Controlla in automatico mentre l'app è aperta",
+    "intervalMinutes": "Ogni (minuti)",
+    "checkNow": "Controlla ora",
+    "checking": "Controllo della posta in corso…",
+    "dryRun": "Prova riconoscimento (non scrive nulla)",
+    "dryRunResult": "{checked} messaggi letti: {matched} verrebbero segnati come candidatura, {ambiguous} da confermare. Non è stato cambiato nulla.",
+    "pendingCount": "{n} in attesa di risposta",
+    "state": {
+      "ok": "Collegata",
+      "unconfigured": "Nessuna casella collegata",
+      "reauthRequired": "Consenso scaduto: ricollega la casella",
+      "authFailed": "Accesso rifiutato: controlla la app password",
+      "error": "Casella non raggiungibile"
+    },
+    "recovery": {
+      "start": "Cerca negli ultimi 90 giorni",
+      "running": "Ricerca negli ultimi 90 giorni…",
+      "done": "{n} messaggi da confermare. Non è stato cambiato nulla.",
+      "truncated": "Sono stati letti solo i messaggi più recenti."
+    },
+    "review": {
+      "title": "Messaggi da confermare",
+      "intro": "Sembrano conferme ma non è stato possibile assegnarli da soli. Non è stato cambiato nulla.",
+      "apply": "Segna i selezionati come candidatura",
+      "dismiss": "Ignora tutti"
+    }
   }
 }

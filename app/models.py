@@ -219,6 +219,26 @@ class SchedulerConfigRequest(BaseModel):
     threshold: int | None = Field(default=None, ge=0, le=10)
 
 
+class MailConfigRequest(BaseModel):
+    """Mailbox settings. ``secret``/``client_id`` follow the provider-key rule:
+    omitted leaves what is stored, a value replaces it, "" removes it."""
+
+    address: str = ""
+    auth: str = ""
+    host: str = ""
+    port: int | None = Field(default=None, ge=1, le=65535)
+    folder: str = ""
+    secret: str | None = None
+    client_id: str | None = None
+    enabled: bool | None = None
+    interval_minutes: int | None = Field(default=None, ge=5, le=240)
+
+
+class MailReviewResolveRequest(BaseModel):
+    apply: list[int] = Field(default_factory=list)
+    dismiss: list[int] = Field(default_factory=list)
+
+
 class ProviderKeysRequest(BaseModel):
     cerebras_api_key: str | None = None
     groq_api_key: str | None = None

@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
@@ -443,6 +443,107 @@ class Database:
             (f"-{max(1, int(ttl_days))} days",),
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def filter_unseen_mail(self, account: str, keys: Sequence[str]) -> list[str]:
+        """The message keys not examined yet, in the order they were given."""
+        if not keys:
+            return []
+        seen: set[str] = set()
+        chunk = 400  # SQLite's variable limit is 999; leave room for the account
+        for start in range(0, len(keys), chunk):
+            window = list(keys[start : start + chunk])
+            placeholders = ",".join("?" for _ in window)
+            rows = self.conn.execute(
+                f"SELECT mail_key FROM mail_seen WHERE account = ? AND mail_key IN ({placeholders})",
+                (account, *window),
+            ).fetchall()
+            seen.update(str(row[0]) for row in rows)
+        return [key for key in keys if key not in seen]
+
+    @_synchronized
+    def record_mail_seen(
+        self,
+        *,
+        account: str,
+        mail_key: str,
+        verdict: str,
+        message_id: str = "",
+        received_at: str = "",
+        job_id: int | None = None,
+        matched_rule: str = "",
+    ) -> None:
+        """Remember the verdict for a message. Never the message itself."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mail_seen"
+            "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                account,
+                mail_key,
+                message_id,
+                received_at,
+                verdict,
+                job_id,
+                matched_rule,
+                now_iso(),
+            ),
+        )
+        self.conn.commit()
+
+    @_synchronized
+    def purge_mail_seen(self, account: str | None = None) -> int:
+        """Forget the examined-messages log, for one account or all of them."""
+        cur = (
+            self.conn.execute("DELETE FROM mail_seen WHERE account = ?", (account,))
+            if account
+            else self.conn.execute("DELETE FROM mail_seen")
+        )
+        self.conn.commit()
+        return int(cur.rowcount or 0)
+
+    @_synchronized
+    def confirm_application_from_mail(self, job_id: int, message_id: str, rule: str) -> bool:
+        """Mark an offer as applied because a confirmation message said so.
+
+        The note is a fixed, non-sensitive string on purpose: notes are shown on
+        the timeline and travel into the CSV export, so putting a mail subject
+        there would put someone's mailbox in a spreadsheet they might share.
+
+        ``apply_confirmed_by`` is what makes every automatic marking listable and
+        reversible, which is the price of being allowed to write here at all.
+        """
+        if not self.conn.execute("SELECT 1 FROM jobs WHERE id = ?", (job_id,)).fetchone():
+            return False
+        self.set_job_action(job_id=job_id, action="applied", notes=f"auto:mail:{rule}")
+        self.conn.execute(
+            "UPDATE jobs SET apply_confirmed_by = 'email', apply_confirm_message_id = ?, "
+            "link_opened_at = NULL WHERE id = ?",
+            (message_id, job_id),
+        )
+        self.conn.commit()
+        return True
+
+    @_synchronized
+    def undo_mail_confirmation(self, job_id: int) -> bool:
+        """Take back an automatic marking, leaving a manual one untouched."""
+        row = self.conn.execute(
+            "SELECT apply_confirmed_by FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        if not row or row[0] != "email":
+            return False
+        self.conn.execute(
+            "UPDATE jobs SET status = 'open', applied_at = NULL, applied_profile_id = NULL, "
+            "apply_confirmed_by = NULL, apply_confirm_message_id = NULL, updated_at = ? "
+            "WHERE id = ?",
+            (now_iso(), job_id),
+        )
+        self.conn.execute(
+            "DELETE FROM job_actions WHERE job_id = ? AND action = 'applied' "
+            "AND notes LIKE 'auto:mail:%'",
+            (job_id,),
+        )
+        self.conn.commit()
+        return True
 
     def _active_profile_id(self) -> int | None:
         """Id of the CV profile in use right now, for stamping an application."""
