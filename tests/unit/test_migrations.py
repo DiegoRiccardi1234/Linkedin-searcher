@@ -340,15 +340,18 @@ def test_migration_019_hides_what_the_user_cannot_apply_to(tmp_path: Path) -> No
                 (job_id,),
             ).fetchone()
 
-        for job_id, flag in (
-            (elsewhere, "sede_non_raggiungibile"),
-            (senior, "esperienza_richiesta"),
-            (master, "titolo_superiore"),
-        ):
-            score, consiglio, blob, _mode = _row(job_id)
-            assert score <= 3, flag
-            assert consiglio == "Salta", flag
+        # Not reachable without a car: capped and hidden, and it stays that way.
+        score, consiglio, blob, _mode = _row(elsewhere)
+        assert score <= 3 and consiglio == "Salta"
+        assert "sede_non_raggiungibile" in json.loads(blob)["blocchi"]
+
+        # Years and degree are negotiable, so migration 021 re-files them as
+        # ceilings. The flag stays; the 3 does not, because it was the cap
+        # talking and what the offer is really worth was never recorded.
+        for job_id, flag in ((senior, "esperienza_richiesta"), (master, "titolo_superiore")):
+            score, _consiglio, blob, _mode = _row(job_id)
             assert flag in json.loads(blob)["blocchi"], flag
+            assert score is None, flag
 
         # The applicable one keeps its score: no false negatives.
         assert _row(ok)[0] == 9
@@ -433,6 +436,121 @@ def test_migration_020_frees_offers_the_corrected_rules_no_longer_block(tmp_path
             ).fetchone()[0]
         )
         assert "esperienza_richiesta" in still["blocchi"], "five years is a real gate"
+    finally:
+        db.close()
+
+
+def _seed_021(db: Database) -> None:
+    db.set_preference("onboarding_work_mode", "Remoto, Torino in sede oppure ibrido su Torino")
+    db.set_preference("last_scan_locations", json.dumps(["Torino"]))
+    db.save_candidate_profile(
+        source_name="cv.pdf",
+        markdown="Laurea Triennale in Informatica, votazione 95/110.",
+        summary={"years_experience": 0},
+    )
+
+
+def _store_analysis(db: Database, job_id: int, score: int | None, **extra: object) -> None:
+    """Put an archive row in the state 019 and 020 would have left it in."""
+    payload: dict[str, object] = {"punteggio": score, "consiglio": "Salta", "scoring_v": 2}
+    payload.update(extra)
+    db.conn.execute(
+        "UPDATE jobs SET analysis_json = ?, punteggio_ai = ?, consiglio = ? WHERE id = ?",
+        (json.dumps(payload), score, payload["consiglio"], job_id),
+    )
+    db.conn.commit()
+
+
+def test_migration_021_lowers_a_ceiling_instead_of_hiding_the_offer(tmp_path: Path) -> None:
+    """Both directions of the re-filing, on the two real postings behind it.
+
+    EY asked for a master's and sat at 9/10 with no flag, because the detector
+    read a "Fortemente gradita" from the next bullet. Nothing in the archive
+    fixes itself: one offer needs its score brought down to the ceiling, the
+    other needs its cap released — and released is not the same as re-scored.
+    """
+    db = Database(tmp_path / "h.db")
+    try:
+        _seed_021(db)
+        body = "Analisi funzionale e raccolta requisiti in team di prodotto. " * 8
+        # Scored 9 with no flag: the requirement was missed, the score is real.
+        ey = _seed_019(
+            db, "Junior Consultant", "Turin, Piedmont, Italy", "Ibrido",
+            body + "\n* Laurea magistrale STEM (Ingegneria, Informatica);\n"
+            "* Fortemente gradita una minima esperienza professionale;\n",
+        )
+        _store_analysis(db, ey, 9, consiglio="Candidati subito", blocchi=[])
+        # Capped to 3 by the old rule: the real number was never written down.
+        capped = _seed_019(
+            db, "Analista due anni", "Turin, Piedmont, Italy", "Ibrido",
+            body + " Richiesti almeno 2 anni di esperienza maturata nel ruolo.",
+        )
+        _store_analysis(
+            db, capped, 3,
+            blocchi=["esperienza_richiesta"],
+            blocchi_dettaglio={"esperienza_richiesta": "Richiede 2 anni"},
+            skills_match={"hai": [], "mancano": ["Richiede 2 anni"]},
+        )
+        # Out of reach for a reason nobody can argue with: must not be touched.
+        elsewhere = _seed_019(
+            db, "Analista Roma", "Rome, Latium, Italy", "In sede",
+            body + " Richiesta laurea magistrale in informatica.",
+        )
+        _store_analysis(db, elsewhere, 3, blocchi=["sede_non_raggiungibile", "titolo_superiore"])
+        # The archive is already past 019/020: only the new pass may run, exactly
+        # as it will on a real install.
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 21")
+        db.conn.commit()
+
+        apply_migrations(db.conn)
+
+        def _row(job_id: int) -> tuple:
+            return db.conn.execute(
+                "SELECT punteggio_ai, consiglio, analysis_json FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+
+        score, consiglio, blob = _row(ey)
+        data = json.loads(blob)
+        assert "titolo_superiore" in data["blocchi"]
+        assert score == 6, "a real score lowered to the ceiling, not replaced"
+        assert consiglio != "Salta", "still worth reading"
+
+        score, consiglio, blob = _row(capped)
+        data = json.loads(blob)
+        assert score is None and consiglio == ""
+        assert "non_valutato" in data["blocchi"], "handed to the re-score path"
+        assert "esperienza_richiesta" in data["blocchi"], "the requirement is still true"
+
+        score, consiglio, _blob = _row(elsewhere)
+        assert score == 3 and consiglio == "Salta", "a hard block outranks a ceiling"
+    finally:
+        db.close()
+
+
+def test_migration_021_is_idempotent(tmp_path: Path) -> None:
+    db = Database(tmp_path / "i.db")
+    try:
+        _seed_021(db)
+        job_id = _seed_019(
+            db, "Junior Consultant", "Turin, Piedmont, Italy", "Ibrido",
+            "Analisi funzionale. " * 20 + "\n* Laurea magistrale in informatica;\n* Inglese;\n",
+        )
+        _store_analysis(db, job_id, 9, consiglio="Candidati subito", blocchi=[])
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 21")
+        db.conn.commit()
+        apply_migrations(db.conn)
+        first = db.conn.execute(
+            "SELECT analysis_json, punteggio_ai FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 21")
+        db.conn.commit()
+        apply_migrations(db.conn)
+        second = db.conn.execute(
+            "SELECT analysis_json, punteggio_ai FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        assert json.loads(first[0]) == json.loads(second[0])
+        assert first[1] == second[1] == 6
     finally:
         db.close()
 

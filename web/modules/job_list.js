@@ -59,11 +59,13 @@ const FLAG_BADGES = [
   { code: "non_valutato", cls: "flag-info", icon: "help", key: "jobs.flag.notEvaluated" },
   { code: "geo_non_ue", cls: "flag-block", icon: "public_off", key: "jobs.flag.geo" },
   { code: "voto_minimo", cls: "flag-block", icon: "school", key: "jobs.flag.grade" },
-  // The three constraints the user declares and the app now enforces.
+  // The constraints the user declares and the app enforces. Location and the
+  // protected-categories register are not arguable, so they read as blockers;
+  // years and degree only lower a ceiling (see WEIGHTED_FLAGS), so they warn.
   { code: "sede_non_raggiungibile", cls: "flag-block", icon: "wrong_location", key: "jobs.flag.location" },
-  { code: "esperienza_richiesta", cls: "flag-block", icon: "work_history", key: "jobs.flag.experience" },
-  { code: "titolo_superiore", cls: "flag-block", icon: "school", key: "jobs.flag.education" },
   { code: "categorie_protette", cls: "flag-block", icon: "accessible", key: "jobs.flag.protected" },
+  { code: "esperienza_richiesta", cls: "flag-warn", icon: "work_history", key: "jobs.flag.experience" },
+  { code: "titolo_superiore", cls: "flag-warn", icon: "school", key: "jobs.flag.education" },
   { code: "lavoro_a_task", cls: "flag-warn", icon: "task_alt", key: "jobs.flag.gig" },
   { code: "ral_sotto_minima", cls: "flag-warn", icon: "payments", key: "jobs.flag.salary" },
   { code: "annuncio_aggregatore", cls: "flag-warn", icon: "content_copy", key: "jobs.flag.aggregator" },
@@ -103,6 +105,19 @@ export function freshnessHtml(lastSeenAt) {
   );
 }
 
+// The posting was opened and nothing has come back yet. Not a flag from
+// analysis_json like the badges above — those describe the OFFER, this one
+// describes what the user did — so it lives beside them rather than in the list.
+export function pendingBadgeHtml(job) {
+  if (!job || !job.link_opened_at || normalizeJobStatus(job.status) !== "open") return "";
+  const label = t("jobs.applyPending");
+  return (
+    `<span class="job-flag flag-warn" title="${escapeHtml(label)}">` +
+    `<span class="material-symbols-outlined">hourglass_top</span>` +
+    `<span>${escapeHtml(label)}</span></span>`
+  );
+}
+
 // Client-side ordering. The server always returns score-desc; the table had no
 // way to answer "what came in most recently" or "who is hiring" without
 // re-reading every row by eye.
@@ -129,7 +144,10 @@ function _paintSortHeaders() {
 }
 
 function _kanbanBadges(job) {
-  const badges = flagBadgesHtml(job.flags, { compact: true }) + freshnessHtml(job.last_seen_at);
+  const badges =
+    flagBadgesHtml(job.flags, { compact: true }) +
+    freshnessHtml(job.last_seen_at) +
+    pendingBadgeHtml(job);
   return badges ? `<div class="job-flags">${badges}</div>` : "";
 }
 
@@ -219,7 +237,10 @@ export async function loadJobs() {
   for (const job of jobs) {
     const newBadge = job.is_new ? `<span class="pill-new">${t("jobs.newBadge")}</span>` : "";
     const sc = scoreCell(job.punteggio_ai);
-    const badges = flagBadgesHtml(job.flags, { compact: true }) + freshnessHtml(job.last_seen_at);
+    const badges =
+      flagBadgesHtml(job.flags, { compact: true }) +
+      freshnessHtml(job.last_seen_at) +
+      pendingBadgeHtml(job);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><span class="${sc.cls}">${sc.text}</span> ${newBadge}</td>
@@ -232,7 +253,7 @@ export async function loadJobs() {
       <td>
         <label class="compare-pick" title="${escapeHtml(t("compare.pick"))}"><input type="checkbox" class="compare-check" data-compare-id="${job.id}"${_deps.isCompareSelected(job.id) ? " checked" : ""} /><span class="material-symbols-outlined">compare_arrows</span></label>
         <button data-detail-id="${job.id}" class="secondary">${t("jobs.details")}</button>
-        ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" style="margin-left: 8px;" title="${t("jobs.openPosting")}" aria-label="${t("jobs.openPosting")}">🔗</a>` : ""}
+        ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" data-job-link="${job.id}" style="margin-left: 8px;" title="${t("jobs.openPosting")}" aria-label="${t("jobs.openPosting")}">🔗</a>` : ""}
       </td>
       <td>
         <div class="mini">

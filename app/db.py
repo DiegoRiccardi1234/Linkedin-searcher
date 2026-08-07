@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
@@ -372,6 +372,10 @@ class Database:
                 "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
                 (status_map[action], now_iso(), job_id),
             )
+            # The answer is in: whatever the funnel now says, there is nothing
+            # left to watch the inbox for.
+            if status_map[action] != "open":
+                self.conn.execute("UPDATE jobs SET link_opened_at = NULL WHERE id = ?", (job_id,))
         # Applying is the one event worth denormalising out of the timeline: the
         # date and the CV that went with it are what the user asks about months
         # later, and the active profile is only knowable NOW (it changes).
@@ -394,6 +398,152 @@ class Database:
             (job_id, action, notes, now_iso()),
         )
         self.conn.commit()
+
+    @_synchronized
+    def mark_link_opened(self, job_id: int) -> str | None:
+        """Record that the posting was opened, and return when the wait started.
+
+        COALESCE keeps the FIRST unresolved open: re-reading a posting a week
+        later must not push the window past a confirmation that already arrived.
+        The counter still moves, because "opened three times, never applied" and
+        "opened once by mistake" are different things.
+
+        Does nothing once the offer has left ``open``: the user has already said
+        what happened, and there is nothing left to wait for.
+        """
+        self.conn.execute(
+            "UPDATE jobs SET link_opened_at = COALESCE(link_opened_at, ?), "
+            "link_open_count = COALESCE(link_open_count, 0) + 1 "
+            "WHERE id = ? AND status = 'open'",
+            (now_iso(), job_id),
+        )
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT link_opened_at FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        return str(row[0]) if row and row[0] else None
+
+    @_synchronized
+    def clear_link_opened(self, job_id: int) -> None:
+        """Stop waiting for a confirmation about this offer."""
+        self.conn.execute("UPDATE jobs SET link_opened_at = NULL WHERE id = ?", (job_id,))
+        self.conn.commit()
+
+    def list_pending_applications(self, ttl_days: int = 14) -> list[dict[str, Any]]:
+        """Offers opened recently and still unanswered, newest first.
+
+        The TTL is what keeps the question answerable: a confirmation arrives in
+        minutes, so an open from three weeks ago is not evidence of anything and
+        would only widen the window a match is drawn from.
+        """
+        rows = self.conn.execute(
+            "SELECT id, titolo, azienda, link, link_opened_at FROM jobs "
+            "WHERE link_opened_at IS NOT NULL AND status = 'open' "
+            "AND link_opened_at > datetime('now', ?) ORDER BY link_opened_at DESC",
+            (f"-{max(1, int(ttl_days))} days",),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def filter_unseen_mail(self, account: str, keys: Sequence[str]) -> list[str]:
+        """The message keys not examined yet, in the order they were given."""
+        if not keys:
+            return []
+        seen: set[str] = set()
+        chunk = 400  # SQLite's variable limit is 999; leave room for the account
+        for start in range(0, len(keys), chunk):
+            window = list(keys[start : start + chunk])
+            placeholders = ",".join("?" for _ in window)
+            rows = self.conn.execute(
+                f"SELECT mail_key FROM mail_seen WHERE account = ? AND mail_key IN ({placeholders})",
+                (account, *window),
+            ).fetchall()
+            seen.update(str(row[0]) for row in rows)
+        return [key for key in keys if key not in seen]
+
+    @_synchronized
+    def record_mail_seen(
+        self,
+        *,
+        account: str,
+        mail_key: str,
+        verdict: str,
+        message_id: str = "",
+        received_at: str = "",
+        job_id: int | None = None,
+        matched_rule: str = "",
+    ) -> None:
+        """Remember the verdict for a message. Never the message itself."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mail_seen"
+            "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                account,
+                mail_key,
+                message_id,
+                received_at,
+                verdict,
+                job_id,
+                matched_rule,
+                now_iso(),
+            ),
+        )
+        self.conn.commit()
+
+    @_synchronized
+    def purge_mail_seen(self, account: str | None = None) -> int:
+        """Forget the examined-messages log, for one account or all of them."""
+        cur = (
+            self.conn.execute("DELETE FROM mail_seen WHERE account = ?", (account,))
+            if account
+            else self.conn.execute("DELETE FROM mail_seen")
+        )
+        self.conn.commit()
+        return int(cur.rowcount or 0)
+
+    @_synchronized
+    def confirm_application_from_mail(self, job_id: int, message_id: str, rule: str) -> bool:
+        """Mark an offer as applied because a confirmation message said so.
+
+        The note is a fixed, non-sensitive string on purpose: notes are shown on
+        the timeline and travel into the CSV export, so putting a mail subject
+        there would put someone's mailbox in a spreadsheet they might share.
+
+        ``apply_confirmed_by`` is what makes every automatic marking listable and
+        reversible, which is the price of being allowed to write here at all.
+        """
+        if not self.conn.execute("SELECT 1 FROM jobs WHERE id = ?", (job_id,)).fetchone():
+            return False
+        self.set_job_action(job_id=job_id, action="applied", notes=f"auto:mail:{rule}")
+        self.conn.execute(
+            "UPDATE jobs SET apply_confirmed_by = 'email', apply_confirm_message_id = ?, "
+            "link_opened_at = NULL WHERE id = ?",
+            (message_id, job_id),
+        )
+        self.conn.commit()
+        return True
+
+    @_synchronized
+    def undo_mail_confirmation(self, job_id: int) -> bool:
+        """Take back an automatic marking, leaving a manual one untouched."""
+        row = self.conn.execute(
+            "SELECT apply_confirmed_by FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        if not row or row[0] != "email":
+            return False
+        self.conn.execute(
+            "UPDATE jobs SET status = 'open', applied_at = NULL, applied_profile_id = NULL, "
+            "apply_confirmed_by = NULL, apply_confirm_message_id = NULL, updated_at = ? "
+            "WHERE id = ?",
+            (now_iso(), job_id),
+        )
+        self.conn.execute(
+            "DELETE FROM job_actions WHERE job_id = ? AND action = 'applied' "
+            "AND notes LIKE 'auto:mail:%'",
+            (job_id,),
+        )
+        self.conn.commit()
+        return True
 
     def _active_profile_id(self) -> int | None:
         """Id of the CV profile in use right now, for stamping an application."""

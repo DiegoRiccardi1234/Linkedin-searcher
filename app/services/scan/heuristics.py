@@ -224,11 +224,52 @@ _EDU_EITHER = re.compile(
 )
 
 
+# Where one requirement ends and the next begins: a line break, a bullet, a
+# semicolon, or a full stop that really closes a sentence. The last one needs the
+# lookahead: "laurea magistrale in ing. elettronica" would otherwise end the
+# clause at the abbreviation, and since this window only ever carries a veto,
+# cutting it short means blocking more than the posting asks for.
+_CLAUSE_BOUNDARY_RE = re.compile(
+    r"[\n\r;•]|(?<=[a-zà-ÿ0-9\)])\.\s+(?=[A-ZÀ-Ý•*\-])",
+)
+
+
+def _clause_window(offer_text: str, start: int, end: int, span: int) -> str:
+    """``span`` characters around a match, stopped at the NEXT clause boundary.
+
+    Only the tail is clamped, and the asymmetry is the posting's, not ours: text
+    that comes before a requirement often governs it — "Elementi con
+    attribuzione di punteggio. Se possiedi: * Laurea Magistrale" is a heading
+    ruling the list under it — while the next bullet is simply the next
+    requirement, about something else entirely.
+
+    Use only for windows carrying a VETO, a word whose presence cancels the match
+    beside it. EY's "Laurea magistrale STEM;" is followed 68 characters later by
+    "Fortemente gradita una minima esperienza", and a blind 90-character tail
+    read that wish as being about the degree: the posting scored 9/10 with no
+    blocker against a three-year degree.
+
+    Deliberately NOT used for windows carrying a QUALIFIER — a word that must be
+    present for the match to count, like the "esperienza" that turns a number
+    into a seniority demand. Measured on the 238-posting archive, clamping the
+    experience window destroyed 8 genuine requirements ("esperienza di almeno 2
+    anni nel ruolo", "minimum 6+ years"), because job boards routinely put the
+    noun on the line above the number; the same clamp on the protected-category
+    veto lost the single truly reserved posting out of the 29 citing the law.
+    """
+    after = offer_text[end : end + span]
+    boundary = _CLAUSE_BOUNDARY_RE.search(after)
+    tail = after[: boundary.start()] if boundary else after
+    return offer_text[max(0, start - span) : end] + tail
+
+
 def education_requirement(offer_text: str) -> tuple[str, bool]:
     """``(required level, is only preferred)`` read from the posting.
 
     The second value matters as much as the first: a posting where the master's
-    is "preferibile" must not be treated as closed to a bachelor.
+    is "preferibile" must not be treated as closed to a bachelor. It is read
+    within the degree's own clause (see :func:`_clause_window`) — a preference
+    voiced in the next bullet is a preference about the next bullet.
     """
     for level, pattern in (
         ("PhD", _EDU_PHD),
@@ -237,7 +278,7 @@ def education_requirement(offer_text: str) -> tuple[str, bool]:
     ):
         match = pattern.search(offer_text)
         if match:
-            window = offer_text[max(0, match.start() - 90) : match.end() + 90]
+            window = _clause_window(offer_text, match.start(), match.end(), 90)
             if level == "Magistrale" and _EDU_EITHER.search(window):
                 # The same sentence offers the bachelor as an alternative.
                 return "Triennale", bool(_PREFERRED_RE.search(window))

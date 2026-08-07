@@ -272,7 +272,9 @@
     "rescoreDone": "{n} offres réévaluées, {c} notes modifiées.",
     "rescoreNothing": "Aucune offre ne correspond à ce critère.",
     "rescoreFailed": "Échec de la réévaluation",
-    "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées."
+    "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées.",
+    "applyPending": "En attente de confirmation",
+    "notApplied": "Je n'ai pas postulé"
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -590,7 +592,13 @@
     "cvAlreadyUploaded": "Ce CV a déjà été téléversé — analyse enregistrée réutilisée.",
     "reanalyzeDone": "Offre évaluée.",
     "reanalyzeStillUnscored": "Aucun modèle n'a répondu : réessayez plus tard.",
-    "reanalyzeFailed": "Échec de la réévaluation"
+    "reanalyzeFailed": "Échec de la réévaluation",
+    "mail": {
+      "saved": "Paramètres de la boîte enregistrés",
+      "connected": "Boîte connectée",
+      "disconnected": "Boîte déconnectée",
+      "applied": "Marquée comme envoyée"
+    }
   },
   "update": {
     "title": "Nouvelle version disponible",
@@ -922,5 +930,56 @@
     "fromHub": "Populaires sur Hugging Face et compatibles avec votre carte :",
     "consentBody": "Pour vous dire quel modèle cette machine peut faire tourner, l'application doit lire la carte graphique, la mémoire vidéo et la RAM. Tout reste ici : rien n'est envoyé.",
     "probe": "Analyser ce PC"
+  },
+  "mail": {
+    "title": "Boîte mail",
+    "subtitle": "Connectez l'adresse avec laquelle vous postulez : l'app reconnaît les mails de confirmation et marque ces offres comme envoyées.",
+    "address": "Adresse e-mail",
+    "provider": {
+      "label": "Connexion",
+      "other": "Autre fournisseur (mot de passe d'application)",
+      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+    },
+    "appPassword": "Mot de passe d'application",
+    "appPasswordHelp": "Générez un mot de passe d'application chez votre fournisseur, jamais le principal. Il est stocké en clair sur ce PC, comme vos clés API.",
+    "graphHelp": "Microsoft a fermé la connexion par mot de passe en IMAP en 2024. La connexion ouvre une page Microsoft où vous autorisez la lecture seule : l'app ne peut jamais écrire dans votre boîte.",
+    "connect": "Connecter Microsoft",
+    "deviceCodeIntro": "Ouvrez la page ci-dessous et saisissez ce code :",
+    "advanced": "Avancé",
+    "host": "Serveur IMAP",
+    "folder": "Dossier",
+    "clientId": "Id d'application Microsoft",
+    "save": "Enregistrer",
+    "test": "Tester la connexion",
+    "testing": "Connexion…",
+    "testFailed": "Échec de la connexion",
+    "disconnect": "Déconnecter",
+    "disconnectConfirm": "Déconnecter la boîte et supprimer l'identifiant enregistré ?",
+    "auto": "Vérifier automatiquement pendant que l'app est ouverte",
+    "intervalMinutes": "Toutes les (minutes)",
+    "checkNow": "Vérifier maintenant",
+    "checking": "Vérification de la boîte…",
+    "dryRun": "Tester la reconnaissance (n'écrit rien)",
+    "dryRunResult": "{checked} messages lus : {matched} seraient marqués comme envoyés, {ambiguous} à confirmer. Rien n'a été modifié.",
+    "pendingCount": "{n} en attente de réponse",
+    "state": {
+      "ok": "Connectée",
+      "unconfigured": "Aucune boîte connectée",
+      "reauthRequired": "Consentement expiré : reconnectez la boîte",
+      "authFailed": "Connexion refusée : vérifiez le mot de passe d'application",
+      "error": "Boîte inaccessible"
+    },
+    "recovery": {
+      "start": "Chercher sur 90 jours",
+      "running": "Recherche sur les 90 derniers jours…",
+      "done": "{n} messages à confirmer. Rien n'a été modifié.",
+      "truncated": "Seuls les messages les plus récents ont été lus."
+    },
+    "review": {
+      "title": "Messages à confirmer",
+      "intro": "Ils ressemblent à des confirmations mais n'ont pas pu être attribués seuls. Rien n'a été modifié.",
+      "apply": "Marquer la sélection comme envoyée",
+      "dismiss": "Tout ignorer"
+    }
   }
 }

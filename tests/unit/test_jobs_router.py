@@ -315,3 +315,50 @@ def test_score_feedback_endpoints(client: TestClient, tmp_path: Path) -> None:
 
     assert client.delete(f"/api/jobs/{jid}/score-feedback").json()["removed"] == 1
     assert client.get("/api/score-feedback/summary").json()["total"] == 0
+
+
+# --- link opened -> pending application --------------------------------------
+
+
+def test_opening_a_posting_starts_and_ends_a_wait(client: TestClient, tmp_path: Path) -> None:
+    """The whole chain, not the DB method: route, storage, list, and clearing.
+
+    Applying happens on someone else's site, so this open is the last thing the
+    app sees. It reached the archive through no route at all before, which is
+    why applied_at was empty on every shortlisted offer.
+    """
+    jid = _seed_job(tmp_path)
+
+    first = client.post(f"/api/jobs/{jid}/link-opened")
+    assert first.status_code == 200
+    started = first.json()["pending_since"]
+    assert started
+
+    # Re-reading the posting must not push the window forward: a confirmation
+    # that already arrived would fall outside it.
+    again = client.post(f"/api/jobs/{jid}/link-opened")
+    assert again.json()["pending_since"] == started
+
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[jid]["link_opened_at"] == started, "the badge reads this off the list response"
+
+    assert client.post(f"/api/jobs/{jid}/link-opened/clear").status_code == 200
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[jid]["link_opened_at"] is None
+    assert client.post("/api/jobs/9999/link-opened").status_code == 404
+
+
+def test_answering_the_question_stops_the_wait(client: TestClient, tmp_path: Path) -> None:
+    """Marking the offer applied leaves nothing to watch the inbox for."""
+    jid = _seed_job(tmp_path, link="https://example.com/job/2")
+    client.post(f"/api/jobs/{jid}/link-opened")
+    client.post(f"/api/jobs/{jid}/action", json={"action": "applied", "notes": ""})
+
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[jid]["status"] == "applied"
+    assert listed[jid]["link_opened_at"] is None
+
+    # And an offer already out of "open" never starts a new wait.
+    client.post(f"/api/jobs/{jid}/link-opened")
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[jid]["link_opened_at"] is None

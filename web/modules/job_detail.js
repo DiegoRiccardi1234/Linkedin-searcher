@@ -190,10 +190,20 @@ export async function showJobDetail(jobId) {
   if (detailLinkBtn) {
     if (job.link) {
       detailLinkBtn.href = job.link;
+      // Static markup, so the tag it is matched on has to be set here, next to
+      // the href it belongs with (see apply_watch.js).
+      detailLinkBtn.dataset.jobLink = String(job.id);
       detailLinkBtn.style.display = "flex";
     } else {
       detailLinkBtn.style.display = "none";
     }
+  }
+
+  const notAppliedBtn = document.getElementById("detailNotAppliedBtn");
+  if (notAppliedBtn) {
+    const pending = Boolean(job.link_opened_at) && (job.status || "open") === "open";
+    notAppliedBtn.style.display = pending ? "" : "none";
+    notAppliedBtn.dataset.jobId = String(job.id);
   }
 
   const genBtn = document.getElementById("generateCoverLetterBtn");
@@ -291,7 +301,7 @@ export async function showJobDetail(jobId) {
       .map((s) => {
         const label = escapeHtml(s.fonte || "?");
         return s.link
-          ? `<a target="_blank" rel="noopener" href="${escapeHtml(s.link)}">${label}</a>`
+          ? `<a target="_blank" rel="noopener" data-job-link="${job.id}" href="${escapeHtml(s.link)}">${label}</a>`
           : label;
       })
       .join(", ");
@@ -520,7 +530,7 @@ function recommendationCardHtml(job) {
   const newTag = job.is_new ? `<span class="pill-new">${t("jobs.newBadge")}</span>` : "";
   const favoriteText = job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite");
   const nextFavorite = job.is_favorite ? "0" : "1";
-  const linkHtml = job.link ? `<div style="margin-top: 4px"><a href="${escapeHtml(job.link)}" target="_blank" rel="noopener">🔗 ${t("jobs.linkToOffer")}</a></div>` : "";
+  const linkHtml = job.link ? `<div style="margin-top: 4px"><a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" data-job-link="${job.id}">🔗 ${t("jobs.linkToOffer")}</a></div>` : "";
 
   return `
     <article class="rec-card" data-rec-id="${job.id}">

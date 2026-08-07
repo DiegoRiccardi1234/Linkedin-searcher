@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [1.8.2] — 2026-08-07
+
+### Added
+- **The app can read your mailbox and mark the applications you actually sent.** Applying happens on LinkedIn or on the employer's form, so nothing comes back and the archive has to be told by hand, one offer at a time, right after the moment you are least likely to do it. Connect the address you apply with and the confirmation emails are recognised and matched to the postings you opened. Gmail, Yahoo, iCloud, Libero, Virgilio, Aruba, Tiscali and corporate servers connect over IMAP with an app password; Microsoft accounts connect through Microsoft Graph, because Outlook.com stopped accepting a password over IMAP in September 2024.
+- **It cannot write to your mailbox, and that is enforced by the server, not by us.** On Microsoft the consent asks for `Mail.Read`, which is read-only — the alternative IMAP scope Microsoft publishes would have granted write access this app has no use for. On IMAP the folder is opened read-only, so not even the "read" flag can change. Only message headers are ever fetched: subjects and bodies are not downloaded, not stored and not logged. `smtplib` is not imported anywhere, and a test walks the source to keep it that way.
+- **No model ever sees your mail.** Recognition is deterministic: a subject that reads like a confirmation *and* a sender that is either a known hiring platform or the company you actually opened. Either signal alone was tried and rejected — the subject alone catches every job alert, the sender alone catches every LinkedIn notification. When a message could belong to two offers, nothing is changed and it goes to a review list.
+- **"Test recognition" runs the rules on your real mailbox and writes nothing**, reporting what it *would* have marked. How well the rules do is unknown until they meet real mail, and the cost of being wrong is a rewritten application history.
+- **A one-off look back over 90 days** finds applications sent before the mailbox was connected. Over that window the only link is the company name, so every hit is a proposal you confirm, never an automatic change. If the sweep hits its ceiling it says so.
+- Every automatic marking records that it was automatic, and can be undone.
+
+- **The app now notices when you open a posting.** Applying happens on LinkedIn or on the company's own form, so the last thing this app ever saw was the click — and it did not see that either: every link was a plain anchor, and the archive could not tell "never looked at it" from "applied three weeks ago". An opened posting is now marked as waiting for an answer, with a badge in the list and a button to say you did not apply after all. It is also the groundwork for recognising the confirmation email: knowing which four companies you opened this week is the difference between a match and a guess.
+
+### Changed
+- **A requirement you do not meet no longer makes the offer disappear.** Years of experience and degree level used to cap a posting to 3 and hide it behind "applicable only", exactly like an office you cannot reach without a car. Those two are the requirements every junior is told to apply for anyway, so they now lower a ceiling instead: 6 for the first unmet one and one less for each further one, never below 3. The offer stays in the list, says why on its badge, and can never outrank one you fully match. The other four blockers — outside the EU, a degree grade an ATS filters on, an unreachable office, a register you are not on — are not arguable and still cap and hide.
+- A weighted constraint no longer skips the model. The check that decides whether to call the AI at all reads only the non-arguable blockers now, because a ceiling needs a real score to lower — otherwise the ceiling itself becomes the verdict, which is the invented number this app stopped producing in 1.7.9.
+
+### Fixed
+- **"Fortemente gradita" in the next bullet was read as being about the degree.** EY's "Junior Consultant Technology Risk" asks for a master's and scored 9/10 against a three-year degree with no blocker at all: the window that looks for a word like "gradita" took 90 characters blindly and ran 68 of them into the following requirement, which was about experience. It now stops at the end of the degree's own clause. Measured on the 238-posting archive: exactly two postings change verdict, both of them genuine master's requirements.
+- The same clamp is deliberately **not** applied to the two windows next to it, and the archive says why: doing it to the experience detector destroyed 8 real requirements ("esperienza di almeno 2 anni nel ruolo", "minimum 6+ years"), because job boards routinely put the noun one line above the number, and doing it to the protected-categories check lost the single genuinely reserved posting out of the 29 that mention the law. A wide window is wrong for a word that cancels a requirement and right for a word that qualifies one.
+- **Migration 021.** Neither half of the above fixes the archive on its own: an offer capped to 3 by a now-weighted constraint is released — without being handed a score back, because the number under the cap was never recorded, so it is marked unevaluated and lands in front of the re-score path — and an offer the corrected detector now sees is brought down to the ceiling, which lowers a real score rather than inventing one.
+
 ## [1.8.1] — 2026-08-06
 
 The checks that hide offers stopped hiding the wrong ones, and a verdict can finally be revisited.

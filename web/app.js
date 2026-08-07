@@ -68,6 +68,8 @@ import {
 } from "./modules/job_detail.js";
 import { initScan, readScanConfig, applyScanConfig } from "./modules/scan.js";
 import { initRescore, wireRescoreBulk } from "./modules/rescore.js";
+import { initApplyWatch, wireApplyWatch } from "./modules/apply_watch.js";
+import { initMailbox, wireMailbox, loadMailboxStatus } from "./modules/mailbox.js";
 
 // Global safety nets: surface otherwise-silent async failures in the console.
 window.addEventListener("unhandledrejection", (e) => console.error("Unhandled promise rejection:", e.reason));
@@ -897,6 +899,21 @@ document.getElementById("detailApplyNowBtn").addEventListener("click", async () 
   }
 });
 
+const notAppliedBtn = document.getElementById("detailNotAppliedBtn");
+if (notAppliedBtn) {
+  notAppliedBtn.addEventListener("click", async () => {
+    const jobId = Number(notAppliedBtn.dataset.jobId || appState.selectedJobId);
+    if (!jobId) return;
+    try {
+      await api(`/api/jobs/${jobId}/link-opened/clear`, { method: "POST", body: "{}" });
+      notAppliedBtn.style.display = "none";
+      await loadJobs();
+    } catch (error) {
+      showToast(`${t("toast.actionError")}: ${error.message}`, "info");
+    }
+  });
+}
+
 const genCovBtn = document.getElementById("generateCoverLetterBtn");
 if (genCovBtn) {
   genCovBtn.addEventListener("click", async () => {
@@ -1174,6 +1191,12 @@ async function bootstrap() {
   initJobDetail({ pinJobToActiveSession, loadJobs });
   initRescore({ loadJobs });
   wireRescoreBulk();
+  // The pending badge appears on the row that was just clicked, so the list has
+  // to be re-read once the open is recorded.
+  initApplyWatch({ onOpened: () => loadJobs() });
+  wireApplyWatch();
+  initMailbox({ loadJobs });
+  wireMailbox();
   initJobList({
     showJobDetail,
     performJobAction,
@@ -1187,6 +1210,7 @@ async function bootstrap() {
   activateView("dashboard");
   await loadHealth();
   await loadKeysStatus();
+  await loadMailboxStatus();
   await loadProfiles();
   await Promise.all([loadJobs(), loadRecommendations()]);
   await loadAnalytics();

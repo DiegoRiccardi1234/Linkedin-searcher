@@ -272,7 +272,9 @@
     "rescoreDone": "Re-scored {n} offers, {c} scores changed.",
     "rescoreNothing": "No offer matches this scope.",
     "rescoreFailed": "Re-scoring failed",
-    "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved."
+    "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved.",
+    "applyPending": "Waiting for confirmation",
+    "notApplied": "I did not apply"
   },
   "kanbanCols": {
     "open": "Open",
@@ -590,7 +592,13 @@
     "cvAlreadyUploaded": "This CV was already uploaded — reusing the saved analysis.",
     "reanalyzeDone": "Offer evaluated.",
     "reanalyzeStillUnscored": "No model answered: try again later.",
-    "reanalyzeFailed": "Re-evaluation failed"
+    "reanalyzeFailed": "Re-evaluation failed",
+    "mail": {
+      "saved": "Mailbox settings saved",
+      "connected": "Mailbox connected",
+      "disconnected": "Mailbox disconnected",
+      "applied": "Marked as applied"
+    }
   },
   "update": {
     "title": "New version available",
@@ -922,5 +930,56 @@
     "fromHub": "Popular on Hugging Face and a fit for your card:",
     "consentBody": "To tell you which model this machine can run, the app needs to read its graphics card, video memory and RAM. It runs here and nothing is sent anywhere.",
     "probe": "Check this PC"
+  },
+  "mail": {
+    "title": "Mailbox",
+    "subtitle": "Connect the address you apply with, and the app recognises the confirmation emails and marks those offers as applied.",
+    "address": "Email address",
+    "provider": {
+      "label": "Sign-in",
+      "other": "Other provider (app password)",
+      "microsoft": "Microsoft (Outlook, Hotmail, Live)"
+    },
+    "appPassword": "App password",
+    "appPasswordHelp": "Generate an app password from your provider — never your main password. It is stored in clear text on this PC, like your API keys.",
+    "graphHelp": "Microsoft closed password sign-in for IMAP in 2024. Connecting opens a Microsoft page where you approve read-only access; the app can never write to your mailbox.",
+    "connect": "Connect Microsoft",
+    "deviceCodeIntro": "Open the page below and type this code:",
+    "advanced": "Advanced",
+    "host": "IMAP server",
+    "folder": "Folder",
+    "clientId": "Microsoft application id",
+    "save": "Save",
+    "test": "Test connection",
+    "testing": "Connecting…",
+    "testFailed": "Connection failed",
+    "disconnect": "Disconnect",
+    "disconnectConfirm": "Disconnect the mailbox and delete the saved credential?",
+    "auto": "Check automatically while the app is open",
+    "intervalMinutes": "Every (minutes)",
+    "checkNow": "Check now",
+    "checking": "Checking the mailbox…",
+    "dryRun": "Test recognition (writes nothing)",
+    "dryRunResult": "{checked} messages read: {matched} would be marked as applied, {ambiguous} need confirming. Nothing was changed.",
+    "pendingCount": "{n} waiting for an answer",
+    "state": {
+      "ok": "Connected",
+      "unconfigured": "No mailbox connected",
+      "reauthRequired": "Consent expired — connect the mailbox again",
+      "authFailed": "Sign-in refused — check the app password",
+      "error": "Could not reach the mailbox"
+    },
+    "recovery": {
+      "start": "Look back 90 days",
+      "running": "Looking through the last 90 days…",
+      "done": "{n} messages to confirm. Nothing has been changed.",
+      "truncated": "Only the most recent messages were read."
+    },
+    "review": {
+      "title": "Messages to confirm",
+      "intro": "These look like confirmations but could not be assigned on their own. Nothing has been changed.",
+      "apply": "Mark selected as applied",
+      "dismiss": "Ignore all"
+    }
   }
 }

@@ -265,6 +265,10 @@
           <a id="detailLinkBtn" target="_blank" class="button secondary" style="display:none;align-items:center;justify-content:center;gap:4px;">
             <span class="material-symbols-outlined" style="font-size:18px">open_in_new</span> <span data-i18n="offcanvas.viewListing">Vedi Annuncio</span>
           </a>
+          <!-- Only while the app is waiting to hear about this posting. Without
+               it an open could only be resolved by moving the offer along the
+               funnel, which says something the user may not mean. -->
+          <button id="detailNotAppliedBtn" class="secondary" style="display:none;" data-i18n="jobs.notApplied">Non mi sono candidato</button>
         </div>
         <div id="jobDetailContainer"></div>
         <div class="cover-letter-section">
@@ -793,6 +797,83 @@
             <option value=""></option>
           </select>
           <pre id="keysStatus" class="output hidden"></pre>
+        </article>
+        <!-- Reading the mailbox to find out which applications were actually
+             sent. Off until connected, and read-only for good: on Microsoft the
+             token is scoped to Mail.Read, on IMAP the folder is opened
+             read-only, and the app cannot send at all. -->
+        <article class="card-block card-block--wide" id="mailboxCard" data-state="empty">
+          <h3><span class="material-symbols-outlined">mark_email_read</span> <span data-i18n="mail.title">Mailbox</span></h3>
+          <p class="micro" data-i18n="mail.subtitle">Connect the address you apply with, and the app recognises the confirmation emails and marks those offers as applied.</p>
+          <div class="mail-row">
+            <label class="micro" for="mailAddress" data-i18n="mail.address">Email address</label>
+            <input id="mailAddress" type="email" autocomplete="off" placeholder="nome@esempio.it" />
+          </div>
+          <div class="mail-row">
+            <label class="micro" for="mailAuth" data-i18n="mail.provider.label">Sign-in</label>
+            <select id="mailAuth">
+              <option value="password" data-i18n="mail.provider.other">Other provider (app password)</option>
+              <option value="graph" data-i18n="mail.provider.microsoft">Microsoft (Outlook, Hotmail, Live)</option>
+            </select>
+          </div>
+          <div id="mailPasswordBlock" class="mail-row">
+            <label class="micro" for="mailSecret" data-i18n="mail.appPassword">App password</label>
+            <input id="mailSecret" type="password" autocomplete="off" />
+            <p class="micro" data-i18n="mail.appPasswordHelp">Generate an app password from your provider — never your main password. It is stored in clear text on this PC, like your API keys.</p>
+          </div>
+          <div id="mailGraphBlock" class="mail-row hidden">
+            <p class="micro" data-i18n="mail.graphHelp">Microsoft closed password sign-in for IMAP in 2024. Connecting opens a Microsoft page where you approve read-only access; the app can never write to your mailbox.</p>
+            <button id="mailConnectBtn" class="secondary" data-i18n="mail.connect">Connect Microsoft</button>
+            <div id="mailDeviceCode" class="mail-device hidden">
+              <p class="micro" data-i18n="mail.deviceCodeIntro">Open the page below and type this code:</p>
+              <code id="mailUserCode" class="mail-code"></code>
+              <a id="mailVerifyLink" target="_blank" rel="noopener" class="micro"></a>
+            </div>
+          </div>
+          <details class="mail-advanced">
+            <summary class="micro" data-i18n="mail.advanced">Advanced</summary>
+            <div class="mail-row">
+              <label class="micro" for="mailHost" data-i18n="mail.host">IMAP server</label>
+              <input id="mailHost" type="text" autocomplete="off" />
+            </div>
+            <div class="mail-row">
+              <label class="micro" for="mailFolder" data-i18n="mail.folder">Folder</label>
+              <input id="mailFolder" type="text" autocomplete="off" placeholder="INBOX" />
+            </div>
+            <div class="mail-row">
+              <label class="micro" for="mailClientId" data-i18n="mail.clientId">Microsoft application id</label>
+              <input id="mailClientId" type="text" autocomplete="off" />
+            </div>
+          </details>
+          <div class="mail-row mail-actions">
+            <button id="mailSaveBtn" class="secondary" data-i18n="mail.save">Save</button>
+            <button id="mailTestBtn" class="secondary" data-i18n="mail.test">Test connection</button>
+            <button id="mailDisconnectBtn" class="danger" data-i18n="mail.disconnect">Disconnect</button>
+          </div>
+          <p id="mailState" class="provider-status-text micro"></p>
+          <div class="mail-row">
+            <label class="micro"><input type="checkbox" id="mailEnabled" /> <span data-i18n="mail.auto">Check automatically while the app is open</span></label>
+            <label class="micro" for="mailInterval" data-i18n="mail.intervalMinutes">Every (minutes)</label>
+            <input id="mailInterval" type="number" min="5" max="240" step="5" value="15" />
+          </div>
+          <div class="mail-row mail-actions">
+            <!-- Runs the rules and reports what they WOULD have marked. How well
+                 they do is unknown until they meet a real mailbox, and the cost
+                 of being wrong is a rewritten application history. -->
+            <button id="mailDryRunBtn" class="secondary" data-i18n="mail.dryRun">Test recognition (writes nothing)</button>
+            <button id="mailCheckBtn" class="secondary" data-i18n="mail.checkNow">Check now</button>
+            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Look back 90 days</button>
+          </div>
+          <pre id="mailOutput" class="output hidden"></pre>
+          <div id="mailReviewBox" class="mail-review hidden">
+            <h4 data-i18n="mail.review.title">Messages to confirm</h4>
+            <p class="micro" data-i18n="mail.review.intro">These look like confirmations but could not be assigned on their own. Nothing has been changed.</p>
+            <div id="mailReviewList"></div>
+            <div class="mail-actions">
+              <button id="mailReviewApplyBtn" class="secondary" data-i18n="mail.review.apply">Mark selected as applied</button>
+              <button id="mailReviewDismissBtn" class="secondary" data-i18n="mail.review.dismiss">Ignore all</button>
+            </div>
+          </div>
         </article>
         <article class="card-block card-block--wide" id="localModelsCard">
           <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>

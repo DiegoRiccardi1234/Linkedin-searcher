@@ -135,12 +135,18 @@ def hard_block_reason(
     ``facts`` carries what the user declared about themselves (years, degree,
     where they can work). It is optional and defaults to "unknown", which blocks
     nothing: a CV the parser misread must never hide jobs.
+
+    Only the non-arguable constraints are read here. A weighted one lowers a
+    ceiling, and a ceiling needs a score to lower: skipping the model for those
+    would make the ceiling itself the verdict — a number nobody judged, which is
+    what this app stopped producing in 1.7.9.
     """
     reason = _geo_status(sede, descrizione)[1] or _grade_status(profile_markdown, descrizione)[1]
     if reason:
         return reason
-    for _code, detail in _declared_constraint_breaks(descrizione, sede, modalita, facts):
-        return detail
+    for code, detail in _declared_constraint_breaks(descrizione, sede, modalita, facts):
+        if code in BLOCKING_FLAGS:
+            return detail
     return None
 
 
@@ -364,16 +370,25 @@ FLAG_PROTECTED_CATEGORY = "categorie_protette"  # reserved to the L. 68/99 regis
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
 #: "you cannot apply" — the offer may well be the best one in the archive.
+#: Neither are the WEIGHTED ones below: those you can apply to and sometimes get.
 BLOCKING_FLAGS = frozenset(
     {
         FLAG_GEO_BLOCKED,
         FLAG_GRADE_BLOCKED,
-        FLAG_EXPERIENCE,
-        FLAG_EDUCATION,
         FLAG_LOCATION,
         FLAG_PROTECTED_CATEGORY,
     }
 )
+
+#: Requirements the candidate does not meet but could still argue with. A degree
+#: and a couple of years are the two every junior is told to apply for anyway,
+#: and hiding those postings threw away real chances — while leaving them at the
+#: model's number put a requirement the candidate does not hold at the top of the
+#: shortlist (EY, "Laurea magistrale STEM", 9/10 against a three-year degree).
+#: They lower a CEILING instead: still visible, still badged, never recommended.
+#: The other four are not arguable — no driving licence, no visa, a grade
+#: threshold an ATS filters on, a register you are not enrolled in.
+WEIGHTED_FLAGS = frozenset({FLAG_EXPERIENCE, FLAG_EDUCATION})
 
 
 def is_unevaluated(analysis: Mapping[str, Any]) -> bool:
@@ -444,6 +459,12 @@ def _cap_score(analysis: dict[str, Any], cap: int, weakness: str) -> None:
 #: outrank one they can, but it stays visible instead of vanishing.
 _DECLARED_CONSTRAINT_CAP = 3
 
+#: Ceiling for an unmet requirement that can still be argued with. 6 sits just
+#: under the "Candidati subito" band, so such an offer is never recommended over
+#: one the candidate fully matches, and each further unmet requirement takes it
+#: down one more — but never below the hard-block cap, which means something else.
+_WEIGHTED_CEILING = 6
+
 #: Short sentence prepended to ``punti_deboli`` per flag, so the list view says
 #: why in the user's language instead of showing a bare code.
 _CONSTRAINT_WEAKNESS = {
@@ -453,21 +474,53 @@ _CONSTRAINT_WEAKNESS = {
 }
 
 
+def _lower_ceiling(analysis: dict[str, Any], ceiling: int, weakness: str) -> None:
+    """Hold the score under ``ceiling`` without declaring the offer a write-off.
+
+    Unlike :func:`_cap_score` this leaves ``consiglio`` alone: an offer asking
+    for one more year than the CV shows is worth reading, and stamping "Salta"
+    on it is the app deciding instead of informing. It still only ever lowers.
+    """
+    try:
+        current = int(analysis.get("punteggio", 0) or 0)
+    except (TypeError, ValueError):
+        current = 0
+    analysis["punteggio"] = min(current, ceiling) if current else ceiling
+    previous = str(analysis.get("punti_deboli") or "").strip()
+    analysis["punti_deboli"] = f"{weakness} {previous}".strip()
+    flags = analysis.get("blocchi")
+    if isinstance(flags, list) and FLAG_NOT_EVALUATED in flags:
+        flags.remove(FLAG_NOT_EVALUATED)
+
+
 def _apply_declared_constraints(
     analysis: dict[str, Any], descrizione: str, sede: str, modalita: str, facts: Any
 ) -> None:
-    """Cap offers that break what the USER declared, not what we assumed.
+    """Weigh or cap the offers that break what the USER declared.
 
     Years, degree and location were asked of the model in prose and ignored: on a
     real scan 8 offers out of 35 scored >=8 while their own
     ``anni_esperienza_richiesti`` field said 1 or 2, and one demanding a master's
     scored 8 against a bachelor. Reading the same fields deterministically is the
     only thing that made those stop being recommended.
+
+    The two kinds part ways here. A constraint in :data:`BLOCKING_FLAGS` is not
+    arguable — no licence, no visa, a grade an ATS filters on — and keeps the cap
+    at 3 plus "Salta". A constraint in :data:`WEIGHTED_FLAGS` lowers a ceiling
+    that starts at 6 and drops by one for each further unmet requirement, so the
+    offer stays in the list, badged and never recommended.
     """
+    weighted = 0
     for code, reason in _declared_constraint_breaks(descrizione, sede, modalita, facts):
         _add_flag(analysis, code, reason)
         _add_missing(analysis, reason)
-        _cap_score(analysis, _DECLARED_CONSTRAINT_CAP, _CONSTRAINT_WEAKNESS.get(code, reason))
+        weakness = _CONSTRAINT_WEAKNESS.get(code, reason)
+        if code in WEIGHTED_FLAGS:
+            weighted += 1
+            ceiling = max(_DECLARED_CONSTRAINT_CAP, _WEIGHTED_CEILING - (weighted - 1))
+            _lower_ceiling(analysis, ceiling, weakness)
+        else:
+            _cap_score(analysis, _DECLARED_CONSTRAINT_CAP, weakness)
 
 
 def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str) -> None:

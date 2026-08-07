@@ -1,0 +1,179 @@
+"""Reading headers over IMAP, with the mailbox physically protected.
+
+Three choices here are load-bearing, and each one is asserted by a test rather
+than trusted:
+
+* ``SELECT`` is issued read-only, so the server refuses any change this code
+  could attempt — including the ``\\Seen`` flag. An app that silently marks a
+  mailbox as read is worse than one that does not work.
+* Only headers are fetched, with ``BODY.PEEK``. Bodies are never downloaded, so
+  the message text cannot leak into a log, a database or an exception. It also
+  makes a 90-day sweep fast enough to be worth offering.
+* ``smtplib`` is not imported anywhere in this package. Reading a mailbox and
+  writing from it are different powers, and the second one is not needed.
+
+``imaplib`` has no per-command timeout, only a socket one, so the caller is
+responsible for an overall budget.
+"""
+
+from __future__ import annotations
+
+import email
+import imaplib
+import ssl
+from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, date, datetime
+from email.header import decode_header, make_header
+from email.utils import parsedate_to_datetime
+from types import TracebackType
+from typing import Any
+
+from app.log import get_logger
+from app.mail.config import MailAccount
+from app.mail.errors import MailAuthError, MailConfigError, MailTransientError, safe_error
+from app.mail.matcher import MailHeader
+
+log = get_logger(__name__)
+
+#: Everything the matcher is allowed to see.
+_HEADER_FIELDS = "FROM TO SUBJECT DATE MESSAGE-ID LIST-ID REPLY-TO"
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def imap_date(day: date) -> str:
+    """``SEARCH SINCE`` wants ``01-Aug-2026`` and nothing else."""
+    return f"{day.day:02d}-{_MONTHS[day.month - 1]}-{day.year}"
+
+
+def _decode(raw: Any) -> str:
+    if not raw:
+        return ""
+    try:
+        return str(make_header(decode_header(str(raw))))
+    except (UnicodeDecodeError, LookupError, ValueError):
+        return str(raw)
+
+
+class ImapMailbox:
+    """One connection, opened by ``with``, always closed.
+
+    ``imap_factory`` exists so the tests can drive a fake server and assert on
+    the exact commands sent: "we never mark anything read" is a claim about the
+    command string, so that is what gets checked.
+    """
+
+    def __init__(
+        self,
+        account: MailAccount,
+        *,
+        timeout: float = 20.0,
+        imap_factory: Callable[..., Any] = imaplib.IMAP4_SSL,
+    ) -> None:
+        self._account = account
+        self._timeout = timeout
+        self._factory = imap_factory
+        self._conn: Any = None
+        self.uidvalidity = 0
+
+    def __enter__(self) -> ImapMailbox:
+        account = self._account
+        if not account.host or not account.address or not account.secret:
+            raise MailConfigError("mailbox not configured")
+        try:
+            self._conn = self._factory(
+                account.host,
+                account.port,
+                ssl_context=ssl.create_default_context(),
+                timeout=self._timeout,
+            )
+            self._conn.login(account.address, account.secret)
+        except imaplib.IMAP4.error as exc:
+            # The server said no. A network problem raises OSError instead, and
+            # the two must not be reported the same way: one needs a new app
+            # password, the other needs nothing at all.
+            raise MailAuthError(safe_error(exc)) from exc
+        except (OSError, ssl.SSLError) as exc:
+            raise MailTransientError(safe_error(exc)) from exc
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        if self._conn is None:
+            return
+        try:
+            self._conn.logout()
+        except Exception:  # a failed logout must not mask the real error
+            log.debug("IMAP logout failed")
+        self._conn = None
+
+    def select_readonly(self, folder: str = "INBOX") -> int:
+        """Open the folder without the right to change anything in it."""
+        typ, _data = self._conn.select(folder, readonly=True)
+        if typ != "OK":
+            raise MailTransientError(f"cannot open folder {folder!r}")
+        typ, raw = self._conn.status(folder, "(UIDVALIDITY)")
+        self.uidvalidity = _parse_uidvalidity(raw) if typ == "OK" else 0
+        return self.uidvalidity
+
+    def search_since(self, day: date) -> list[int]:
+        typ, data = self._conn.uid("search", None, f"(SINCE {imap_date(day)})")
+        if typ != "OK" or not data or data[0] is None:
+            return []
+        raw = data[0]
+        parts = raw.split() if isinstance(raw, bytes) else str(raw).split()
+        out: list[int] = []
+        for part in parts:
+            token = part.decode() if isinstance(part, bytes) else str(part)
+            if token.isdigit():
+                out.append(int(token))
+        return out
+
+    def fetch_headers(self, uids: Sequence[int]) -> Iterator[MailHeader]:
+        """Headers only, and without marking anything as read."""
+        for uid in uids:
+            typ, data = self._conn.uid(
+                "fetch", str(uid), f"(BODY.PEEK[HEADER.FIELDS ({_HEADER_FIELDS})])"
+            )
+            if typ != "OK" or not data or not data[0]:
+                continue
+            payload = data[0][1] if isinstance(data[0], tuple) else data[0]
+            if not isinstance(payload, bytes | bytearray):
+                continue
+            message = email.message_from_bytes(bytes(payload))
+            yield MailHeader(
+                key=f"imap:{self.uidvalidity}:{uid}",
+                subject=_decode(message.get("Subject")),
+                from_addr=_decode(message.get("From")),
+                from_name=_decode(message.get("From")),
+                message_id=str(message.get("Message-ID") or "").strip(),
+                date=_parse_date(message.get("Date")),
+                list_id=str(message.get("List-Id") or "").strip(),
+            )
+
+
+def _parse_uidvalidity(raw: Any) -> int:
+    text = ""
+    if isinstance(raw, list) and raw:
+        first = raw[0]
+        text = first.decode() if isinstance(first, bytes) else str(first)
+    elif raw:
+        text = raw.decode() if isinstance(raw, bytes) else str(raw)
+    digits = "".join(ch for ch in text.partition("UIDVALIDITY")[2] if ch.isdigit())
+    return int(digits) if digits else 0
+
+
+def _parse_date(raw: Any) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        parsed = parsedate_to_datetime(str(raw))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
