@@ -255,13 +255,24 @@
       "aggregatorLong": "Republiée par un agrégateur : l'entreprise affichée n'est pas celle qui recrute",
       "location": "Lieu hors zone",
       "experience": "Demande de l'expérience",
-      "education": "Diplôme supérieur"
+      "education": "Diplôme supérieur",
+      "protected": "Réservée aux catégories protégées"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
       "likelyExpired": "Probablement expirée"
     },
-    "adviceToEvaluate": "À évaluer"
+    "adviceToEvaluate": "À évaluer",
+    "rescoreBulk": "Réévaluer",
+    "rescoreScopeHint": "Quelles offres réévaluer avec l'IA",
+    "rescoreScopeUnscored": "Non évaluées uniquement",
+    "rescoreScopeApplicable": "Candidatables",
+    "rescoreScopeAll": "Toutes",
+    "rescoreConfirm": "Réévaluer {n} offres avec l'IA ? Cela peut prendre quelques minutes.",
+    "rescoreDone": "{n} offres réévaluées, {c} notes modifiées.",
+    "rescoreNothing": "Aucune offre ne correspond à ce critère.",
+    "rescoreFailed": "Échec de la réévaluation",
+    "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées."
   },
   "kanbanCols": {
     "open": "Ouvert",

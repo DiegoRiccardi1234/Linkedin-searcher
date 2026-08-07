@@ -361,6 +361,119 @@ def test_migration_019_hides_what_the_user_cannot_apply_to(tmp_path: Path) -> No
         db.close()
 
 
+def test_migration_020_frees_offers_the_corrected_rules_no_longer_block(tmp_path: Path) -> None:
+    """The three shapes that were hiding applicable jobs, as stored flags.
+
+    019 only ever adds flags, so fixing the detectors leaves the archive exactly
+    as wrong as it was. 020 is the pass that lets go.
+    """
+    db = Database(tmp_path / "f.db")
+    try:
+        db.set_preference("onboarding_work_mode", "Remoto, Torino in sede oppure ibrido su Torino")
+        db.set_preference("last_scan_locations", json.dumps(["Torino"]))
+        db.save_candidate_profile(
+            source_name="cv.pdf",
+            markdown="Laurea Triennale in Informatica, votazione 95/110.",
+            summary={"years_experience": 0},
+        )
+        body = "Analisi funzionale e raccolta requisiti in team di prodotto. " * 8
+        # An apprenticeship blocked by a time window, stored as capped.
+        apprendistato = _seed_019(
+            db, "Security adviser apprendistato", "Turin, Piedmont, Italy", "In sede",
+            body + " Esperienza pregressa di almeno 6 mesi, maturata nel corso degli ultimi 2 anni.",
+        )
+        # Genuinely out of reach: must stay blocked.
+        senior = _seed_019(
+            db, "Analista senior", "Turin, Piedmont, Italy", "In sede",
+            body + " Richiesti almeno 5 anni di esperienza maturata nel ruolo.",
+        )
+        for job_id in (apprendistato, senior):
+            db.conn.execute(
+                "UPDATE jobs SET analysis_json = ?, punteggio_ai = 3, consiglio = 'Salta' "
+                "WHERE id = ?",
+                (
+                    json.dumps(
+                        {
+                            "punteggio": 3,
+                            "consiglio": "Salta",
+                            "blocchi": ["esperienza_richiesta"],
+                            "blocchi_dettaglio": {
+                                "esperienza_richiesta": "Richiede 2 anni di esperienza"
+                            },
+                            "skills_match": {
+                                "hai": [],
+                                "mancano": ["Richiede 2 anni di esperienza"],
+                            },
+                            "scoring_v": 2,
+                        }
+                    ),
+                    job_id,
+                ),
+            )
+        db.conn.commit()
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 20")
+        db.conn.commit()
+
+        apply_migrations(db.conn)
+
+        freed = db.conn.execute(
+            "SELECT punteggio_ai, consiglio, analysis_json, analysis_v FROM jobs WHERE id = ?",
+            (apprendistato,),
+        ).fetchone()
+        blob = json.loads(freed[2])
+        assert "esperienza_richiesta" not in blob["blocchi"]
+        # No score is handed back: the number under the cap was never recorded.
+        assert freed[0] is None and freed[1] == "" and freed[3] is None
+        assert "non_valutato" in blob["blocchi"]
+        assert blob["skills_match"]["mancano"] == [], "the stale gap must stop being shown"
+
+        still = json.loads(
+            db.conn.execute(
+                "SELECT analysis_json FROM jobs WHERE id = ?", (senior,)
+            ).fetchone()[0]
+        )
+        assert "esperienza_richiesta" in still["blocchi"], "five years is a real gate"
+    finally:
+        db.close()
+
+
+def test_migration_020_is_idempotent(tmp_path: Path) -> None:
+    """A second run must find nothing stale and change nothing."""
+    db = Database(tmp_path / "g.db")
+    try:
+        db.set_preference("onboarding_work_mode", "Remoto, Torino in sede oppure ibrido su Torino")
+        db.save_candidate_profile(
+            source_name="cv.pdf",
+            markdown="Laurea Triennale in Informatica.",
+            summary={"years_experience": 0},
+        )
+        job_id = _seed_019(
+            db, "Analista", "Turin, Piedmont, Italy", "Ibrido",
+            "Analisi funzionale. " * 20 + " Esperienza maturata negli ultimi 2 anni.",
+        )
+        db.conn.execute(
+            "UPDATE jobs SET analysis_json = ?, punteggio_ai = 3 WHERE id = ?",
+            (json.dumps({"punteggio": 3, "blocchi": ["esperienza_richiesta"]}), job_id),
+        )
+        db.conn.commit()
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 20")
+        db.conn.commit()
+        apply_migrations(db.conn)
+        first = db.conn.execute(
+            "SELECT analysis_json FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()[0]
+
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 20")
+        db.conn.commit()
+        apply_migrations(db.conn)
+        second = db.conn.execute(
+            "SELECT analysis_json FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()[0]
+        assert json.loads(first) == json.loads(second)
+    finally:
+        db.close()
+
+
 def test_migration_019_blocks_nothing_without_a_readable_cv(tmp_path: Path) -> None:
     """No profile, no preferences: every offer must survive untouched."""
     db = Database(tmp_path / "e.db")

@@ -355,6 +355,12 @@
           </select>
           <button id="refreshJobsBtn" type="button" class="ghost-btn" aria-label="Refresh jobs"><span class="material-symbols-outlined">refresh</span></button>
           <button id="exportCsvBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">download</span> <span data-i18n="jobs.csv">CSV</span></button>
+          <select id="rescoreScope" data-i18n-title="jobs.rescoreScopeHint" title="Which offers to re-score">
+            <option value="unscored" data-i18n="jobs.rescoreScopeUnscored">Unscored only</option>
+            <option value="applicable" data-i18n="jobs.rescoreScopeApplicable">Applicable</option>
+            <option value="all" data-i18n="jobs.rescoreScopeAll">Everything</option>
+          </select>
+          <button id="rescoreBulkBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">autorenew</span> <span id="rescoreBulkLabel" data-i18n="jobs.rescoreBulk">Re-score</span></button>
           <button id="addManualJobBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">add</span> <span data-i18n="manualJob.addShort">Add job</span></button>
           <button id="deleteAllJobsBtn" type="button" class="ghost-btn danger" title="Delete all jobs" data-i18n-title="jobs.deleteAllTitle"><span class="material-symbols-outlined">delete_sweep</span> <span data-i18n="jobs.deleteAll">Delete all</span></button>
         </div>

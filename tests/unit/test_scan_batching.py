@@ -157,11 +157,20 @@ def _payload() -> ScanRequest:
 
 class _ScanBatchPM:
     """PM that answers both batch prompts (array) and single prompts (object),
-    returning a non-int score to also exercise coercion."""
+    returning a non-int score to also exercise coercion.
+
+    The scores VARY on purpose. Answering "8/10" to everything is precisely what
+    the end-of-scan audit calls a flat distribution, so a uniform answer sends
+    every offer back for a second, single-offer call and the call counts below
+    stop measuring the batching this test is about.
+    """
+
+    _SCORES = ("8/10", "6/10", "9/10", "4/10", "7/10")
 
     def __init__(self) -> None:
         self.batch_calls = 0
         self.single_calls = 0
+        self._n = 0
 
     def preview_scoring_model(self, _policy: Any) -> str:
         return "fake/model:free"
@@ -169,13 +178,18 @@ class _ScanBatchPM:
     def clear_model_penalties(self, reason: str | None = None) -> None:
         pass
 
+    def _next_score(self) -> str:
+        score = self._SCORES[self._n % len(self._SCORES)]
+        self._n += 1
+        return score
+
     def complete_json(self, prompt: str, max_tokens: int = 700, **kwargs: Any) -> Any:
         n = prompt.count("--- OFFERTA ")
         if n == 0:
             self.single_calls += 1
-            return {"punteggio": "8/10"}
+            return {"punteggio": self._next_score()}
         self.batch_calls += 1
-        return {"valutazioni": [{"punteggio": "8/10"} for _ in range(n)]}
+        return {"valutazioni": [{"punteggio": self._next_score()} for _ in range(n)]}
 
 
 def test_run_scan_batch_scores_all_and_coerces(
@@ -200,8 +214,10 @@ def test_run_scan_batch_scores_all_and_coerces(
     # 5 jobs, batch_size 2 → units [2, 2, 1]: two batched calls + one single call.
     assert pm.batch_calls == 2
     assert pm.single_calls == 1
-    # "8/10" coerced to int 8 for every job.
-    assert all(e["job"]["score"] == 8 for e in analyzed)
+    # "8/10" coerced to a real int for every job — and no extra single calls,
+    # which is what says the audit found nothing to send back.
+    assert all(isinstance(e["job"]["score"], int) for e in analyzed)
+    assert sorted(e["job"]["score"] for e in analyzed) == [4, 6, 7, 8, 9]
 
 
 # ── anti copy-paste guard (v1.7.6) ───────────────────────────────────────────

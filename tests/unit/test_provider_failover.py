@@ -357,6 +357,30 @@ def test_no_credit_does_not_empty_an_all_paid_provider(tmp_path: Any) -> None:
     assert mgr._ranked_models_for(provider, limit=3)
 
 
+def test_an_empty_account_is_not_read_as_throttling() -> None:
+    """GLM reports an exhausted account with HTTP 429, not 403.
+
+    Real message, from a run on 06/08/2026: "Error code: 429 - {'error':
+    {'code': '1113', 'message': 'Insufficient balance or no resource package.
+    Please recharge.'}}". Classified as a rate limit it promises that waiting
+    helps, so every offer in the run paid another round trip to the same empty
+    account — and six of them ended unevaluated carrying that text as the reason.
+    """
+    from app.providers.factory import _classify_failure
+
+    empty_account = RuntimeError(
+        "Error code: 429 - {'error': {'code': '1113', 'message': "
+        "'Insufficient balance or no resource package. Please recharge.'}}"
+    )
+    assert _classify_failure(empty_account) == "forbidden"
+    # A real throttle must keep its own reason: it clears by waiting.
+    throttle = RuntimeError(
+        "Error code: 429 - {'message': 'Requests per minute limit exceeded - "
+        "too many requests sent.', 'code': 'request_quota_exceeded'}"
+    )
+    assert _classify_failure(throttle) == "rate_limit"
+
+
 def test_no_credit_is_per_provider(tmp_path: Any) -> None:
     """Cerebras naming nothing ":free" must not be mistaken for a paid catalog."""
     cerebras = _CatalogProvider("cerebras", ["gemma-4-31b", "qwen-3-235b-instruct"])

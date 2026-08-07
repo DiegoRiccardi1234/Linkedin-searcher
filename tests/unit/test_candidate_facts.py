@@ -71,6 +71,57 @@ def test_experience_band_takes_the_highest_requirement() -> None:
     assert _estimate_experience_band("azienda fondata 5 anni fa, cerchiamo neolaureati") == "0"
 
 
+def test_experience_band_survives_markdown_escaping() -> None:
+    """LinkedIn descriptions arrive with markdown-escaped hyphens (``1\\-2``).
+
+    The escape broke the range: the regex could not join "1" to "anni" across
+    ``\\-``, so it matched the SECOND number instead and read the range at its
+    upper bound. Measured on the real archive: "3\\-5 anni" was read as five,
+    "1\\-2 anni" as two — which is exactly the threshold that blocks.
+    """
+    assert _estimate_experience_band(r"almeno **1\-2 anni** di esperienza pratica") == "1"
+    assert _estimate_experience_band(r"esperienza di 3\-5 anni nello sviluppo") == "3+"
+    assert _estimate_experience_band(r"esperienza di 2\-4 anni maturata in contesti") == "2"
+
+
+def test_experience_ignores_a_time_window() -> None:
+    """"Six months earned over the last two years" asks for six months.
+
+    Real posting (SECURITY ADVISER, apprenticeship): the "2 anni" is the window
+    the experience was earned in, not the amount demanded — and an apprenticeship
+    is precisely the kind of opening this must not hide.
+    """
+    text = "esperienza pregressa di almeno 6 mesi, maturata nel corso degli ultimi 2 anni"
+    _band, reason = cf.experience_status(text, _facts(years_experience=0))
+    assert reason is None, "a time window is not a seniority requirement"
+    # Nothing else in the sentence states a requirement, so nothing is known.
+    window_only = "competenza maturata negli ultimi 4 anni in ambito ict"
+    assert _estimate_experience_band(window_only) == "Non specificato"
+
+
+def test_experience_ignores_the_companys_own_years() -> None:
+    """The company's age is not the candidate's experience.
+
+    Real posting: "JUNIOR CONSULTANT - Neolaureato/a", described as "una realtà
+    consolidata con oltre 30 anni di esperienza" — read as a 30-year seniority
+    demand and capped to 3, a graduate role hidden from a graduate.
+    """
+    text = (
+        "Siamo una realtà consolidata nel panorama IT, con oltre 30 anni di esperienza "
+        "nella fornitura di servizi. Cerchiamo un neolaureato da inserire nel team."
+    )
+    assert _estimate_experience_band(text.lower()) == "0"
+    _band, reason = cf.experience_status(text, _facts(years_experience=0))
+    assert reason is None
+
+
+def test_experience_ignores_a_pay_table() -> None:
+    """A salary bracket per seniority band is not a requirement."""
+    text = r"**Total compensation** indicativa 1 \- 2 anni di esperienza: 30000\-35000 lordi annui"
+    _band, reason = cf.experience_status(text, _facts(years_experience=0))
+    assert reason is None
+
+
 def test_experience_blocks_only_from_two_years_up() -> None:
     facts = _facts(years_experience=0)
     _band, reason = cf.experience_status("almeno 2 anni di esperienza maturata", facts)
@@ -95,6 +146,42 @@ def test_education_blocks_a_required_master_but_not_a_preferred_one() -> None:
     assert reason is not None
     _level, reason = cf.education_status("Laurea magistrale gradita, sufficiente triennale", facts)
     assert reason is None, "'gradita' is a wish, not a gate"
+
+
+def test_education_accepts_a_posting_open_to_either_degree() -> None:
+    """"bachelor's or master's" is satisfied by a bachelor.
+
+    Real posting (AI, Data and Emerging Tech Consultant): the master's pattern
+    matched first and the "bachelor's or" in front of it was never read, so a
+    role explicitly open to a three-year degree was capped to 3.
+    """
+    facts = _facts(education_level="Triennale")
+    text = "We are looking for an outstanding bachelor's or master's degree in Computer Science"
+    _level, reason = cf.education_status(text, facts)
+    assert reason is None
+    _level, reason = cf.education_status("Laurea triennale o magistrale in informatica", facts)
+    assert reason is None
+    # "BSc/MSc in Computer Science" is the same offer written with a slash.
+    _level, reason = cf.education_status("BSc/MSc in Computer Science or related field", facts)
+    assert reason is None
+    # The slash must not swallow a genuine master-only requirement.
+    _level, reason = cf.education_status("Laurea magistrale/specialistica in ingegneria", facts)
+    assert reason is not None
+
+
+def test_education_treats_a_scored_title_as_preferential() -> None:
+    """A degree that only earns points in a ranking is not a gate.
+
+    Real posting: "Elementi con attribuzione di punteggio. Se possiedi: Laurea
+    Magistrale…" — a preference expressed as a score, blocked as a requirement.
+    """
+    facts = _facts(education_level="Triennale")
+    text = (
+        "Elementi con attribuzione di punteggio. Se possiedi: * Laurea Magistrale "
+        "e/o Ciclo Unico e/o Vecchio Ordinamento."
+    )
+    _level, reason = cf.education_status(text, facts)
+    assert reason is None
 
 
 def test_education_requirement_reads_every_level() -> None:
@@ -234,6 +321,79 @@ def test_missing_facts_are_reported_not_guessed(tmp_path) -> None:
         db.close()
 
 
+# ── reserved to the protected-categories register ────────────────────────────
+
+#: Verbatim from the 238-offer archive (06/08/2026). Twenty-nine postings cite
+#: L. 68/99 and exactly ONE is reserved — the rest is equal-opportunity
+#: boilerplate on jobs anyone can apply for, including the highest-scoring offer
+#: in the archive. A detector that fires on "categorie protette" would delete
+#: half the shortlist, which is why every one of these is pinned here.
+_RESERVED = (
+    "Per un cliente in ambito dei Servizi e Consulenza IT, la specializzazione Digital & "
+    "Technologies di Adecco sta cercando una figura di uno Junior Data Engineer "
+    "appartenente alle categorie protette (L.68/99) sul territorio di Torino."
+)
+_BOILERPLATE = (
+    # Teoresi
+    "L'offerta è rivolta ad entrambi i sessi in ottemperanza al D.Lgs. 198/2006 ed è aperta "
+    "anche a candidati appartenenti alle categorie protette e iscritti al collocamento "
+    "mirato, in conformità con la Legge 68/99 (Art. 1 e Art.18).",
+    # EY — the best-scoring offer in the whole archive
+    "assicuriamo che tutte le nostre offerte siano aperte anche a persone con disabilità, "
+    "in linea con la legge italiana L.68/99.",
+    # Reply
+    "regardless of age, gender, sexual orientation, religion, nationality or disabilities "
+    "as protected by Italian Law (L.68/99). Reply is committed to ensuring a fair process.",
+    # BIP
+    "Lavoriamo per un ambiente etico, equo e accogliente, anche attraverso politiche attive "
+    "per le categorie protette (L. 68/99).",
+    # ALTEN
+    "Promuoviamo l'inserimento e l'integrazione lavorativa delle persone appartenenti alle "
+    "categorie protette - in base a quanto disciplinato dalla legge 68/99.",
+    # agap2 / ADENTIS
+    "Inoltre, teniamo fede ai nostri impegni prestando attenzione alle risorse appartenenti "
+    "alle categorie protette ai sensi degli articoli 1 e 18 della Legge 68/99.",
+    # Skytechnology / Akronos
+    "valutiamo candidature indipendentemente da genere, etnia, disabilità (artt. 1 e 18, "
+    "legge 68/99), età, orientamento sessuale, religione.",
+    # PRAXI — a preference in a public-sector ranking, not a gate
+    "Costituirà titolo preferenziale la candidatura presentata da soggetti appartenenti "
+    "alle categorie di cui all'art. 1 della legge n. 68/99.",
+    # Unipol
+    "Rappresenta requisito preferenziale per la selezione l'appartenenza alle categorie "
+    "protette (ex art° 1 L. 68/99).",
+    # Teoresi V&V
+    "La ricerca è rivolta anche a candidati appartenenti alle categorie protette, con "
+    "requisiti indicati nella legge 68/99 art.1 e art. 18.",
+    # sennder
+    "Do not hesitate to apply as a member of the protected categories law 68/99.",
+    # Topnetwork
+    "a persone di tutte le età e tutte le nazionalità, ai sensi dei decreti legislativi "
+    "215/03 e 216/03 e ai facenti parte di Categorie Protette, legge 68/99.",
+)
+
+
+def test_a_reserved_posting_is_blocked_only_when_the_user_said_they_are_not_on_the_register() -> None:
+    not_registered = _facts(protected_category=False)
+    _label, reason = cf.protected_category_status(_RESERVED, not_registered)
+    assert reason is not None
+
+    # Registered: the posting is an advantage, not an obstacle.
+    _label, reason = cf.protected_category_status(_RESERVED, _facts(protected_category=True))
+    assert reason is None
+    # Never stated: an unknown fact hides nothing, like every other check here.
+    _label, reason = cf.protected_category_status(_RESERVED, _facts(protected_category=None))
+    assert reason is None
+
+
+def test_equal_opportunity_boilerplate_is_not_a_reserved_posting() -> None:
+    """The 28 postings that mention the law and are open to everyone."""
+    facts = _facts(protected_category=False)
+    for text in _BOILERPLATE:
+        _label, reason = cf.protected_category_status(text, facts)
+        assert reason is None, f"boilerplate treated as reserved: {text[:70]}"
+
+
 # ── the end-of-scan audit ────────────────────────────────────────────────────
 
 
@@ -254,6 +414,49 @@ def test_audit_spots_a_flat_score_distribution() -> None:
     out = audit_scan([_scored(i, 8) for i in range(6)])
     assert any(a["codice"] == "voti_piatti" for a in out["anomalie"])
     assert len(out["sospetti"]) == 6
+
+
+def test_audit_does_not_denounce_correctly_blocked_offers() -> None:
+    """A run where most offers are capped at 3 by a hard block is HEALTHY.
+
+    On the real archive 143 offers out of 238 are correctly out of reach, so the
+    flat-score check fired on every scan, called the cap a malfunction, and sent
+    those offers back to the model only to be capped to 3 again.
+    """
+    from app.services.scanner_service import audit_scan
+
+    blocked = [_scored(i, 3, blocchi=["sede_non_raggiungibile"]) for i in range(8)]
+    judged = [_scored(100 + i, s) for i, s in enumerate([9, 7, 5, 8])]
+    out = audit_scan(blocked + judged)
+    assert not any(a["codice"] == "voti_piatti" for a in out["anomalie"])
+    # And a genuinely flat run is still caught, blocked offers or not.
+    flat = [_scored(200 + i, 6) for i in range(5)]
+    out = audit_scan(blocked + flat)
+    assert any(a["codice"] == "voti_piatti" for a in out["anomalie"])
+    assert all(jid >= 200 for jid in out["sospetti"])
+
+
+def test_audit_does_not_call_the_apps_own_sentences_clones() -> None:
+    """A blocked offer's summary is written by the app, not by a model.
+
+    "Non candidabile: richiede 3+ anni di esperienza" is identical across every
+    offer that breaks the same rule — 34 of them on the real archive — so the
+    clone check reported an epidemic on every scan and sent them off to be
+    re-scored, which is both wrong and expensive.
+    """
+    from app.services.scanner_service import audit_scan
+
+    canned = "Non candidabile: richiede 3+ anni di esperienza (il profilo ne dichiara 0)."
+    blocked = [_scored(i, 3, riassunto=canned, blocchi=["esperienza_richiesta"]) for i in range(6)]
+    judged = [_scored(100 + i, s) for i, s in enumerate([9, 7, 5, 8])]
+    out = audit_scan(blocked + judged)
+    assert not any(a["codice"] == "riassunti_clonati" for a in out["anomalie"])
+
+    # A model pasting one summary over unrelated offers is still caught.
+    real_clone = "Ottima opportunità in linea col profilo, con margini di crescita interessanti."
+    cloned = [_scored(300 + i, 7 + (i % 2), riassunto=real_clone) for i in range(3)]
+    out = audit_scan(blocked + cloned + judged)
+    assert any(a["codice"] == "riassunti_clonati" for a in out["anomalie"])
 
 
 def test_audit_spots_the_same_summary_on_different_offers() -> None:

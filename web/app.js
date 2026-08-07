@@ -67,6 +67,7 @@ import {
   closeJobDetail,
 } from "./modules/job_detail.js";
 import { initScan, readScanConfig, applyScanConfig } from "./modules/scan.js";
+import { initRescore, wireRescoreBulk } from "./modules/rescore.js";
 
 // Global safety nets: surface otherwise-silent async failures in the console.
 window.addEventListener("unhandledrejection", (e) => console.error("Unhandled promise rejection:", e.reason));
@@ -1171,6 +1172,8 @@ async function bootstrap() {
   refreshModelPickerLabel();
   // loadJobs: after an on-demand re-score the list still shows "to evaluate".
   initJobDetail({ pinJobToActiveSession, loadJobs });
+  initRescore({ loadJobs });
+  wireRescoreBulk();
   initJobList({
     showJobDetail,
     performJobAction,

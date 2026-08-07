@@ -210,10 +210,12 @@ def test_analyze_endpoint_rescores_a_job(
     client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     job_id = _seed_unscored(tmp_path)
-    import app.routers.jobs as jobs_router
+    # The scoring call moved into rescore_service, which the bulk path shares:
+    # patch it where it is CALLED or the stub is never reached.
+    import app.services.rescore_service as rescore_service
 
     monkeypatch.setattr(
-        jobs_router,
+        rescore_service,
         "analyze_offer",
         lambda **k: ss.enforce_hard_requirements(
             {"punteggio": 7, "consiglio": "Valutabile"},
@@ -238,9 +240,9 @@ def test_analyze_endpoint_reports_a_failed_retry(
     in the wrong place.
     """
     job_id = _seed_unscored(tmp_path)
-    import app.routers.jobs as jobs_router
+    import app.services.rescore_service as rescore_service
 
-    monkeypatch.setattr(jobs_router, "analyze_offer", lambda **k: _unscored())
+    monkeypatch.setattr(rescore_service, "analyze_offer", lambda **k: _unscored())
     res = client.post(f"/api/jobs/{job_id}/analyze")
     assert res.status_code == 200
     assert res.json()["evaluated"] is False

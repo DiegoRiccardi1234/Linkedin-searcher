@@ -39,6 +39,9 @@ FACT_EDUCATION = f"{FACT_PREFIX}education_level"
 FACT_GRADE = f"{FACT_PREFIX}grade"
 FACT_BASE_CITIES = f"{FACT_PREFIX}base_cities"
 FACT_WORK_MODES = f"{FACT_PREFIX}work_modes"
+#: "1"/"0" — whether the user is on the protected-categories register (L. 68/99).
+#: Absent means unknown, and unknown blocks nothing, like every other fact here.
+FACT_PROTECTED_CATEGORY = f"{FACT_PREFIX}protected_category"
 
 _GRADE_RE = re.compile(r"(\d{2,3})\s*/\s*110")
 
@@ -129,6 +132,8 @@ class CandidateFacts:
     years_experience: int | None = None
     education_level: str | None = None
     grade: int | None = None
+    #: On the protected-categories register (L. 68/99). None = not stated.
+    protected_category: bool | None = None
     work_rule: WorkRule = field(default_factory=WorkRule)
     #: fact name -> "cv" | "manuale" | "mancante", for the profile panel.
     sources: dict[str, str] = field(default_factory=dict)
@@ -252,11 +257,21 @@ def candidate_facts(db: Database) -> CandidateFacts:
         grade = found[0] if found else None
         sources["grade"] = "cv" if grade is not None else "mancante"
 
+    raw_protected = (db.get_preference(FACT_PROTECTED_CATEGORY, "") or "").strip().lower()
+    protected: bool | None
+    if raw_protected in ("1", "si", "sì", "yes", "true"):
+        protected, sources["protected_category"] = True, "manuale"
+    elif raw_protected in ("0", "no", "false"):
+        protected, sources["protected_category"] = False, "manuale"
+    else:
+        protected, sources["protected_category"] = None, "mancante"
+
     rule = _work_rule_for(db, sources)
     return CandidateFacts(
         years_experience=years,
         education_level=education,
         grade=grade,
+        protected_category=protected,
         work_rule=rule,
         sources=sources,
     )
@@ -356,6 +371,56 @@ def location_status(sede: str, modalita: str, facts: CandidateFacts) -> tuple[st
     return "Non specificato", None  # unknown mode blocks nothing
 
 
+# Nearly every Italian IT posting mentions L. 68/99, and nearly none of them is
+# reserved: 29 postings in a real 238-offer archive cite it and exactly ONE is
+# restricted. The other 28 are equal-opportunity boilerplate — "aperta ANCHE a
+# candidati appartenenti alle categorie protette", "valutiamo candidature
+# indipendentemente da ... disabilità" — attached to jobs anyone can apply for,
+# including the highest-scoring offer in the whole archive. So the rule here is
+# deliberately hard to trigger: an inclusive phrase anywhere near the mention
+# vetoes the block, and only a posting that states the requirement AS the
+# requirement counts.
+_PROTECTED_MENTION_RE = re.compile(
+    r"categori[ae]\s+protett|collocamento\s+mirato|legge\s+68/99|l\.?\s*68/99|68/99",
+    re.IGNORECASE,
+)
+_PROTECTED_INCLUSIVE_RE = re.compile(
+    r"anche\s+a|rivolta\s+anche|aperta\s+anche|indipendentemente|preferenzial|promuoviamo"
+    r"|valutiamo|pari\s+opportunit|do\s+not\s+hesitate|committed|inserimento\s+e\s+l|"
+    r"attenzione\s+alle\s+risorse|ambosessi|entrambi\s+i\s+sessi|valorizzazione",
+    re.IGNORECASE,
+)
+_PROTECTED_REQUIRED_RE = re.compile(
+    r"riservat\w*\s+(?:a|ai|alle)|esclusivamente\s+(?:a|ai|alle)"
+    r"|(?:cerc\w+|ricerc\w+|selezion\w+|figura\s+di|profilo|risorsa|candidat[oa])"
+    r"[^.;!?]{0,80}appartenente\s+alle\s+categori",
+    re.IGNORECASE,
+)
+
+
+def protected_category_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
+    """``(label, blocking reason or None)`` for a posting reserved to L. 68/99.
+
+    Blocks only when the user has explicitly said they are NOT on the register:
+    an unstated fact hides nothing, exactly like the other checks here.
+    """
+    if facts.protected_category is not False:
+        return "Non pertinente", None
+    text = str(descrizione or "")
+    mention = _PROTECTED_MENTION_RE.search(text)
+    if not mention:
+        return "Non pertinente", None
+    window = text[max(0, mention.start() - 220) : mention.end() + 220]
+    if _PROTECTED_INCLUSIVE_RE.search(window):
+        return "Citata come pari opportunità", None
+    if not _PROTECTED_REQUIRED_RE.search(window):
+        return "Citata", None
+    return (
+        "Riservata alle categorie protette",
+        "Posizione riservata alle categorie protette (L. 68/99), non dichiarate nel profilo",
+    )
+
+
 def blocking_reasons(
     descrizione: str, sede: str, modalita: str, facts: CandidateFacts | None
 ) -> list[tuple[str, str]]:
@@ -370,6 +435,7 @@ def blocking_reasons(
         FLAG_EDUCATION,
         FLAG_EXPERIENCE,
         FLAG_LOCATION,
+        FLAG_PROTECTED_CATEGORY,
     )
 
     out: list[tuple[str, str]] = []
@@ -377,6 +443,7 @@ def blocking_reasons(
         (FLAG_EXPERIENCE, experience_status(descrizione, facts)),
         (FLAG_EDUCATION, education_status(descrizione, facts)),
         (FLAG_LOCATION, location_status(sede, modalita, facts)),
+        (FLAG_PROTECTED_CATEGORY, protected_category_status(descrizione, facts)),
     ):
         if reason:
             out.append((code, reason))
