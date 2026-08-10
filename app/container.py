@@ -59,8 +59,19 @@ class AppContainer:
         # inert; started by the app lifespan, stopped on shutdown. The mailbox
         # check rides the same tick rather than opening a second thread.
         from app.services.autoscan import AutoScanScheduler
+        from app.services.reminder_watch import check_due as _check_reminders
 
-        self.autoscan = AutoScanScheduler(self, extra_tasks=[self.mailwatch.tick])
+        def _reminder_tick() -> None:
+            # The count is for the tests; the scheduler wants a plain task.
+            _check_reminders(self.db)
+
+        self.autoscan = AutoScanScheduler(
+            self,
+            # Both ride the one tick the scheduler already runs. A reminder that
+            # nothing announces is a note you have to remember to go and read,
+            # which is the opposite of what setting one is for.
+            extra_tasks=[self.mailwatch.tick, _reminder_tick],
+        )
 
         cv_path = workspace_dir / "cv.md"
         if cv_path.exists() and not self.db.get_latest_candidate_profile():

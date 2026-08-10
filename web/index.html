@@ -269,6 +269,9 @@
                it an open could only be resolved by moving the offer along the
                funnel, which says something the user may not mean. -->
           <button id="detailNotAppliedBtn" class="secondary" style="display:none;" data-i18n="jobs.notApplied">Non mi sono candidato</button>
+          <!-- Taking back a marking the mailbox made. Manual ones are left
+               alone by the endpoint, and the button follows the same rule. -->
+          <button id="detailUndoMailBtn" class="secondary" style="display:none;" data-i18n="jobs.undoMail">Undo the mailbox marking</button>
         </div>
         <div id="jobDetailContainer"></div>
         <div class="cover-letter-section">
@@ -359,6 +362,10 @@
           </select>
           <button id="refreshJobsBtn" type="button" class="ghost-btn" aria-label="Refresh jobs"><span class="material-symbols-outlined">refresh</span></button>
           <button id="exportCsvBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">download</span> <span data-i18n="jobs.csv">CSV</span></button>
+          <!-- The applications, not the archive: status, which CV went with
+               it, how it ended. The endpoint has always been there and had no
+               button, so the only way to reach it was to type the URL. -->
+          <button id="exportApplicationsBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">fact_check</span> <span data-i18n="jobs.csvApplications">Applications CSV</span></button>
           <select id="rescoreScope" data-i18n-title="jobs.rescoreScopeHint" title="Which offers to re-score">
             <option value="unscored" data-i18n="jobs.rescoreScopeUnscored">Unscored only</option>
             <option value="applicable" data-i18n="jobs.rescoreScopeApplicable">Applicable</option>
@@ -614,6 +621,16 @@
               <small class="feature-desc" data-i18n="profile.features.skillGapDesc">Skills that recur in jobs but are missing from your CV.</small>
             </div>
             <div class="feature-group">
+              <span class="feature-group-title" data-i18n="profile.features.groupReminders">Reminders</span>
+              <!-- The list always worked; nothing ever announced one, so a
+                   reminder only reached you if you went looking for it. Opt-in,
+                   because a notification is an interruption. -->
+              <label class="feature-toggle"><input type="checkbox" data-feature="reminder_notify" /> <span data-i18n="settings.features.reminderNotify">Notify me when a reminder is due</span></label>
+              <small class="feature-desc" data-i18n="profile.features.reminderNotifyDesc">A desktop notification when a reminder comes due. Without it, reminders only show on the Dashboard.</small>
+              <label class="micro" for="reminderStaleDays" data-i18n="settings.features.staleDays">Nudge me about an application after (days)</label>
+              <input id="reminderStaleDays" type="number" min="1" max="90" step="1" value="7" />
+            </div>
+            <div class="feature-group">
               <span class="feature-group-title" data-i18n="profile.features.groupPrivacy">Privacy</span>
               <label class="feature-toggle"><input type="checkbox" data-feature="privacy_mode" /> <span data-i18n="profile.features.privacyMode">Privacy Mode</span></label>
               <small class="feature-desc" data-i18n="profile.features.privacyModeDesc">Removes name, email, phone and address from the CV before it's sent to the AI. On by default.</small>
@@ -796,7 +813,15 @@
           <select id="preferredModel" class="hidden" aria-hidden="true">
             <option value=""></option>
           </select>
-          <pre id="keysStatus" class="output hidden"></pre>
+          <!-- A diagnostic dump, not a feature: the provider cards above are the
+               real UI. It used to be written into an element that nothing ever
+               un-hid, so the text existed and nobody could read it. Collapsed
+               by default rather than deleted: it is what you paste when a key
+               "is there" and the provider still says it is not. -->
+          <details class="keys-status-details">
+            <summary class="micro" data-i18n="settings.keysDiagnostics">Key diagnostics</summary>
+            <pre id="keysStatus" class="output hidden"></pre>
+          </details>
         </article>
         <!-- Reading the mailbox to find out which applications were actually
              sent. Off until connected, and read-only for good: on Microsoft the
@@ -869,13 +894,43 @@
             <label class="micro" for="mailInterval" data-i18n="mail.intervalMinutes">Every (minutes)</label>
             <input id="mailInterval" type="number" min="5" max="240" step="5" value="15" />
           </div>
+          <!-- The subject of a confirmation names the employer and never the
+               role, so a recovered application has no job title unless the body
+               is read — and not reading bodies is something this app promised.
+               Rather than quietly redefine the promise, it becomes a choice with
+               three honest positions. Default: nothing is read until you ask,
+               for the one message you asked about. -->
+          <div class="mail-row">
+            <label class="micro" for="mailBodyMode" data-i18n="mail.body.label">Job title from the message body</label>
+            <select id="mailBodyMode">
+              <option value="never" data-i18n="mail.body.never">Never read the body</option>
+              <option value="ask" data-i18n="mail.body.ask">Only when I ask, message by message</option>
+              <option value="always" data-i18n="mail.body.always">Always, for confirmations</option>
+            </select>
+          </div>
+          <p class="micro" data-i18n="mail.body.hint">Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.</p>
           <div class="mail-row mail-actions">
             <!-- Runs the rules and reports what they WOULD have marked. How well
                  they do is unknown until they meet a real mailbox, and the cost
                  of being wrong is a rewritten application history. -->
             <button id="mailDryRunBtn" class="secondary" data-i18n="mail.dryRun">Test recognition (writes nothing)</button>
             <button id="mailCheckBtn" class="secondary" data-i18n="mail.checkNow">Check now</button>
-            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Look back 90 days</button>
+          </div>
+          <!-- The window was fixed at 90 days. Someone reaching back for the
+               applications they sent before connecting the mailbox is usually
+               reaching further than that, and a year is ~3.300 messages — worth
+               measuring with the dry run before spending, because a message
+               recorded as "no match" is never looked at again. -->
+          <div class="mail-row mail-actions">
+            <label class="micro" for="mailRecoveryDays" data-i18n="mail.recovery.window">Look back</label>
+            <select id="mailRecoveryDays">
+              <option value="90">90</option>
+              <option value="180">180</option>
+              <option value="365">365</option>
+            </select>
+            <span class="micro" data-i18n="mail.recovery.days">days</span>
+            <button id="mailRecoveryDryBtn" class="secondary" data-i18n="mail.recovery.dry">Count first (writes nothing)</button>
+            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Find applications</button>
           </div>
           <pre id="mailOutput" class="output hidden"></pre>
           <div id="mailReviewBox" class="mail-review hidden">
@@ -1016,6 +1071,7 @@
         </div>
         <div class="chat-session-bar">
           <select id="chatSessionSelect" class="mini-select" title="Switch chat"></select>
+          <button type="button" id="chatSessionRename" class="ghost-btn small" data-i18n-title="chat.renameSession" title="Rename chat"><span class="material-symbols-outlined">edit</span></button>
           <button type="button" id="chatSessionNew" class="ghost-btn small" title="New chat"><span class="material-symbols-outlined">add</span></button>
           <button type="button" id="chatSessionDelete" class="ghost-btn small danger" title="Delete chat"><span class="material-symbols-outlined">delete</span></button>
         </div>

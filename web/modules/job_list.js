@@ -73,14 +73,33 @@ const FLAG_BADGES = [
   { code: "analisi_locale", cls: "flag-info", icon: "psychology_alt", key: "jobs.flag.heuristic" },
 ];
 
+// Not a flag on the analysis: these rows have no analysis. It is where the row
+// came from, and it explains at a glance why there is no title and no score —
+// the posting never went through Job Finder, only the confirmation email did.
+export function sourceBadgeHtml(job) {
+  if ((job?.fonte || "") !== "mail") return "";
+  const label = t("jobs.flag.mailImport");
+  return (
+    `<span class="job-flag flag-info" title="${escapeHtml(t("jobs.flag.mailImportLong"))}">` +
+    `<span class="material-symbols-outlined">mail</span><span>${escapeHtml(label)}</span></span>`
+  );
+}
+
 export function flagBadgesHtml(flags, { compact = false } = {}) {
   const codes = new Set(Array.isArray(flags) ? flags : []);
   return FLAG_BADGES.filter((f) => codes.has(f.code))
     .map((f) => {
       const label = t(f.key);
+      // The tooltip repeated the label, which told a hovering user nothing.
+      // Where a "…Long" key exists it explains the badge instead. A missing key
+      // comes back as the key itself, so the check is against that, not against
+      // falsiness.
+      const longKey = `${f.key}Long`;
+      const long = t(longKey);
+      const title = long === longKey ? label : long;
       const text = compact ? "" : `<span>${escapeHtml(label)}</span>`;
       return (
-        `<span class="job-flag ${f.cls}" title="${escapeHtml(label)}">` +
+        `<span class="job-flag ${f.cls}" title="${escapeHtml(title)}">` +
         `<span class="material-symbols-outlined">${f.icon}</span>${text}</span>`
       );
     })
@@ -238,6 +257,7 @@ export async function loadJobs() {
     const newBadge = job.is_new ? `<span class="pill-new">${t("jobs.newBadge")}</span>` : "";
     const sc = scoreCell(job.punteggio_ai);
     const badges =
+      sourceBadgeHtml(job) +
       flagBadgesHtml(job.flags, { compact: true }) +
       freshnessHtml(job.last_seen_at) +
       pendingBadgeHtml(job);
@@ -245,7 +265,7 @@ export async function loadJobs() {
     tr.innerHTML = `
       <td><span class="${sc.cls}">${sc.text}</span> ${newBadge}</td>
       <td>${statusPillHtml(job.status)}</td>
-      <td>${escapeHtml(truncate(job.titolo || ""))}${badges ? ` <span class="job-flags">${badges}</span>` : ""}</td>
+      <td>${escapeHtml(truncate(job.titolo || t("jobs.titleUnavailable")))}${badges ? ` <span class="job-flags">${badges}</span>` : ""}</td>
       <td>${escapeHtml(truncate(job.azienda || ""))}</td>
       <td>${escapeHtml(truncate(job.sede || ""))}</td>
       <td>${escapeHtml(truncate(job.fonte || ""))}</td>

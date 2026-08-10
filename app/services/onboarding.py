@@ -60,6 +60,28 @@ def onboarding_ral(db: Database) -> tuple[int | None, int | None]:
     )
 
 
+def linkedin_suffix(db: Database) -> str:
+    """CV-context suffix from the saved LinkedIn data.
+
+    Prefers the fetched/pasted profile text over the bare URL. Truncated; PII is
+    scrubbed downstream by Privacy Mode since this is appended to the CV markdown.
+
+    It lives here, in a module with no app imports, because three callers need it
+    and one of them is the scanner — which ``rescore_service`` (its previous home)
+    imports, so the scanner could not import back. The result was that the scan
+    and the chat each grew their own version appending the bare URL, and the
+    pasted profile text — the only part a model can actually read — reached
+    neither.
+    """
+    text = db.get_preference("linkedin_profile_text", "")
+    if text and text.strip():
+        return f"\n\nProfilo LinkedIn (estratto):\n{text.strip()[:2000]}"
+    url = db.get_preference("linkedin_url", "")
+    if url:
+        return f"\n\nProfilo LinkedIn: {url}"
+    return ""
+
+
 def onboarding_context(db: Database) -> str:
     """Return the filled onboarding answers as ``Label: value`` lines (or "")."""
     lines = []

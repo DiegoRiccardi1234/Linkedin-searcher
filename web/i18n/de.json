@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Eine auf eine bestimmte Stelle zugeschnittene CV-Version.",
       "skillGapDesc": "Skills, die in Stellen oft vorkommen, aber in deinem CV fehlen.",
       "privacyMode": "Datenschutzmodus",
-      "privacyModeDesc": "Entfernt Name, E-Mail, Telefon und Adresse aus dem CV, bevor es an die KI geht. Standardmäßig aktiv."
+      "privacyModeDesc": "Entfernt Name, E-Mail, Telefon und Adresse aus dem CV, bevor es an die KI geht. Standardmäßig aktiv.",
+      "groupReminders": "Erinnerungen",
+      "reminderNotifyDesc": "Eine Desktop-Benachrichtigung, wenn eine Erinnerung fällig wird. Ohne sie erscheinen Erinnerungen nur im Dashboard."
     },
     "linkedinPaste": "…oder füge deinen Profiltext ein (wird genutzt, wenn LinkedIn nicht abrufbar ist)",
     "linkedinPasteSaved": "Profiltext gespeichert",
@@ -249,14 +251,17 @@
       "salary": "Unter deinem Minimum",
       "salaryLong": "Die angegebene Vergütung liegt unter deinem Minimum",
       "shortDesc": "Kurze Beschreibung",
-      "heuristic": "Lokale Schätzung",
+      "heuristic": "Regelbasiertes Urteil",
       "notEvaluated": "Nicht bewertet",
       "aggregator": "Aggregator",
       "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein",
       "location": "Standort außerhalb",
       "experience": "Verlangt Erfahrung",
       "education": "Höherer Abschluss",
-      "protected": "Geschützten Kategorien vorbehalten"
+      "protected": "Geschützten Kategorien vorbehalten",
+      "heuristicLong": "Kein Modell hat diese Anzeige gelesen: Die Bewertung folgt aus einer harten Vorgabe (Standort, Mindestnote)",
+      "mailImport": "Aus dem Postfach",
+      "mailImportLong": "Aus einer Bestätigungsmail rekonstruierte Bewerbung: Die Anzeige lief nie über Job Finder, es gibt also weder Titel noch Beschreibung zu bewerten"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
@@ -274,7 +279,9 @@
     "rescoreFailed": "Neubewertung fehlgeschlagen",
     "rescoreInterrupted": "Neubewertung abgebrochen: bereits bewertete Angebote sind gespeichert.",
     "applyPending": "Warte auf Bestätigung",
-    "notApplied": "Ich habe mich nicht beworben"
+    "notApplied": "Ich habe mich nicht beworben",
+    "csvApplications": "Bewerbungen als CSV",
+    "undoMail": "Postfach-Markierung rückgängig machen"
   },
   "kanbanCols": {
     "open": "Offen",
@@ -376,7 +383,9 @@
       "minScore": "Mindestscore",
       "runNow": "Jetzt ausführen",
       "autoscanStarted": "Auto-Scan gestartet",
-      "notify": "Desktop-Benachrichtigung für neue Top-Jobs"
+      "notify": "Desktop-Benachrichtigung für neue Top-Jobs",
+      "reminderNotify": "Benachrichtigen, wenn eine Erinnerung fällig ist",
+      "staleDays": "An eine Bewerbung erinnern nach (Tagen)"
     },
     "dedup": {
       "title": "Doppelte Jobs",
@@ -410,7 +419,8 @@
     "usage": {
       "limitLabel": "Tägliches Anfragelimit (0 = kein Limit)",
       "limitSaved": "Tägliches Limit aktualisiert."
-    }
+    },
+    "keysDiagnostics": "Schlüssel-Diagnose"
   },
   "coach": {
     "title": "Career Coach",
@@ -597,7 +607,8 @@
       "saved": "Postfach-Einstellungen gespeichert",
       "connected": "Postfach verbunden",
       "disconnected": "Postfach getrennt",
-      "applied": "Als beworben markiert"
+      "applied": "Als beworben markiert",
+      "undone": "Markierung rückgängig gemacht."
     }
   },
   "update": {
@@ -650,7 +661,8 @@
     "unpin": "Lösen",
     "pinned": "An Chat angeheftet",
     "pinFailed": "Anheften fehlgeschlagen",
-    "noResponse": "Keine Antwort verfügbar."
+    "noResponse": "Keine Antwort verfügbar.",
+    "renameSession": "Diesen Chat umbenennen"
   },
   "common": {
     "close": "Schließen",
@@ -910,7 +922,9 @@
     "agreementLabel": "Übereinstimmung mit der KI",
     "casesLabel": "bewertete Angebote",
     "avgGapLabel": "durchschnittliche Abweichung",
-    "export": "Fälle exportieren (JSONL)"
+    "export": "Fälle exportieren (JSONL)",
+    "clear": "Bewertung entfernen",
+    "cleared": "Bewertung entfernt."
   },
   "local": {
     "title": "Ein Modell auf diesem PC nutzen",
@@ -971,16 +985,22 @@
       "error": "Postfach nicht erreichbar"
     },
     "recovery": {
-      "start": "90 Tage zurückschauen",
-      "running": "Suche in den letzten 90 Tagen…",
+      "start": "Bewerbungen suchen",
+      "running": "Suche läuft…",
       "done": "{n} Nachrichten zu bestätigen. Nichts wurde geändert.",
-      "truncated": "Es wurden nur die neuesten Nachrichten gelesen."
+      "truncated": "Es wurden nur die neuesten Nachrichten gelesen.",
+      "window": "Zurückblicken",
+      "days": "Tage",
+      "dry": "Erst zählen (schreibt nichts)",
+      "counted": "Über {days} Tage: {checked} Nachrichten gelesen, {n} wären zu bestätigen. Es wurde nichts geschrieben."
     },
     "review": {
-      "title": "Nachrichten zum Bestätigen",
-      "intro": "Sie sehen wie Bestätigungen aus, konnten aber nicht allein zugeordnet werden. Nichts wurde geändert.",
+      "title": "Im Postfach gefundene Bewerbungen",
+      "intro": "Das sehen nach Bewerbungsbestätigungen aus, lassen sich aber nicht von allein zuordnen. Wähle das richtige Angebot oder ignoriere es. Bis dahin ändert sich nichts.",
       "apply": "Ausgewählte als beworben markieren",
-      "dismiss": "Alle ignorieren"
+      "dismiss": "Alle ignorieren",
+      "noCandidates": "Kein passendes Angebot mehr im Archiv.",
+      "createEntry": "Als eigene Bewerbung erfassen"
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {
@@ -988,6 +1008,15 @@
       "azure": "Ein Azure-Konto: dieselben Schritte. Der kostenlose Tarif kostet nichts, verlangt aber eine Karte zur Identitätsprüfung.",
       "none": "Keines von beiden: ein privates Outlook lässt sich nicht verbinden. Richte eine Regel ein, die Bestätigungsmails an ein funktionierendes Postfach weiterleitet — Gmail oder ein beliebiges IMAP-Postfach — und verbinde dieses.",
       "other": "Manche Open-Source-Mailprogramme veröffentlichen ihre eigene App-ID, die man hier einfügen kann. Das funktioniert, aber der Zustimmungsdialog zeigt deren Namen statt Job Finder, und ein Widerruf betrifft beide."
+    },
+    "body": {
+      "label": "Stellenbezeichnung aus dem Nachrichtentext",
+      "never": "Nachrichtentext nie lesen",
+      "ask": "Nur auf Anfrage, Nachricht für Nachricht",
+      "always": "Immer, bei Bestätigungen",
+      "hint": "Was auch immer du wählst: Der Text wird nur im Speicher gelesen — nie gespeichert, nie protokolliert, nie an ein Modell geschickt.",
+      "fetchOne": "Stellenbezeichnung holen",
+      "notFound": "Keine erkennbare Stellenbezeichnung in dieser Nachricht."
     }
   }
 }

@@ -492,14 +492,244 @@ class Database:
 
     @_synchronized
     def purge_mail_seen(self, account: str | None = None) -> int:
-        """Forget the examined-messages log, for one account or all of them."""
-        cur = (
-            self.conn.execute("DELETE FROM mail_seen WHERE account = ?", (account,))
-            if account
-            else self.conn.execute("DELETE FROM mail_seen")
+        """Forget everything read from a mailbox: the log AND the pending queue.
+
+        Disconnecting has to take both. Leaving the queue behind would keep
+        proposals about a mailbox the user just detached, and they would be
+        unanswerable — there is no longer an account to check them against.
+        """
+        deleted = 0
+        for table in ("mail_seen", "mail_review"):
+            cur = (
+                self.conn.execute(f"DELETE FROM {table} WHERE account = ?", (account,))
+                if account
+                else self.conn.execute(f"DELETE FROM {table}")
+            )
+            deleted += int(cur.rowcount or 0)
+        self.conn.commit()
+        return deleted
+
+    # ── the queue of messages waiting for a human ───────────────────────────
+
+    @_synchronized
+    def add_mail_review(
+        self,
+        *,
+        account: str,
+        mail_key: str,
+        kind: str,
+        message_id: str = "",
+        received_at: str = "",
+        company: str = "",
+        sender: str = "",
+        rule: str = "",
+        role: str = "",
+        candidates: Sequence[int] = (),
+    ) -> None:
+        """Queue a proposal. Idempotent per message, so a re-sweep does not double it."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mail_review"
+            "(account, mail_key, message_id, received_at, kind, company, sender, rule, role, "
+            "candidates_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                account,
+                mail_key,
+                message_id,
+                received_at,
+                kind,
+                company,
+                sender,
+                rule,
+                role,
+                json.dumps(list(candidates)),
+                now_iso(),
+            ),
         )
         self.conn.commit()
-        return int(cur.rowcount or 0)
+
+    def list_mail_review(self, account: str | None = None) -> list[dict[str, Any]]:
+        """The pending proposals, with their candidate offers resolved.
+
+        Candidates are looked up now rather than stored denormalised: this user
+        has deleted 159 offers by hand, and a proposal pointing at one of them
+        must lose that option, not show a row that leads nowhere.
+        """
+        sql = "SELECT * FROM mail_review"
+        params: list[Any] = []
+        if account:
+            sql += " WHERE account = ?"
+            params.append(account)
+        sql += " ORDER BY received_at DESC, id DESC"
+        out: list[dict[str, Any]] = []
+        for row in self.conn.execute(sql, params).fetchall():
+            item = dict(row)
+            try:
+                ids = [int(i) for i in json.loads(item.pop("candidates_json") or "[]")]
+            except (TypeError, ValueError):
+                ids = []
+            item["candidates"] = self._resolve_candidates(ids)
+            out.append(item)
+        return out
+
+    def _resolve_candidates(self, ids: Sequence[int]) -> list[dict[str, Any]]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        rows = self.conn.execute(
+            f"SELECT id, titolo, azienda, first_seen_at, status FROM jobs "
+            f"WHERE id IN ({placeholders})",
+            tuple(ids),
+        ).fetchall()
+        found = {int(r["id"]): dict(r) for r in rows}
+        return [found[i] for i in ids if i in found]
+
+    @_synchronized
+    def set_mail_review_role(self, review_id: int, role: str) -> None:
+        """Remember the title read from a body, so the list does not reconnect to show it."""
+        self.conn.execute(
+            "UPDATE mail_review SET role = ? WHERE id = ?", (role.strip()[:120], review_id)
+        )
+        self.conn.commit()
+
+    @_synchronized
+    def close_mail_review(self, review_ids: Sequence[int], verdict: str) -> int:
+        """Take proposals off the queue and record that they were answered.
+
+        The row moves from ``mail_review`` to ``mail_seen``: the question is
+        closed, and ``filter_unseen_mail`` will not offer the message again. That
+        is the part that was missing — a dismissed proposal used to come back on
+        the next sweep, because nothing was written down about it either way.
+        """
+        if not review_ids:
+            return 0
+        placeholders = ",".join("?" for _ in review_ids)
+        rows = self.conn.execute(
+            f"SELECT * FROM mail_review WHERE id IN ({placeholders})",
+            tuple(review_ids),
+        ).fetchall()
+        for row in rows:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO mail_seen"
+                "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, "
+                "seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row["account"],
+                    row["mail_key"],
+                    row["message_id"],
+                    row["received_at"],
+                    verdict,
+                    None,
+                    row["rule"],
+                    now_iso(),
+                ),
+            )
+        self.conn.execute(
+            f"DELETE FROM mail_review WHERE id IN ({placeholders})",
+            tuple(review_ids),
+        )
+        self.conn.commit()
+        return len(rows)
+
+    @_synchronized
+    def add_application_from_mail(
+        self, *, company: str, applied_at: str, message_id: str, rule: str, role: str = ""
+    ) -> int | None:
+        """Record an application to a company the archive has never seen.
+
+        Deliberately NOT ``upsert_job``. Two reasons, both verified:
+
+        * ``add_manual_job`` calls the model on every insert, and these rows have
+          no description to read — sixty of them would spend quota producing
+          nothing;
+        * ``job_hash`` is ``sha256(titolo|azienda|link)`` and UNIQUE, so two
+          applications to the same company with an empty title and an empty link
+          collide, and the second silently overwrites the first.
+
+        So the hash is built from what actually identifies this thing: the mail
+        source, the canonical company, and the DAY. The day is the right grain —
+        measured over a year of a real mailbox, no (company, day) pair carries
+        more than one confirmation, so keying on it collapses the "LinkedIn says
+        sent / the ATS says received" pair for one application without merging
+        two genuine ones.
+
+        Returns the new job id, or ``None`` when the row already existed.
+
+        What is deliberately left empty: the TITLE, because a LinkedIn
+        confirmation names the employer and never the role, and inventing one is
+        the same sin as inventing a score; ``applied_profile_id``, because which
+        CV was used three months ago is not knowable and today's active profile
+        is a guess wearing a fact's clothes; and every scoring column, which is
+        the shape the archive already uses for "collected, not judged".
+        """
+        canonical = canonical_company(company) or company.strip().lower()
+        day = (applied_at or "")[:10]
+        job_hash = hashlib.sha256(f"mail|{canonical}|{day}".encode()).hexdigest()
+        if self.conn.execute("SELECT 1 FROM jobs WHERE job_hash = ?", (job_hash,)).fetchone():
+            return None
+        stamp = now_iso()
+        cur = self.conn.execute(
+            # punteggio_ai is written as an explicit NULL: the column carries
+            # DEFAULT 0, so leaving it out would store a zero — a score nobody
+            # gave, on a row nobody could score, in the one app that refuses
+            # fallback scores everywhere else.
+            "INSERT INTO jobs (job_hash, titolo, azienda, descrizione, sede, fonte, link, "
+            "ricerca_usata, modalita, dedup_key, status, applied_at, apply_confirmed_by, "
+            "apply_confirm_message_id, first_seen_at, last_seen_at, updated_at, is_new, "
+            "punteggio_ai) "
+            "VALUES (?, ?, ?, '', '', 'mail', '', 'mail_import', '', ?, 'applied', ?, "
+            "'email', ?, ?, ?, ?, 0, NULL)",
+            (
+                job_hash,
+                # Empty unless the body was read and gave one up: the subject
+                # names the employer and never the role.
+                role.strip(),
+                company.strip(),
+                job_hash,
+                applied_at,
+                message_id,
+                stamp,
+                stamp,
+                stamp,
+            ),
+        )
+        job_id = int(cur.lastrowid or 0)
+        self.conn.execute(
+            "INSERT INTO job_actions (job_id, action, notes, created_at) VALUES (?, ?, ?, ?)",
+            (job_id, "applied", f"auto:mail:{rule}", stamp),
+        )
+        self.conn.commit()
+        return job_id
+
+    def applications_near(self, company: str, day: str, window_days: int = 7) -> list[int]:
+        """Offers from this company already marked applied around that date.
+
+        The third and last dedup level: the application may well be in the
+        archive already, entered by hand or matched by an earlier sweep, and a
+        second stub for it would be a duplicate nobody asked for.
+        """
+        canonical = canonical_company(company)
+        if not canonical or not day:
+            return []
+        rows = self.conn.execute(
+            "SELECT id, azienda FROM jobs WHERE applied_at IS NOT NULL AND applied_at <> '' "
+            "AND date(applied_at) BETWEEN date(?, ?) AND date(?, ?)",
+            (day, f"-{window_days} days", day, f"+{window_days} days"),
+        ).fetchall()
+        from app.services.scan.companies import company_matches
+
+        return [int(r["id"]) for r in rows if company_matches(str(r["azienda"] or ""), company)]
+
+    def open_offers_from(self, company: str) -> list[int]:
+        """Open, unapplied offers from this company — the ones worth asking about."""
+        if not canonical_company(company):
+            return []
+        rows = self.conn.execute(
+            "SELECT id, azienda FROM jobs WHERE status = 'open' "
+            "AND (applied_at IS NULL OR applied_at = '')"
+        ).fetchall()
+        from app.services.scan.companies import company_matches
+
+        return [int(r["id"]) for r in rows if company_matches(str(r["azienda"] or ""), company)]
 
     @_synchronized
     def confirm_application_from_mail(self, job_id: int, message_id: str, rule: str) -> bool:
@@ -1371,13 +1601,26 @@ class Database:
         self.conn.commit()
 
     def get_analytics(self) -> dict[str, Any]:
+        """Charts of what the scan found — which is not the same as the archive.
+
+        Applications rebuilt from confirmation emails (``fonte = 'mail'``) are
+        left out of the score charts on purpose. They are real applications and
+        they belong in the archive, but they carry no posting: counting sixty
+        rows that nobody could score into "unscored" would say the scoring is
+        failing, when in fact there was never anything to read. They stay in the
+        funnel counts, because that is precisely what they are evidence of.
+        """
         cursor = self.conn.cursor()
+        scored_pool = "fonte IS NULL OR fonte <> 'mail'"
         total = cursor.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] or 0
         applied = (
             cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'applied'").fetchone()[0] or 0
         )
         rejected = (
             cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'rejected'").fetchone()[0] or 0
+        )
+        from_mail = (
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE fonte = 'mail'").fetchone()[0] or 0
         )
 
         jobs_by_status: dict[str, int] = {
@@ -1397,7 +1640,8 @@ class Database:
 
         score_distribution: dict[str, int] = {str(i): 0 for i in range(11)}
         for row in cursor.execute(
-            "SELECT punteggio_ai, COUNT(*) AS count FROM jobs GROUP BY punteggio_ai"
+            f"SELECT punteggio_ai, COUNT(*) AS count FROM jobs WHERE {scored_pool} "
+            "GROUP BY punteggio_ai"
         ).fetchall():
             try:
                 score = int(row[0])
@@ -1411,7 +1655,9 @@ class Database:
         # and the loop above drops them silently — which would make them vanish
         # from a chart whose bars are supposed to add up to the archive.
         unscored = (
-            cursor.execute("SELECT COUNT(*) FROM jobs WHERE punteggio_ai IS NULL").fetchone()[0]
+            cursor.execute(
+                f"SELECT COUNT(*) FROM jobs WHERE punteggio_ai IS NULL AND ({scored_pool})"
+            ).fetchone()[0]
             or 0
         )
 
@@ -1429,6 +1675,7 @@ class Database:
             "jobs_by_status": jobs_by_status,
             "score_distribution": score_distribution,
             "unscored": int(unscored),
+            "from_mail": int(from_mail),
             "top_companies": top_companies,
         }
 

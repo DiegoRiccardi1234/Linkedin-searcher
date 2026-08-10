@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.log import get_logger
 from app.services.candidate_facts import CandidateFacts, candidate_facts
-from app.services.onboarding import onboarding_context
+from app.services.onboarding import linkedin_suffix, onboarding_context
 from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer, is_unevaluated
 
 if TYPE_CHECKING:
@@ -37,21 +37,6 @@ SCOPES = ("unscored", "applicable", "all")
 #: pause hits the cap a third of the way in and turns the rest of the archive
 #: into 429s. Skipped when the call itself already took this long.
 _PAUSE_BETWEEN_CALLS = 2.0
-
-
-def linkedin_suffix(db: Database) -> str:
-    """CV-context suffix from the saved LinkedIn data.
-
-    Prefers the fetched/pasted profile text over the bare URL. Truncated; PII is
-    scrubbed downstream by Privacy Mode since this is appended to the CV markdown.
-    """
-    text = db.get_preference("linkedin_profile_text", "")
-    if text and text.strip():
-        return f"\n\nProfilo LinkedIn (estratto):\n{text.strip()[:2000]}"
-    url = db.get_preference("linkedin_url", "")
-    if url:
-        return f"\n\nProfilo LinkedIn: {url}"
-    return ""
 
 
 @dataclass(frozen=True)
@@ -110,7 +95,13 @@ def select_job_ids(db: Database, scope: str, ids: list[int] | None = None) -> li
     """
     if ids:
         return list(dict.fromkeys(ids))
-    jobs = db.list_jobs(limit=2000)
+    # An offer with no description cannot be judged, and asking anyway is how a
+    # score gets invented. This became load-bearing with the mail import: those
+    # rows carry an employer and a date and nothing to read, and they are all
+    # unscored by construction — so "re-score the unscored" would have sent sixty
+    # empty descriptions to the model in one click. Measured on the real archive
+    # before adding the guard: it excludes none of the offers that were there.
+    jobs = [j for j in db.list_jobs(limit=2000) if (j.get("descrizione") or "").strip()]
     if scope == "unscored":
         return [j["id"] for j in jobs if j.get("punteggio_ai") is None]
     if scope == "applicable":

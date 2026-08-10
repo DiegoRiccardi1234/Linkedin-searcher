@@ -14,6 +14,7 @@ on the next scan, or on demand (see app.scoring_schema).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Any
 
 from app.log import get_logger
@@ -59,6 +60,18 @@ _MD_ESCAPE_RE = re.compile(r"\\([-–—/+*_.])")  # noqa: RUF001
 # not how much of it is demanded. Read as a requirement it hid an apprenticeship.
 _TIME_WINDOW_RE = re.compile(r"ultim[oi]\s*$", re.IGNORECASE)
 
+# "al termine dei due anni otterrai il Diploma ITS" is how long the PROGRAMME
+# lasts. Caught on a real Lidl apprenticeship posting, which the years detector
+# would otherwise have read as demanding two years of prior experience — from an
+# ad whose whole point is that it wants people who have none.
+_DURATION_LEAD_RE = re.compile(
+    r"(?:al termine\s+(?:de[il]|dei|delle)?|(?:della\s+)?durata(?:\s+di)?"
+    r"|nell.arco\s+(?:di|dei)?|percorso\s+(?:di|dei)?|corso\s+(?:di|dei)?"
+    r"|programma\s+(?:di|dei)?|contratto\s+(?:di|della durata di)?"
+    r"|for the (?:first|next)|over the (?:first|next))\s*$",
+    re.IGNORECASE,
+)
+
 # "una realtà con oltre 30 anni di esperienza nel settore" is the COMPANY's age.
 # It needs all three signals to be dismissed: something introducing the company,
 # no wording that turns the number into a demand, and the "oltre/più di" shape
@@ -81,6 +94,44 @@ _BOAST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The same requirement, written out. "Almeno quattro anni di esperienza nel ruolo
+# di Project Manager" is not a rarer way of saying it than "almeno 4": measured
+# on 348 real postings, 15 spell the number out, SIX of them state a genuine
+# requirement — and not one of those six carried the flag. One of them was a
+# senior Project Manager role sitting in the shortlist at 6/10 with no warning.
+# The nine that are not requirements (a company's age, the length of an ITS
+# diploma, a data-retention clause) are dismissed by the very same guards below,
+# which is the reason this is a wider net and not a second detector.
+_NUMBER_WORDS: dict[str, int] = {
+    "un": 1, "uno": 1, "one": 1,
+    "due": 2, "two": 2,
+    "tre": 3, "three": 3,
+    "quattro": 4, "four": 4,
+    "cinque": 5, "five": 5,
+    "sei": 6, "six": 6,
+    "sette": 7, "seven": 7,
+    "otto": 8, "eight": 8,
+    "nove": 9, "nine": 9,
+    "dieci": 10, "ten": 10,
+}  # fmt: skip
+_WORD_ALT = "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True))
+_YEARS_WORD_RE = re.compile(
+    r"(?:almeno|minimo|min\.?|at least|oltre|più di|piu di)?\s*"
+    rf"\b({_WORD_ALT})\b"
+    # "uno o due anni" asks for one, exactly like "1-2 anni" does.
+    rf"(?:\s*(?:o|a|to|[-–—])\s*\b(?:{_WORD_ALT})\b)?"  # noqa: RUF001
+    r"\s*(?:ann[oi]|years?|yrs?)\b",
+    re.IGNORECASE,
+)
+
+
+def _year_matches(text: str) -> Iterator[tuple[re.Match[str], int]]:
+    """Every "N years" in the text, digits or words, with N already read."""
+    for match in _YEARS_RE.finditer(text):
+        yield match, int(match.group(1))
+    for match in _YEARS_WORD_RE.finditer(text):
+        yield match, _NUMBER_WORDS[match.group(1).lower()]
+
 
 def _estimate_experience_band(offer_text: str) -> str:
     """Years of experience the posting demands: ``0|1|2|3+|Non specificato``.
@@ -97,12 +148,12 @@ def _estimate_experience_band(offer_text: str) -> str:
     """
     offer_text = _MD_ESCAPE_RE.sub(r"\1", offer_text)
     best: int | None = None
-    for match in _YEARS_RE.finditer(offer_text):
+    for match, low in _year_matches(offer_text):
         window = offer_text[max(0, match.start() - 70) : match.end() + 70]
         if not _EXPERIENCE_CONTEXT_RE.search(window):
             continue
         before = offer_text[max(0, match.start() - 80) : match.start()]
-        if _TIME_WINDOW_RE.search(before):
+        if _TIME_WINDOW_RE.search(before) or _DURATION_LEAD_RE.search(before):
             continue
         if (
             _COMPANY_SUBJECT_RE.search(before)
@@ -110,8 +161,7 @@ def _estimate_experience_band(offer_text: str) -> str:
             and _BOAST_RE.search(before + match.group(0))
         ):
             continue
-        low = int(match.group(1))
-        # group(2) is the top of a range; the lower bound is what must be cleared.
+        # A range is read at its lower bound: that is the bar to clear.
         if low > 40:  # a year like "2026", not a duration
             continue
         best = low if best is None else max(best, low)

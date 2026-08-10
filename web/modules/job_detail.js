@@ -206,6 +206,15 @@ export async function showJobDetail(jobId) {
     notAppliedBtn.dataset.jobId = String(job.id);
   }
 
+  // Only for a marking the mailbox made, never a manual one — that is exactly
+  // what the endpoint enforces, and the button follows the same rule. Without
+  // it, a mail that picked the wrong offer could not be taken back at all.
+  const undoBtn = document.getElementById("detailUndoMailBtn");
+  if (undoBtn) {
+    undoBtn.style.display = job.apply_confirmed_by === "email" ? "" : "none";
+    undoBtn.dataset.jobId = String(job.id);
+  }
+
   const genBtn = document.getElementById("generateCoverLetterBtn");
   const covBox = document.getElementById("coverLetterBox");
   if (genBtn && covBox) {

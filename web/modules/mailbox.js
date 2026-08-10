@@ -19,6 +19,10 @@ export function initMailbox(deps) {
 
 const $ = (id) => document.getElementById(id);
 
+// Which affordance a queued row shows depends on the body-reading mode, and
+// the row renderer has no status object of its own.
+let _bodyMode = "ask";
+
 function _setState(text, kind = "info") {
   const el = $("mailState");
   if (!el) return;
@@ -65,6 +69,8 @@ export async function loadMailboxStatus() {
   if ($("mailFolder") && !$("mailFolder").value) $("mailFolder").value = status.folder || "INBOX";
   if ($("mailEnabled")) $("mailEnabled").checked = Boolean(status.enabled);
   if ($("mailInterval")) $("mailInterval").value = status.interval_minutes || 15;
+  _bodyMode = status.body_mode || "ask";
+  if ($("mailBodyMode")) $("mailBodyMode").value = _bodyMode;
   _toggleAuthBlocks();
 
   const key = _STATE_KEYS[status.state] || "mail.state.unconfigured";
@@ -87,15 +93,59 @@ export async function loadMailReview() {
     return;
   }
   box.classList.toggle("hidden", items.length === 0);
+  // One row per message, and the choice of WHICH offer is a radio inside it.
+  // Before, a proposal that could be about any of 275 offers rendered as a
+  // single checkbox naming whichever one happened to sort first — a question
+  // about Hays presented as a question about somebody else.
   list.innerHTML = items
-    .map(
-      (item) => `
-      <label class="mail-review-row">
-        <input type="checkbox" class="mail-review-pick" value="${item.job_id}" />
-        <span class="mail-review-job">${escapeHtml(item.job_title || "?")} — ${escapeHtml(item.company || "?")}</span>
-        <span class="micro">${escapeHtml(item.subject || "")} · ${escapeHtml(item.from_domain || "")}</span>
-      </label>`,
-    )
+    .map((item) => {
+      const when = (item.received_at || "").slice(0, 10);
+      const from = item.sender ? ` · ${escapeHtml(item.sender)}` : "";
+      const options = (item.candidates || [])
+        .map(
+          (c) => `
+        <label class="mail-review-option">
+          <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
+                 data-review="${item.review_id}" value="${c.job_id}" />
+          <span>${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}</span>
+        </label>`,
+        )
+        .join("");
+      // An import is an application to an employer the archive does not have.
+      // Any open offers from that employer come along as candidates, because
+      // attaching to the real posting beats a card with no title — but "record
+      // it on its own" stays available and is the default when nothing matches.
+      const createOption =
+        item.kind === "import"
+          ? `
+        <label class="mail-review-option">
+          <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
+                 data-review="${item.review_id}" value="create"${options ? "" : " checked"} />
+          <span data-i18n="mail.review.createEntry">Record it as a new application</span>
+        </label>`
+          : "";
+      const empty =
+        options || createOption
+          ? ""
+          : `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`;
+      // "Ask" mode: the title lives in the body, and the body is only read for
+      // the one message you press this on.
+      const roleBit = item.role
+        ? `<span class="mail-review-role">${escapeHtml(item.role)}</span>`
+        : item.kind === "import" && _bodyMode === "ask"
+          ? `<button type="button" class="ghost-btn small mail-review-role-btn"
+                     data-review="${item.review_id}" data-i18n="mail.body.fetchOne">Get the job title</button>`
+          : "";
+      return `
+      <div class="mail-review-row" data-review-row="${item.review_id}">
+        <div class="mail-review-head">
+          <strong>${escapeHtml(item.company || "?")}</strong>
+          ${roleBit}
+          <span class="micro">${escapeHtml(when)}${from}</span>
+        </div>
+        ${options}${createOption}${empty}
+      </div>`;
+    })
     .join("");
   applyTranslations(box);
 }
@@ -108,6 +158,7 @@ async function _save() {
     folder: $("mailFolder")?.value.trim() || "INBOX",
     enabled: Boolean($("mailEnabled")?.checked),
     interval_minutes: Number($("mailInterval")?.value || 15),
+    body_mode: $("mailBodyMode")?.value || "",
   };
   // Empty means "leave what is stored" here, not "delete it": a user reopening
   // settings must not wipe the password by pressing Save.
@@ -229,8 +280,13 @@ export function wireMailbox() {
     }
   });
 
-  $("mailRecoveryBtn")?.addEventListener("click", () => {
-    const source = new EventSource("/api/mail/recovery/stream?days=90");
+  // One runner for both buttons: the dry run and the real sweep differ by a
+  // query parameter and by what the final line says, not by their flow.
+  function _runRecovery(dryRun) {
+    const days = Number($("mailRecoveryDays")?.value || 90);
+    const source = new EventSource(
+      `/api/mail/recovery/stream?days=${days}${dryRun ? "&dry_run=1" : ""}`,
+    );
     _showOutput(t("mail.recovery.running"));
     source.onmessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -239,26 +295,55 @@ export function wireMailbox() {
       } else if (data.status === "complete") {
         source.close();
         const truncated = data.truncated ? ` ${t("mail.recovery.truncated")}` : "";
+        const key = data.dry_run ? "mail.recovery.counted" : "mail.recovery.done";
         _showOutput(
-          t("mail.recovery.done").replace("{n}", String(data.proposals ?? 0)) + truncated,
+          t(key)
+            .replace("{n}", String(data.proposals ?? 0))
+            .replace("{checked}", String(data.checked ?? 0))
+            .replace("{days}", String(data.days ?? days)) + truncated,
         );
-        await loadMailReview();
+        if (!data.dry_run) await loadMailReview();
       } else if (data.status === "error") {
         source.close();
         _showOutput(`${t("mail.state.error")}: ${data.error}`);
       }
     };
     source.onerror = () => source.close();
+  }
+
+  $("mailRecoveryDryBtn")?.addEventListener("click", () => _runRecovery(true));
+  $("mailRecoveryBtn")?.addEventListener("click", () => _runRecovery(false));
+
+  $("mailReviewList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest?.(".mail-review-role-btn");
+    if (!button) return;
+    button.disabled = true;
+    try {
+      const out = await api(`/api/mail/review/${button.dataset.review}/role`, {
+        method: "POST",
+        body: "{}",
+      });
+      if (out.role) await loadMailReview();
+      else showToast(t("mail.body.notFound"), "info");
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
   });
 
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
-    const picked = [...document.querySelectorAll(".mail-review-pick:checked")].map((el) =>
-      Number(el.value),
-    );
-    if (!picked.length) return;
+    const picked = [...document.querySelectorAll(".mail-review-pick:checked")];
+    const attach = picked
+      .filter((el) => el.value !== "create")
+      .map((el) => ({ review_id: Number(el.dataset.review), job_id: Number(el.value) }));
+    const create = picked
+      .filter((el) => el.value === "create")
+      .map((el) => Number(el.dataset.review));
+    if (!attach.length && !create.length) return;
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ apply: picked, dismiss: [] }),
+      body: JSON.stringify({ attach, create, dismiss: [] }),
     });
     showToast(t("toast.mail.applied"), "info");
     await loadMailReview();
@@ -266,10 +351,14 @@ export function wireMailbox() {
   });
 
   $("mailReviewDismissBtn")?.addEventListener("click", async () => {
-    const all = [...document.querySelectorAll(".mail-review-pick")].map((el) => Number(el.value));
+    // Every queued message, not every candidate: the unit the user is dismissing
+    // is the message, and one message can offer several offers.
+    const all = [...document.querySelectorAll("[data-review-row]")].map((el) =>
+      Number(el.dataset.reviewRow),
+    );
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ apply: [], dismiss: all }),
+      body: JSON.stringify({ attach: [], dismiss: all }),
     });
     await loadMailReview();
   });

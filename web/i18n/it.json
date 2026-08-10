@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Una versione del CV adattata a una specifica offerta.",
       "skillGapDesc": "Skill che ricorrono nelle offerte ma mancano nel tuo CV.",
       "privacyMode": "Modalità Privacy",
-      "privacyModeDesc": "Rimuove nome, email, telefono e indirizzo dal CV prima di inviarlo all'IA. Attivo di default."
+      "privacyModeDesc": "Rimuove nome, email, telefono e indirizzo dal CV prima di inviarlo all'IA. Attivo di default.",
+      "groupReminders": "Promemoria",
+      "reminderNotifyDesc": "Una notifica di sistema quando un promemoria scade. Senza, i promemoria si vedono solo aprendo la Dashboard."
     },
     "linkedinPaste": "…oppure incolla il testo del tuo profilo (usato se LinkedIn non è recuperabile)",
     "linkedinPasteSaved": "Testo profilo salvato",
@@ -249,14 +251,17 @@
       "salary": "Sotto la tua RAL minima",
       "salaryLong": "La retribuzione dichiarata è sotto la minima che hai impostato",
       "shortDesc": "Descrizione breve",
-      "heuristic": "Stima locale",
+      "heuristic": "Verdetto da regole",
       "notEvaluated": "Da valutare",
       "aggregator": "Aggregatore",
       "aggregatorLong": "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume",
       "location": "Sede fuori zona",
       "experience": "Chiede esperienza",
       "education": "Titolo superiore",
-      "protected": "Riservata alle categorie protette"
+      "protected": "Riservata alle categorie protette",
+      "heuristicLong": "Nessun modello ha letto questo annuncio: il punteggio è calcolato da un vincolo certo (sede, voto minimo)",
+      "mailImport": "Dalla posta",
+      "mailImportLong": "Candidatura ricostruita da una mail di conferma: l'annuncio non è mai passato da Job Finder, quindi non c'è titolo né descrizione da valutare"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",
@@ -274,7 +279,9 @@
     "rescoreFailed": "Rivalutazione non riuscita",
     "rescoreInterrupted": "Rivalutazione interrotta: le offerte gia' fatte sono salvate.",
     "applyPending": "In attesa di conferma",
-    "notApplied": "Non mi sono candidato"
+    "notApplied": "Non mi sono candidato",
+    "csvApplications": "CSV candidature",
+    "undoMail": "Annulla la marcatura della posta"
   },
   "kanbanCols": {
     "open": "Aperto",
@@ -376,7 +383,9 @@
       "minScore": "Punteggio min",
       "runNow": "Esegui ora",
       "autoscanStarted": "Scansione avviata",
-      "notify": "Notifica desktop per nuovi lavori ad alto punteggio"
+      "notify": "Notifica desktop per nuovi lavori ad alto punteggio",
+      "reminderNotify": "Avvisami quando scade un promemoria",
+      "staleDays": "Ricordami una candidatura ferma da (giorni)"
     },
     "dedup": {
       "title": "Offerte duplicate",
@@ -410,7 +419,8 @@
     "usage": {
       "limitLabel": "Limite richieste al giorno (0 = nessun limite)",
       "limitSaved": "Limite giornaliero aggiornato."
-    }
+    },
+    "keysDiagnostics": "Diagnostica chiavi"
   },
   "coach": {
     "title": "Career Coach",
@@ -597,7 +607,8 @@
       "saved": "Impostazioni casella salvate",
       "connected": "Casella collegata",
       "disconnected": "Casella scollegata",
-      "applied": "Segnata come candidatura"
+      "applied": "Segnata come candidatura",
+      "undone": "Marcatura annullata."
     }
   },
   "update": {
@@ -650,7 +661,8 @@
     "unpin": "Rimuovi",
     "pinned": "Fissato nella chat",
     "pinFailed": "Pin fallito",
-    "noResponse": "Nessuna risposta disponibile."
+    "noResponse": "Nessuna risposta disponibile.",
+    "renameSession": "Rinomina questa chat"
   },
   "common": {
     "close": "Chiudi",
@@ -910,7 +922,9 @@
     "agreementLabel": "d'accordo con l'IA",
     "casesLabel": "offerte giudicate",
     "avgGapLabel": "scarto medio",
-    "export": "Esporta i casi (JSONL)"
+    "export": "Esporta i casi (JSONL)",
+    "clear": "Togli il tuo giudizio",
+    "cleared": "Giudizio rimosso."
   },
   "local": {
     "title": "Usa un modello su questo PC",
@@ -971,16 +985,22 @@
       "error": "Casella non raggiungibile"
     },
     "recovery": {
-      "start": "Cerca negli ultimi 90 giorni",
-      "running": "Ricerca negli ultimi 90 giorni…",
+      "start": "Cerca le candidature",
+      "running": "Ricerca in corso…",
       "done": "{n} messaggi da confermare. Non è stato cambiato nulla.",
-      "truncated": "Sono stati letti solo i messaggi più recenti."
+      "truncated": "Sono stati letti solo i messaggi più recenti.",
+      "window": "Guarda indietro",
+      "days": "giorni",
+      "dry": "Conta prima (non scrive nulla)",
+      "counted": "Su {days} giorni: {checked} messaggi letti, {n} sarebbero da confermare. Non è stato scritto niente."
     },
     "review": {
-      "title": "Messaggi da confermare",
-      "intro": "Sembrano conferme ma non è stato possibile assegnarli da soli. Non è stato cambiato nulla.",
+      "title": "Candidature trovate nella posta",
+      "intro": "Sembrano conferme di candidatura ma non si assegnano da sole. Scegli l'offerta giusta, oppure ignora. Finché non scegli, non cambia niente.",
       "apply": "Segna i selezionati come candidatura",
-      "dismiss": "Ignora tutti"
+      "dismiss": "Ignora tutti",
+      "noCandidates": "Nessuna offerta corrispondente rimasta in archivio.",
+      "createEntry": "Registrala come candidatura a sé"
     },
     "whereIdFrom": "Dove si prende un id applicazione?",
     "idSource": {
@@ -988,6 +1008,15 @@
       "azure": "Un account Azure: stessi passi. Il piano gratuito non costa nulla ma chiede una carta per verificare l'identità.",
       "none": "Nessuno dei due: un Outlook personale non si può collegare. Crea una regola che inoltri le mail di conferma a una casella che funziona — Gmail, Libero, una qualsiasi IMAP — e collega quella.",
       "other": "Alcuni client di posta open source pubblicano il proprio id applicazione, e si può incollare qui. Funziona, ma la schermata di consenso mostrerà il loro nome al posto di Job Finder, e revocare l'accesso vale per entrambi."
+    },
+    "body": {
+      "label": "Titolo del ruolo dal corpo del messaggio",
+      "never": "Mai leggere il corpo",
+      "ask": "Solo quando lo chiedo, messaggio per messaggio",
+      "always": "Sempre, per le conferme",
+      "hint": "Qualunque cosa scegli, il corpo viene letto solo in memoria: mai salvato, mai nei log, mai spedito a un modello.",
+      "fetchOne": "Recupera il ruolo",
+      "notFound": "Nessun titolo riconoscibile in questo messaggio."
     }
   }
 }

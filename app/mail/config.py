@@ -79,9 +79,33 @@ PREF_LAST_OK = "mailwatch_last_ok_connect_ts"
 PREF_LAST_ERROR = "mailwatch_last_error"
 PREF_PENDING_DAYS = "mailwatch_pending_days"
 PREF_RECOVERY_DONE = "mailwatch_recovery_done"
+PREF_BODY_MODE = "mailwatch_body_mode"
 
 DEFAULT_INTERVAL_MINUTES = 15
 DEFAULT_PENDING_DAYS = 14
+
+#: Whether the app may download the BODY of a message, and on whose initiative.
+#:
+#: The subject of a confirmation names the employer and never the role, so the
+#: job title only exists in the body — and downloading a body is precisely what
+#: this package promised not to do. Rather than quietly redefine the promise,
+#: the promise becomes a setting with three honest positions:
+#:
+#: * ``never``   — no command that fetches a body is ever issued. The original
+#:                 guarantee, unchanged, and still asserted on the literal IMAP
+#:                 command by a test.
+#: * ``ask``     — the default. Nothing is downloaded until you press the button
+#:                 on one specific queued message, and only that message.
+#: * ``always``  — every message that has already passed the confirmation gate
+#:                 gets its body read, so imported applications arrive titled.
+#:
+#: In all three the body is parsed in memory and never stored, never logged and
+#: never sent to a model.
+BODY_MODE_NEVER = "never"
+BODY_MODE_ASK = "ask"
+BODY_MODE_ALWAYS = "always"
+BODY_MODES = (BODY_MODE_NEVER, BODY_MODE_ASK, BODY_MODE_ALWAYS)
+DEFAULT_BODY_MODE = BODY_MODE_ASK
 
 
 def domain_of(address: str) -> str:

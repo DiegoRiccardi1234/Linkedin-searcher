@@ -295,6 +295,11 @@ async function loadHealth() {
   if (linkedinText && prefs.linkedin_profile_text) {
     linkedinText.value = prefs.linkedin_profile_text;
   }
+  // Read back, or the field shows the placeholder 7 whatever you saved — the
+  // same "written and never re-read" shape as the panels that were invisible.
+  const staleDays = document.getElementById("reminderStaleDays");
+  if (staleDays && prefs.reminder_stale_days) staleDays.value = prefs.reminder_stale_days;
+
   const dedupSel = document.getElementById("dedupModeSelect");
   if (dedupSel) {
     const mode = prefs.dedup_mode || "city";
@@ -307,7 +312,7 @@ async function loadHealth() {
   updateProvidersMetadata(health.provider || {}, keys.preferred_model || "");
   renderProviderCards(keys, health.provider || {});
   loadProviderHealth();
-  setText("keysStatus", JSON.stringify(status, null, 2));
+  showKeysStatus(status);
 }
 
 async function loadKeysStatus() {
@@ -319,7 +324,18 @@ async function loadKeysStatus() {
   updateProvidersMetadata(provider, keys.preferred_model || "");
   renderProviderCards(keys, provider);
   loadProviderHealth();
-  setText("keysStatus", JSON.stringify(status, null, 2));
+  showKeysStatus(status);
+}
+
+// #keysStatus ships with class="hidden" and nothing ever took it off, so this
+// JSON was written into an element nobody could see. It is a diagnostic dump,
+// not a feature: the provider cards above are the real UI. Kept, but behind a
+// details element that starts closed, instead of written into the void.
+function showKeysStatus(status) {
+  const el = document.getElementById("keysStatus");
+  if (!el) return;
+  el.textContent = JSON.stringify(status, null, 2);
+  el.classList.remove("hidden");
 }
 
 async function loadProfiles() {
@@ -533,7 +549,7 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       },
     );
     if (!response.ok) {
-      setText("cvSummary", `${t("toast.uploadError")}: ${await response.text()}`);
+      showCvSummary(`${t("toast.uploadError")}: ${await response.text()}`);
       showToast(t("toast.uploadError") || "Upload failed", "error");
       return;
     }
@@ -541,7 +557,7 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     const payload = await response.json();
     // Was JSON.stringify(payload) — the user got the raw API response dumped
     // into the page. Show what the AI actually understood.
-    setText("cvSummary", cvSummaryText(payload));
+    showCvSummary(cvSummaryText(payload));
     await loadProfiles();
     await loadProfileView();
     await loadRecommendations();
@@ -570,6 +586,15 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     dropzone?.classList.remove("is-busy");
   }
 });
+
+// #cvSummary ships with class="hidden" and nothing ever took it off, so both
+// the summary of what the AI understood AND the server's reason for a failed
+// upload were written into an element nobody could see — the user got a generic
+// "Upload failed" toast and no way to find out why.
+function showCvSummary(text) {
+  setText("cvSummary", text);
+  document.getElementById("cvSummary")?.classList.toggle("hidden", !text);
+}
 
 // The upload response is a status envelope; the readable part is the profile
 // the parser built from the CV.
@@ -899,6 +924,22 @@ document.getElementById("detailApplyNowBtn").addEventListener("click", async () 
   }
 });
 
+const undoMailBtn = document.getElementById("detailUndoMailBtn");
+if (undoMailBtn) {
+  undoMailBtn.addEventListener("click", async () => {
+    const jobId = Number(undoMailBtn.dataset.jobId || appState.selectedJobId);
+    if (!jobId) return;
+    try {
+      await api(`/api/mail/undo/${jobId}`, { method: "POST", body: "{}" });
+      undoMailBtn.style.display = "none";
+      showToast(t("toast.mail.undone"), "info");
+      await loadJobs();
+    } catch (error) {
+      showToast(`${t("toast.actionError")}: ${error.message}`, "info");
+    }
+  });
+}
+
 const notAppliedBtn = document.getElementById("detailNotAppliedBtn");
 if (notAppliedBtn) {
   notAppliedBtn.addEventListener("click", async () => {
@@ -1019,6 +1060,18 @@ document.getElementById("exportCsvBtn").addEventListener("click", () => {
   // Let the browser download the CSV instead of writing a file server-side.
   const a = document.createElement("a");
   a.href = "/api/export/csv";
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+// The applications, not the whole archive: what was sent, with which CV, and how
+// it ended. A plain link, like the score-feedback export — no JS needed to
+// download a file the server already knows how to produce.
+document.getElementById("exportApplicationsBtn")?.addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = "/api/applications/export?format=csv";
   a.download = "";
   document.body.appendChild(a);
   a.click();
@@ -1596,6 +1649,29 @@ function renderChatSessionDropdown() {
 
 function wireChatSessionUI() {
   const sel = document.getElementById("chatSessionSelect");
+  // The translation for "chat renamed" has existed in all five languages since
+  // the endpoint was written. The button never did.
+  const renameBtn = document.getElementById("chatSessionRename");
+  if (renameBtn && !renameBtn.dataset.wired) {
+    renameBtn.dataset.wired = "1";
+    renameBtn.addEventListener("click", async () => {
+      const current = ChatSessions.list.find((x) => x.id === ChatSessions.active);
+      const title = prompt(t("chat.renameSession"), current?.title || "");
+      if (title === null) return;
+      try {
+        await api(`/api/chat/sessions/${ChatSessions.active}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: title.trim() }),
+        });
+        await refreshChatSessions();
+        renderChatSessionDropdown();
+        showToast(t("toast.chatRenamed"), "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+
   const newBtn = document.getElementById("chatSessionNew");
   const delBtn = document.getElementById("chatSessionDelete");
   if (sel) {

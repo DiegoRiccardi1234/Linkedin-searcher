@@ -115,15 +115,90 @@ def test_a_short_company_name_does_not_swallow_a_longer_one() -> None:
     assert classify(header, [_pending(company="bit")]).verdict != "match"
 
 
+# ── the three ways a real mailbox produced answers nobody could use ──────────
+# Each of these was measured on one real 90-day Outlook mailbox (853 messages,
+# 275 offers in the archive) before it was written: the rules produced 116
+# proposals, 66 of which no human could have resolved. After these three, 50
+# proposals and nothing true was lost.
+
+
+def test_an_application_merely_viewed_is_not_a_confirmation_of_sending() -> None:
+    """LinkedIn says "visualizzata da X" when someone OPENS it, not when it is sent.
+
+    21 of them in one real mailbox, and not one is assignable: the regex that
+    reads the employer out of a subject wants "inviata a".
+    """
+    header = _header(
+        "La tua candidatura è stata visualizzata da Hays", "jobs-noreply@linkedin.com"
+    )
+    assert classify(header, [_pending(company="Hays")]).verdict == "no_match"
+
+
+def test_a_subject_naming_an_employer_we_never_saved_is_not_a_proposal() -> None:
+    """The message says who it is about, and it is nobody in the archive.
+
+    Falling through to the weaker rules would look for the offer elsewhere and
+    settle on one the message just said it is NOT about.
+    """
+    header = _header("La tua candidatura è stata inviata a Kirey", "jobs-noreply@linkedin.com")
+    result = classify(header, [_pending(company="Reply")])
+    assert result.verdict == "no_match"
+    assert result.rule == "named_company_absent"
+
+
+def test_with_no_evidence_at_all_the_answer_is_no_not_a_random_offer() -> None:
+    """No employer in the subject, none in the sender, several offers open.
+
+    The old answer was "ambiguous" carrying every pending id, and the review
+    screen shows the first one — a question about Hays presented as a question
+    about whatever sorted first.
+    """
+    header = _header("Grazie per la tua candidatura", "no-reply@myworkday.com")
+    result = classify(header, [_pending(1), _pending(2, company="Accenture")])
+    assert result.verdict == "no_match"
+    assert result.rule == "no_evidence"
+    assert result.candidates == ()
+
+
+def test_one_offer_open_is_still_worth_asking_about() -> None:
+    """The narrowing above must not swallow the case that IS answerable."""
+    header = _header("Grazie per la tua candidatura", "no-reply@myworkday.com")
+    result = classify(header, [_pending(1)])
+    assert result.verdict == "ambiguous"
+    assert result.rule == "single_pending"
+    assert result.candidates == (1,)
+
+
+def test_teamtailor_actually_sends_from_teamtailor_mail_com() -> None:
+    """A list bug, not an omission: "teamtailor.com" never matches the real one."""
+    assert is_known_sender("noreply@finomnia.teamtailor-mail.com")
+    assert is_known_sender("candidature@join.com")
+
+
 # ── the mailbox cannot be written to ─────────────────────────────────────────
 
 
 class FakeIMAP4:
-    """Stands in for imaplib.IMAP4_SSL and records every command received."""
+    """Stands in for imaplib.IMAP4_SSL and records every command received.
 
-    def __init__(self, host: str, port: int, ssl_context: object = None, timeout: float = 0) -> None:
+    ``uid_in_prefix`` picks which of the two real reply shapes to speak. Outlook
+    sends the UID in the element AFTER the payload; other servers put it in the
+    prefix. This fake used to invent a third shape that no server sends, which is
+    how a batched reader shipped green tests and returned zero headers from a
+    real mailbox.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        ssl_context: object = None,
+        timeout: float = 0,
+        uid_in_prefix: bool = False,
+    ) -> None:
         self.calls: list[tuple] = []
         self.messages: dict[int, bytes] = {}
+        self.uid_in_prefix = uid_in_prefix
 
     def login(self, user: str, password: str) -> tuple[str, list]:
         self.calls.append(("login", user))
@@ -144,8 +219,25 @@ class FakeIMAP4:
         self.calls.append(("uid", command, *args))
         if command == "search":
             return ("OK", [b" ".join(str(u).encode() for u in self.messages)])
-        uid = int(str(args[0]))
-        return ("OK", [(b"1 (UID)", self.messages[uid])])
+        # Transcribed from what outlook.office365.com actually sends back:
+        #   (b'7913 (BODY[HEADER.FIELDS (...)] {334}', b'Date: ...')
+        #   b' UID 69662)'
+        # one pair per message. The UID arrives AFTER the payload, which is the
+        # detail that matters and the one a hand-written fake gets wrong.
+        out: list[object] = []
+        for seq, raw in enumerate(str(args[0]).split(","), start=1):
+            uid = int(raw)
+            if uid not in self.messages:
+                continue
+            body = self.messages[uid]
+            fields = "BODY[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID LIST-ID REPLY-TO)]"
+            if self.uid_in_prefix:
+                out.append((f"{seq} (UID {uid} {fields} {{{len(body)}}}".encode(), body))
+                out.append(b")")
+            else:
+                out.append((f"{seq} ({fields} {{{len(body)}}}".encode(), body))
+                out.append(f" UID {uid})".encode())
+        return ("OK", out)
 
     def logout(self) -> tuple[str, list]:
         self.calls.append(("logout",))
@@ -187,6 +279,60 @@ def test_the_mailbox_is_opened_read_only_and_bodies_are_never_fetched() -> None:
     assert ("logout",) in fake.calls
     assert headers[0].subject.startswith("La tua candidatura")
     assert headers[0].key == "imap:42:7"
+
+
+def test_headers_are_fetched_in_batches_not_one_round_trip_each() -> None:
+    """A 365-day sweep is around 3.300 messages, and imaplib is one command each.
+
+    One FETCH per message turned "look back a year" into an afternoon. The UID is
+    read back out of each response line rather than zipped with the request:
+    servers may answer in any order, and pairing by position would silently file
+    every header under the wrong message.
+    """
+    from app.mail.config import MailAccount
+    from app.mail.imap_client import _FETCH_BATCH, ImapMailbox
+
+    fake = FakeIMAP4("h", 993)
+    uids = list(range(1, 121))
+    for uid in uids:
+        fake.messages[uid] = _RAW
+    account = MailAccount(address="me@libero.it", host="imapmail.libero.it", secret="pw")
+
+    with ImapMailbox(account, imap_factory=lambda *a, **k: fake) as box:
+        box.select_readonly("INBOX")
+        headers = list(box.fetch_headers(uids))
+
+    fetches = [c for c in fake.calls if c[0] == "uid" and c[1] == "fetch"]
+    assert len(fetches) == 3, f"120 messages in batches of {_FETCH_BATCH} is three commands"
+    assert len(headers) == 120, "every message still comes back"
+    assert [h.key for h in headers] == [f"imap:42:{uid}" for uid in uids]
+    for call in fetches:
+        sent = " ".join(str(a) for a in call[2:])
+        assert "BODY.PEEK[HEADER.FIELDS" in sent
+        assert "BODY[" not in sent.replace("BODY.PEEK[", ""), "still headers only"
+
+
+def test_the_uid_is_read_wherever_the_server_puts_it() -> None:
+    """Outlook sends it after the payload, other servers in the prefix.
+
+    Both shapes are real. Getting this wrong is silent: the reader returns
+    nothing at all, and every test written against a fake that speaks the
+    parser's own dialect stays green while a real mailbox yields zero headers.
+    """
+    from app.mail.config import MailAccount
+    from app.mail.imap_client import ImapMailbox
+
+    account = MailAccount(address="me@libero.it", host="imapmail.libero.it", secret="pw")
+    for uid_in_prefix in (False, True):
+        fake = FakeIMAP4("h", 993, uid_in_prefix=uid_in_prefix)
+        fake.messages[11] = _RAW
+        fake.messages[12] = _RAW
+        with ImapMailbox(account, imap_factory=lambda *a, **k: fake) as box:
+            box.select_readonly("INBOX")
+            headers = list(box.fetch_headers([11, 12]))
+        assert [h.key for h in headers] == ["imap:42:11", "imap:42:12"], (
+            f"uid_in_prefix={uid_in_prefix}"
+        )
 
 
 def test_microsoft_over_imap_authenticates_with_a_token_never_a_password() -> None:
@@ -341,6 +487,632 @@ def test_a_confirmation_marks_the_offer_applied_end_to_end(
     assert client.post(f"/api/mail/undo/{job_id}").status_code == 200
     listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
     assert listed[job_id]["status"] == "open"
+
+
+def test_the_historic_dry_run_counts_without_consuming_the_mailbox(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Measuring a year's worth of mailbox must not spend it.
+
+    A message the sweep files as ``no_match`` is recorded, and recorded means
+    never looked at again — so a "how many is this" run that wrote those rows
+    would burn the very messages a later, better rule would want to re-read.
+    """
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        db.upsert_job(
+            {
+                "titolo": "AI Consultant",
+                "azienda": "Reply",
+                "link": "https://www.linkedin.com/jobs/view/9",
+                "descrizione": "Consulenza AI.",
+            }
+        )
+    finally:
+        db.close()
+
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject("La tua candidatura è stata inviata a Reply").encode()
+        + b"\r\nDate: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <sent@linkedin.com>\r\n\r\n"
+    )
+    fake.messages[4] = (
+        b"From: Newsletter <news@example.com>\r\n"
+        b"Subject: Job alert: 12 nuove offerte per te\r\n"
+        b"Date: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <alert@example.com>\r\n\r\n"
+    )
+
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+
+    events = list(watcher.run_historic(365, dry_run=True))
+    done = events[-1]
+    assert done["status"] == "complete"
+    assert done["dry_run"] is True
+    assert done["checked"] == 2, "it read the mailbox"
+    assert done["proposals"] == 1, "and it counted what it found"
+
+    seen = client.app.state.container.db.conn.execute(  # type: ignore[attr-defined]
+        "SELECT COUNT(1) FROM mail_seen"
+    ).fetchone()[0]
+    assert seen == 0, "a dry run must not consume a single message"
+    assert client.get("/api/mail/status").json()["recovery_done"] is False
+
+    # And the real sweep afterwards still sees everything the dry run saw.
+    real = list(watcher.run_historic(365))[-1]
+    assert real["checked"] == 2 and real["proposals"] == 1
+
+
+def _seed_two_reply_offers(path: Path) -> None:
+    from app.db import Database
+
+    db = Database(path)
+    try:
+        for n in (1, 2):
+            db.upsert_job(
+                {
+                    "titolo": f"AI Consultant {n}",
+                    "azienda": "Reply",
+                    "link": f"https://www.linkedin.com/jobs/view/{n}",
+                    "descrizione": "Consulenza AI.",
+                }
+            )
+    finally:
+        db.close()
+
+
+def _sweep(client: TestClient, subject: str, uid: int = 3) -> None:
+    fake = FakeIMAP4("h", 993)
+    fake.messages[uid] = (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject(subject).encode() + b"\r\n"
+        b"Date: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <sent@linkedin.com>\r\n\r\n"
+    )
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+
+
+def test_the_review_queue_survives_a_restart(client: TestClient, tmp_path: Path) -> None:
+    """The failure this whole table exists for.
+
+    On 7 August a real 90-day sweep put 110 proposals in a Python list, the app
+    was restarted, and every one was gone — leaving a card that said "recovery
+    done, 0 to review", which reads as "there was nothing".
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert len(items) == 1
+    assert items[0]["company"] == "Reply"
+    assert {c["job_id"] for c in items[0]["candidates"]}, "it names the offers it could be about"
+
+    # The restart: a brand new watcher over the same database.
+    from app.mail.watcher import MailWatcher
+    from app.services.scan_control import ScanControl
+
+    container = client.app.state.container  # type: ignore[attr-defined]
+    reborn = MailWatcher(container.db, container.settings.data_dir, ScanControl())
+    assert len(reborn.review_items()) == 1, "the queue outlives the process"
+    assert reborn.status()["review_count"] == 1
+
+
+def test_answering_a_proposal_closes_it_for_good(client: TestClient, tmp_path: Path) -> None:
+    """A dismissed message used to come back on the next sweep.
+
+    Nothing was written down about it either way, so the sweep re-proposed it
+    forever. Answering now moves the row into ``mail_seen``, which is the record
+    ``filter_unseen_mail`` reads.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    item = client.get("/api/mail/review").json()["items"][0]
+
+    resolved = client.post(
+        "/api/mail/review/resolve", json={"attach": [], "dismiss": [item["review_id"]]}
+    ).json()
+    assert resolved["dismissed"] == 1
+    assert client.get("/api/mail/review").json()["items"] == []
+
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    assert client.get("/api/mail/review").json()["items"] == [], "and it stays answered"
+
+
+def test_a_proposal_can_only_be_attached_to_an_offer_it_named(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The guard that keeps a wrong click from rewriting your history.
+
+    This endpoint writes to the record of what you applied for. A review row
+    that could be about two Reply offers must not be usable to mark a third one.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        other, _n, _s = db.upsert_job(
+            {
+                "titolo": "Frontend Developer",
+                "azienda": "Zucchetti",
+                "link": "https://www.linkedin.com/jobs/view/99",
+                "descrizione": "React.",
+            }
+        )
+    finally:
+        db.close()
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    item = client.get("/api/mail/review").json()["items"][0]
+
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [{"review_id": item["review_id"], "job_id": other}], "dismiss": []},
+    ).json()
+    assert out["applied"] == 0
+    assert out["refused"] == [item["review_id"]]
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[other]["status"] == "open", "an offer it never named is untouched"
+
+    chosen = item["candidates"][0]["job_id"]
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [{"review_id": item["review_id"], "job_id": chosen}], "dismiss": []},
+    ).json()
+    assert out["applied"] == 1
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[chosen]["status"] == "applied"
+
+
+def test_no_part_of_a_message_reaches_the_database(client: TestClient, tmp_path: Path) -> None:
+    """The promise, checked by searching the whole file rather than trusting it.
+
+    "No subject, no sender address, no body" is the claim this feature is sold
+    on. The sentinel sits where the real risk is: LinkedIn opens every one of
+    these subjects with the user's own first name — "Diego, la tua candidatura è
+    stata inviata a Reply" — so the queue must keep the employer and nothing
+    around it. Then every text column of every table is searched.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    sentinel = "ZZSENTINELZZ"
+    _sweep(client, f"{sentinel}, la tua candidatura è stata inviata a Reply")
+
+    assert client.get("/api/mail/review").json()["items"][0]["company"] == "Reply"
+
+    conn = client.app.state.container.db.conn  # type: ignore[attr-defined]
+    tables = [
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    ]
+    for table in tables:
+        columns = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        for column in columns:
+            rows = conn.execute(
+                f'SELECT COUNT(1) FROM "{table}" WHERE CAST("{column}" AS TEXT) LIKE ?',  # noqa: S608
+                (f"%{sentinel}%",),
+            ).fetchone()
+            assert rows[0] == 0, f"the subject leaked into {table}.{column}"
+
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(mail_review)").fetchall()}
+    assert not columns & {"subject", "from_addr", "body", "recipient"}
+
+
+# ── applications the archive never knew about ────────────────────────────────
+
+
+def test_extract_application_answers_a_different_question_than_classify() -> None:
+    """"Which offer is this about" and "did I apply, and to whom" are not the same.
+
+    ``classify`` must keep answering ``no_match`` when the subject names a
+    company the archive has never seen — that correction stopped 39 real
+    messages from marking the wrong offer. ``extract_application`` is what makes
+    those 39 useful instead of merely harmless.
+    """
+    from app.mail.matcher import extract_application
+
+    header = _header("La tua candidatura è stata inviata a Kirey", "jobs-noreply@linkedin.com")
+    assert classify(header, [_pending(company="Reply")]).rule == "named_company_absent"
+
+    evidence = extract_application(header)
+    assert evidence is not None
+    assert evidence.company == "Kirey"
+
+
+def test_extract_application_still_needs_two_independent_facts() -> None:
+    """Without a pending list to check against, the ATS sender is what is left.
+
+    Drop it and any message quoting the word "candidatura" could invent an
+    employer and write it into the record of what you applied for.
+    """
+    from app.mail.matcher import extract_application
+
+    assert extract_application(_header("Job alert per te", "jobs-noreply@linkedin.com")) is None
+    assert (
+        extract_application(
+            _header("La tua candidatura è stata inviata a Kirey", "amico@gmail.com")
+        )
+        is None
+    ), "a confirmation-shaped subject from anywhere is not evidence"
+    assert (
+        extract_application(_header("Grazie per la tua candidatura", "no-reply@myworkday.com"))
+        is None
+    ), "no employer named, nothing to record"
+    assert (
+        extract_application(
+            _header("Purtroppo non sei stato selezionato", "jobs-noreply@linkedin.com")
+        )
+        is None
+    ), "a rejection is not a record of sending"
+
+
+def test_two_applications_to_one_company_are_two_rows(tmp_path: Path) -> None:
+    """The reason this does not go through ``upsert_job``.
+
+    ``job_hash`` is sha256(title|company|link) and UNIQUE, so with an empty title
+    and an empty link the second application to the same employer would collide
+    with the first and silently overwrite it.
+    """
+    from app.db import Database
+
+    db = Database(tmp_path / "imp.db")
+    try:
+        first = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        second = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-07-15T10:00:00+00:00", message_id="<b>", rule="import"
+        )
+        assert first is not None and second is not None and first != second
+
+        # Same day twice is one application announced twice: LinkedIn says sent,
+        # the employer's ATS says received. Measured over a year of real mail, no
+        # (company, day) pair carries more than one genuine application.
+        again = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T18:30:00+00:00", message_id="<c>", rule="import"
+        )
+        assert again is None
+
+        rows = db.conn.execute(
+            "SELECT titolo, azienda, fonte, status, applied_at, applied_profile_id, punteggio_ai, "
+            "descrizione, link FROM jobs ORDER BY id"
+        ).fetchall()
+        assert len(rows) == 2
+        for row in rows:
+            assert row["titolo"] == "", "the mail names the employer, never the role"
+            assert row["azienda"] == "Kirey"
+            assert row["fonte"] == "mail"
+            assert row["status"] == "applied"
+            assert row["punteggio_ai"] is None, "never a score nobody gave"
+            assert row["applied_profile_id"] is None, "which CV, three months ago, is not knowable"
+            assert row["descrizione"] == "" and row["link"] == ""
+        assert rows[0]["applied_at"].startswith("2026-06-01"), "the date of the mail, not today"
+    finally:
+        db.close()
+
+
+def test_an_imported_application_is_never_sent_to_the_model(tmp_path: Path) -> None:
+    """The guard that keeps the import from turning into a quota bill.
+
+    "Re-score the unscored" would otherwise pick up every imported row — they are
+    unscored by construction — and post sixty empty descriptions to the provider.
+    """
+    from app.db import Database
+    from app.services.rescore_service import select_job_ids
+
+    db = Database(tmp_path / "g.db")
+    try:
+        real, _n, _s = db.upsert_job(
+            {
+                "titolo": "Analista funzionale",
+                "azienda": "BTO",
+                "link": "https://example.com/1",
+                "descrizione": "Analisi dei requisiti e data governance.",
+            }
+        )
+        imported = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        for scope in ("unscored", "applicable", "all"):
+            picked = select_job_ids(db, scope, None)
+            assert imported not in picked, f"{scope} would have scored an empty description"
+        assert real in select_job_ids(db, "unscored", None), "and real offers still qualify"
+    finally:
+        db.close()
+
+
+def test_importing_from_the_queue_creates_the_application(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """End to end: mailbox read, proposal queued, user says yes, archive changes."""
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    _sweep(client, "La tua candidatura è stata inviata a Kirey")
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert [i["kind"] for i in items] == ["import"]
+    assert items[0]["company"] == "Kirey"
+    assert items[0]["candidates"] == [], "no Kirey offer in the archive to attach to"
+
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [], "create": [items[0]["review_id"]], "dismiss": []},
+    ).json()
+    assert len(out["created"]) == 1
+
+    jobs = {j["azienda"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert jobs["Kirey"]["status"] == "applied"
+    assert jobs["Kirey"]["punteggio_ai"] is None
+    assert jobs["Kirey"]["fonte"] == "mail"
+    assert client.get("/api/mail/review").json()["items"] == [], "and the question is closed"
+
+
+def test_an_application_already_in_the_archive_is_not_imported_twice(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Third dedup level: it may already be recorded, by hand or by an earlier sweep."""
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        job_id, _n, _s = db.upsert_job(
+            {
+                "titolo": "Consulente applicativo",
+                "azienda": "Kirey",
+                "link": "https://example.com/k",
+                "descrizione": "Integrazione applicativa.",
+            }
+        )
+        db.set_job_action(job_id=job_id, action="applied", notes="manual")
+    finally:
+        db.close()
+
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Kirey")
+
+    assert client.get("/api/mail/review").json()["items"] == [], "nothing to ask: already recorded"
+    assert len(client.get("/api/jobs").json()["jobs"]) == 1, "and no second row was created"
+
+
+def test_the_charts_do_not_count_imports_as_a_scoring_failure(tmp_path: Path) -> None:
+    """Sixty rows nobody could score would read as sixty the scorer missed."""
+    from app.db import Database
+
+    db = Database(tmp_path / "a.db")
+    try:
+        job_id, _n, _s = db.upsert_job(
+            {
+                "titolo": "Analista",
+                "azienda": "BTO",
+                "link": "https://example.com/1",
+                "descrizione": "Analisi.",
+            }
+        )
+        db.update_job_analysis(job_id=job_id, analysis={"punteggio": 8, "consiglio": "Candidati"})
+        db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        stats = db.get_analytics()
+        assert stats["unscored"] == 0, "an application with no posting is not an unscored posting"
+        assert stats["from_mail"] == 1, "but it is counted, and said out loud"
+        assert stats["total"] == 2, "it is still in the archive"
+        assert stats["jobs_by_status"]["applied"] == 1, "and still an application"
+    finally:
+        db.close()
+
+
+# ── the job title, and the promise it costs ──────────────────────────────────
+
+def _linkedin_message() -> bytes:
+    """A whole confirmation: the headers the sweep reads, and the body it does not.
+
+    Both in one blob because the fake server, like a real one, holds one message
+    — what differs is which parts of it a given FETCH asks for.
+    """
+    return (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject("La tua candidatura è stata inviata a AGM SOLUTIONS").encode()
+        + b"\r\nDate: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <agm@linkedin.com>\r\n"
+        b"MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"La tua candidatura e' stata inviata a AGM SOLUTIONS\r\n"
+        b"AI Developer\r\n"
+        b"AGM SOLUTIONS\r\n"
+        b"Italia\r\n"
+        b"---------------------------------------------------------\r\n"
+        b"Ora fai cosi' per avere ancora piu' successo\r\n"
+        b"Visualizza offerte di lavoro simili che potrebbero interessarti\r\n"
+        b"Software Engineer (Junior) - AI Systems\r\n"
+        b"DAIDALOS\r\n"
+    )
+
+
+
+def test_the_role_comes_from_the_anchor_not_from_a_search() -> None:
+    """Below the confirmation sit the recommendations, and they look like jobs.
+
+    Transcribed from a real LinkedIn confirmation. Anything that goes hunting
+    for "a line that reads like a job title" finds DAIDALOS's opening and files
+    somebody else's job as yours. Measured on 30 real confirmations from six
+    senders: 29 titles, none wrong.
+    """
+    from app.mail.body import role_from_body
+
+    assert role_from_body(_linkedin_message(), "AGM SOLUTIONS") == "AI Developer"
+
+
+def test_the_role_is_refused_when_the_company_does_not_corroborate_it() -> None:
+    """The second independent fact: the employer has to follow the title."""
+    from app.mail.body import role_from_body
+
+    assert role_from_body(_linkedin_message(), "Reply") == ""
+    assert role_from_body(b"", "AGM SOLUTIONS") == ""
+
+
+def test_never_mode_issues_no_command_that_could_fetch_a_body(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The original guarantee, still checkable on the literal IMAP command."""
+    client.post(
+        "/api/mail/config",
+        json={
+            "address": "me@libero.it",
+            "auth": "password",
+            "secret": "pw",
+            "body_mode": "never",
+        },
+    )
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    assert watcher.body_mode() == "never"
+    list(watcher.run_historic(90))
+
+    for call in fake.calls:
+        sent = " ".join(str(a) for a in call)
+        assert "BODY.PEEK[]" not in sent, "a whole message was downloaded in 'never' mode"
+
+    # And the endpoint cannot be used to go round the setting.
+    items = client.get("/api/mail/review").json()["items"]
+    if items:
+        assert (
+            client.post(f"/api/mail/review/{items[0]['review_id']}/role").status_code == 409
+        )
+
+
+def test_a_sweep_works_on_an_empty_archive(client: TestClient, tmp_path: Path) -> None:
+    """Connecting the mailbox before ever running a scan used to recover nothing.
+
+    The sweep returned early when there was nothing to attach to, which was true
+    before the import path existed: that one does not need candidates, it reads
+    what the message says happened.
+    """
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw", "body_mode": "never"},
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    assert client.get("/api/jobs").json()["jobs"] == []
+    done = list(watcher.run_historic(90))[-1]
+    assert done["imports"] == 1
+    assert client.get("/api/mail/review").json()["items"][0]["company"] == "AGM SOLUTIONS"
+
+
+def test_ask_mode_reads_one_body_and_only_when_pressed(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The default. Nothing is downloaded until a button names a message."""
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw", "body_mode": "ask"},
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+    assert not any("BODY.PEEK[]" in " ".join(str(a) for a in c) for c in fake.calls), (
+        "the sweep itself must not read bodies in 'ask'"
+    )
+
+    item = client.get("/api/mail/review").json()["items"][0]
+    assert item["role"] == ""
+    out = client.post(f"/api/mail/review/{item['review_id']}/role").json()
+    assert out["role"] == "AI Developer"
+    assert any("BODY.PEEK[]" in " ".join(str(a) for a in c) for c in fake.calls)
+
+    # And it sticks, so the list does not reconnect to show it.
+    assert client.get("/api/mail/review").json()["items"][0]["role"] == "AI Developer"
+
+
+def test_always_mode_titles_the_application_it_creates(
+    client: TestClient, tmp_path: Path
+) -> None:
+    client.post(
+        "/api/mail/config",
+        json={
+            "address": "me@libero.it",
+            "auth": "password",
+            "secret": "pw",
+            "body_mode": "always",
+        },
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+
+    item = client.get("/api/mail/review").json()["items"][0]
+    assert item["role"] == "AI Developer", "read during the sweep, without being asked twice"
+
+    client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [], "create": [item["review_id"]], "dismiss": []},
+    )
+    job = next(j for j in client.get("/api/jobs").json()["jobs"] if j["azienda"] == "AGM SOLUTIONS")
+    assert job["titolo"] == "AI Developer"
+    assert job["punteggio_ai"] is None, "a title is not a judgement"
 
 
 def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:

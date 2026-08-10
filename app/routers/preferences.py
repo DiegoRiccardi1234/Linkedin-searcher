@@ -35,6 +35,11 @@ _WRITABLE_KEYS = frozenset(
         "density",
         "linkedin_url",
         "preferred_roles",
+        # How long an application sits untouched before the Dashboard nudges
+        # about it. Read by list_reminders since it was written, and settable
+        # nowhere — not here, not in the UI, not even through the chat's hidden
+        # parser. Editing the table by hand was the only way.
+        "reminder_stale_days",
         "theme",
         "tutorial_seen",
         "ui_language",

@@ -232,10 +232,30 @@ class MailConfigRequest(BaseModel):
     client_id: str | None = None
     enabled: bool | None = None
     interval_minutes: int | None = Field(default=None, ge=5, le=240)
+    #: ``never`` | ``ask`` | ``always`` — whether a message BODY may be read to
+    #: recover the job title, which the subject never carries. Anything else is
+    #: ignored rather than rejected: an unknown value must not be able to turn
+    #: body reading on by accident.
+    body_mode: str = ""
+
+
+class MailReviewAttach(BaseModel):
+    """One answer: this queued message is about that offer.
+
+    Both halves are required: a proposal can name several offers, and choosing
+    between them is the user's answer, not the server's guess.
+    """
+
+    review_id: int
+    job_id: int
 
 
 class MailReviewResolveRequest(BaseModel):
-    apply: list[int] = Field(default_factory=list)
+    attach: list[MailReviewAttach] = Field(default_factory=list)
+    #: Queued applications to record as offers of their own, by review id. Used
+    #: for the employers the archive has never seen — most of them, as it turns
+    #: out: 84 named in a year of real mail, 27 already known.
+    create: list[int] = Field(default_factory=list)
     dismiss: list[int] = Field(default_factory=list)
 
 

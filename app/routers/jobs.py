@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
+from app.services.onboarding import linkedin_suffix as _linkedin_suffix
 from app.services.onboarding import onboarding_context
 from app.services.rescore_service import (
     SCOPES,
@@ -30,9 +31,6 @@ from app.services.rescore_service import (
     rescore_job,
     rescore_jobs,
     select_job_ids,
-)
-from app.services.rescore_service import (
-    linkedin_suffix as _linkedin_suffix,
 )
 from app.services.scan.companies import WATCHLIST_SUGGESTIONS, canonical_company
 from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer, is_unevaluated
@@ -106,6 +104,11 @@ def build_router(container: AppContainer) -> APIRouter:
         job = container.db.get_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if not str(job.get("descrizione") or "").strip():
+            # Nothing to read, so nothing to judge. An application imported from
+            # a confirmation email is exactly this: an employer and a date. The
+            # model would answer anyway, and the answer would be about nothing.
+            raise HTTPException(status_code=422, detail="no_description")
 
         ctx = build_context(container.db, privacy=container.feature_enabled("privacy_mode", True))
         analysis = rescore_job(container.providers, job, ctx)
@@ -559,12 +562,9 @@ def build_router(container: AppContainer) -> APIRouter:
     @router.get("/api/reminders")
     def list_reminders() -> dict[str, Any]:
         """Manual reminders due + auto nudges for stale applications (F4)."""
-        raw = container.db.get_preference("reminder_stale_days", "7")
-        try:
-            stale_days = max(1, int(raw))
-        except (TypeError, ValueError):
-            stale_days = 7
-        return container.db.list_reminders(stale_days=stale_days)
+        from app.services.reminder_watch import stale_days
+
+        return container.db.list_reminders(stale_days=stale_days(container.db))
 
     @router.post("/api/jobs/{job_id}/favorite")
     def set_favorite(job_id: int, payload: FavoriteRequest) -> dict[str, Any]:
@@ -703,7 +703,10 @@ def build_router(container: AppContainer) -> APIRouter:
                 "company": r[1] or "",
                 "location": r[2] or "",
                 "status": r[3] or "",
-                "ai_score": r[4] or 0,
+                # NOT `or 0`: an unjudged offer has punteggio_ai NULL, and a 0 in
+                # this column is a score nobody gave. The app refuses invented
+                # scores everywhere else; this export was the back door.
+                "ai_score": "" if r[4] is None else r[4],
                 "advice": r[5] or "",
                 "url": r[6] or "",
                 "updated_at": r[7] or "",

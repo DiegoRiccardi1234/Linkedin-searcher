@@ -40,6 +40,14 @@ def build_router(container: AppContainer) -> APIRouter:
 
     @router.post("/api/mail/config")
     def mail_configure(payload: MailConfigRequest) -> dict[str, Any]:
+        # Written before the address is validated, because it is not part of the
+        # account: it is a decision about what this app is allowed to read, and
+        # someone must be able to set it to "never" BEFORE connecting anything.
+        # Behind the check it was silently discarded along with a 400 whenever
+        # the address field happened to be empty.
+        if payload.body_mode in mail_config.BODY_MODES:
+            container.db.set_preference(mail_config.PREF_BODY_MODE, payload.body_mode)
+
         address = payload.address.strip()
         if "@" not in address:
             raise HTTPException(status_code=400, detail="invalid_address")
@@ -79,10 +87,11 @@ def build_router(container: AppContainer) -> APIRouter:
     def mail_disconnect() -> dict[str, Any]:
         account = container.mailwatch.account()
         if account:
+            # Takes the examined-messages log AND the pending queue: proposals
+            # about a mailbox that is no longer attached cannot be answered.
             container.db.purge_mail_seen(account.address)
         mail_config.forget_account(container.db, container.settings.data_dir)
         container.db.set_preference(mail_config.PREF_ENABLED, "0")
-        container.mailwatch.review.clear()
         return {"ok": True}
 
     @router.post("/api/mail/oauth/start")
@@ -164,14 +173,25 @@ def build_router(container: AppContainer) -> APIRouter:
         return container.mailwatch.run_once(dry_run=True)
 
     @router.get("/api/mail/recovery/stream")
-    def mail_recovery(request: Request, days: int = Query(default=90, ge=1, le=365)):  # type: ignore[no-untyped-def]
+    def mail_recovery(  # type: ignore[no-untyped-def]
+        request: Request,
+        days: int = Query(default=90, ge=1, le=365),
+        dry_run: bool = Query(default=False),
+    ):
         """Look for applications sent before the mailbox was connected.
 
         Streams progress like a scan, and applies nothing: over three months the
         only link between a message and an offer is the company name, which is a
         reason to ask rather than to decide.
+
+        ``dry_run`` reports the same counts and writes nothing, which is how you
+        find out what a year's worth of mailbox costs before spending it — a
+        message recorded as ``no_match`` is never looked at again.
         """
-        rate_limit.check(request, bucket="mail_recovery", limit=2, window_seconds=600)
+        # Six a run rather than two: a dry run at 90, 180 and 365 days is three
+        # of them before the real sweep, and being rate-limited out of your own
+        # measurement is a poor way to encourage measuring first.
+        rate_limit.check(request, bucket="mail_recovery", limit=6, window_seconds=600)
         account = container.mailwatch.account()
         if not account or not account.configured:
             raise HTTPException(status_code=412, detail="mail_unconfigured")
@@ -182,7 +202,7 @@ def build_router(container: AppContainer) -> APIRouter:
             import json
 
             try:
-                for event in container.mailwatch.run_historic(days):
+                for event in container.mailwatch.run_historic(days, dry_run=dry_run):
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as exc:  # the stream must always close cleanly
                 yield f"data: {json.dumps({'status': 'error', 'error': safe_error(exc)})}\n\n"
@@ -191,25 +211,74 @@ def build_router(container: AppContainer) -> APIRouter:
 
     @router.get("/api/mail/review")
     def mail_review() -> dict[str, Any]:
+        """The pending queue. Read from the table, so a restart does not empty it.
+
+        No subject and no sender address: an employer name, a date, the rule that
+        fired, and the offers it could be about.
+        """
+        items = container.mailwatch.review_items()
         return {
             "items": [
                 {
-                    "job_id": item.job_id,
-                    "job_title": item.job_title,
-                    "company": item.company,
-                    "subject": item.subject,
-                    "from_domain": item.from_domain,
-                    "received_at": item.received_at,
-                    "rule": item.rule,
-                    "candidates": list(item.candidates),
+                    "review_id": int(item["id"]),
+                    "kind": item["kind"],
+                    "company": item.get("company") or "",
+                    "role": item.get("role") or "",
+                    "sender": item.get("sender") or "",
+                    "received_at": item.get("received_at") or "",
+                    "rule": item.get("rule") or "",
+                    "candidates": [
+                        {
+                            "job_id": int(c["id"]),
+                            "titolo": c.get("titolo") or "",
+                            "azienda": c.get("azienda") or "",
+                        }
+                        for c in item["candidates"]
+                    ],
                 }
-                for item in container.mailwatch.review
-            ]
+                for item in items
+            ],
+            "counts": {
+                "attach": sum(1 for i in items if i["kind"] == "attach"),
+                "import": sum(1 for i in items if i["kind"] == "import"),
+            },
         }
+
+    @router.post("/api/mail/review/{review_id}/role")
+    def mail_review_role(review_id: int, request: Request) -> dict[str, Any]:
+        """Read the job title out of THIS message's body, because you asked.
+
+        The one action in this package that downloads a body, for one message,
+        on an explicit press. Refused outright when the setting says never.
+        """
+        rate_limit.check(request, bucket="mail_check", limit=30, window_seconds=60)
+        row = next(
+            (i for i in container.mailwatch.review_items() if int(i["id"]) == review_id), None
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="not_found")
+        if container.mailwatch.body_mode() == mail_config.BODY_MODE_NEVER:
+            raise HTTPException(status_code=409, detail="body_reading_off")
+        try:
+            role = container.mailwatch.fetch_role(
+                str(row["mail_key"]), str(row.get("company") or "")
+            )
+        except MailError as exc:
+            raise HTTPException(status_code=502, detail=safe_error(exc)) from exc
+        if role:
+            container.db.set_mail_review_role(review_id, role)
+        return {"ok": True, "review_id": review_id, "role": role}
 
     @router.post("/api/mail/review/resolve")
     def mail_review_resolve(payload: MailReviewResolveRequest) -> dict[str, Any]:
-        result = container.mailwatch.resolve_review(payload.apply, payload.dismiss)
+        """Answer queued proposals.
+
+        Indexed by ``review_id``, not by ``job_id``: a proposal can name several
+        offers, so "which one" is part of the answer and not something the server
+        should pick. Nothing persisted used the old shape — the queue lived in
+        memory — so there is no compatibility to keep.
+        """
+        result = container.mailwatch.resolve_review(payload.attach, payload.dismiss, payload.create)
         return {"ok": True, **result}
 
     @router.post("/api/mail/undo/{job_id}")

@@ -555,6 +555,111 @@ def test_migration_021_is_idempotent(tmp_path: Path) -> None:
         db.close()
 
 
+def test_migration_024_sees_years_written_in_words(tmp_path: Path) -> None:
+    """The detector learned to count in words; the archive did not follow.
+
+    "Almeno quattro anni di esperienza nel ruolo di Project Manager" sat in the
+    shortlist at 6/10 with no warning on it, because the years detector only ever
+    matched digits. Trial on a copy of the real archive: 4 offers gain the flag,
+    none lose one, no score is touched.
+    """
+    db = Database(tmp_path / "w.db")
+    try:
+        _seed_021(db)
+        body = "Gestione di progetti IT presso il cliente. " * 8
+        spelled = _seed_019(
+            db, "Project Manager IT", "Turin, Piedmont, Italy", "Ibrido",
+            body + "\n**Requisiti essenziali:**\n* Almeno quattro anni di esperienza nel ruolo;\n",
+        )
+        _store_analysis(db, spelled, 6, consiglio="Valutabile", blocchi=[])
+        # The length of a programme is not a prerequisite, in words either.
+        apprentice = _seed_019(
+            db, "Apprendista Assistant Manager", "Turin, Piedmont, Italy", "In sede",
+            body + " Al termine dei due anni, superati gli esami, otterrai il diploma ITS.",
+        )
+        _store_analysis(db, apprentice, 7, consiglio="Valutabile", blocchi=[])
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 24")
+        db.conn.commit()
+
+        apply_migrations(db.conn)
+
+        score, blob = db.conn.execute(
+            "SELECT punteggio_ai, analysis_json FROM jobs WHERE id = ?", (spelled,)
+        ).fetchone()
+        assert "esperienza_richiesta" in json.loads(blob)["blocchi"]
+        assert score == 6, "the ceiling is 6 and the score already was: nothing to lower"
+
+        score, blob = db.conn.execute(
+            "SELECT punteggio_ai, analysis_json FROM jobs WHERE id = ?", (apprentice,)
+        ).fetchone()
+        assert json.loads(blob)["blocchi"] == []
+        assert score == 7, "a duration is not a requirement"
+    finally:
+        db.close()
+
+
+def test_migration_024_never_wipes_a_real_verdict(tmp_path: Path) -> None:
+    """It must not repeat 021's one-off release of the old caps.
+
+    An offer carrying a weighted flag and a genuine score of 3 is indistinguish-
+    able from one pinned at 3 by the cap 021 retired. Run that release twice and
+    the second pass cannot tell them apart: on the real archive it would have
+    turned **40 real verdicts** into "unevaluated". Measured on a copy, which is
+    why this test exists and why the release is opt-in.
+    """
+    db = Database(tmp_path / "k.db")
+    try:
+        _seed_021(db)
+        job_id = _seed_019(
+            db, "Analista due anni", "Turin, Piedmont, Italy", "Ibrido",
+            "Analisi funzionale. " * 20 + " Richiesti almeno 2 anni di esperienza nel ruolo.",
+        )
+        # 021 has already run on this archive: the flag is there and the 3 is a
+        # verdict, not a cap.
+        _store_analysis(
+            db, job_id, 3,
+            blocchi=["esperienza_richiesta"],
+            blocchi_dettaglio={"esperienza_richiesta": "Richiede 2 anni"},
+        )
+        db.conn.execute("DELETE FROM schema_version WHERE version >= 24")
+        db.conn.commit()
+
+        apply_migrations(db.conn)
+
+        score, blob = db.conn.execute(
+            "SELECT punteggio_ai, analysis_json FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        assert score == 3, "a real 3 survives"
+        assert "non_valutato" not in json.loads(blob)["blocchi"]
+    finally:
+        db.close()
+
+
+def test_migration_024_is_idempotent(tmp_path: Path) -> None:
+    db = Database(tmp_path / "x.db")
+    try:
+        _seed_021(db)
+        job_id = _seed_019(
+            db, "Project Manager IT", "Turin, Piedmont, Italy", "Ibrido",
+            "Gestione progetti. " * 20 + "\n* Almeno quattro anni di esperienza nel ruolo;\n",
+        )
+        _store_analysis(db, job_id, 6, consiglio="Valutabile", blocchi=[])
+        rows = []
+        for _ in range(2):
+            db.conn.execute("DELETE FROM schema_version WHERE version >= 24")
+            db.conn.commit()
+            apply_migrations(db.conn)
+            rows.append(
+                db.conn.execute(
+                    "SELECT analysis_json, punteggio_ai FROM jobs WHERE id = ?", (job_id,)
+                ).fetchone()
+            )
+        assert json.loads(rows[0][0]) == json.loads(rows[1][0])
+        assert rows[0][1] == rows[1][1] == 6
+    finally:
+        db.close()
+
+
 def test_migration_020_is_idempotent(tmp_path: Path) -> None:
     """A second run must find nothing stale and change nothing."""
     db = Database(tmp_path / "g.db")

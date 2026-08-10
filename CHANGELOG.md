@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.8.4] — 2026-08-10
+
+### Added
+- **Job Finder can now find the applications you sent before it was watching.** It believed you had sent six. Your mailbox knew of eighty-four employers over a year, and the archive had heard of twenty-seven of them — the rest happened and were invisible, because the automatic matcher only recognises postings you opened from inside the app, and most people apply from LinkedIn. "Find applications" reads the confirmation emails, proposes an offer to attach each one to when it knows the company, and offers to record the rest as applications of their own. Nothing is written until you say so.
+- **Look back 90, 180 or 365 days, and count the cost first.** The window was fixed at three months. Next to it there is now a dry run that reports exactly what a real sweep would find and writes nothing at all — not even the "already looked at" marks, which matters because a message marked as looked-at is never re-read.
+- **The job title, and the promise it costs, as a choice you make.** A confirmation names the employer in its subject and never the role, so a recovered application arrives without a title; the title is in the body, and not reading bodies is something this app promised. Rather than quietly redefine that, the mailbox card offers three positions: never read a body, read one only when you press the button on that message (the default), or read every confirmation. In all three the message is parsed in memory and never stored, never logged and never sent to a model.
+- **Reminders now actually remind.** They were a list you had to remember to go and read. A due reminder can raise a desktop notification, opt-in and announced once, and how long an application may sit before it nudges you is finally a setting instead of a value only reachable by editing the database.
+- **Four things the app could already do, and offered no way to ask for**: exporting your applications (with the CV that went with each and how it ended) rather than the whole archive, undoing a marking the mailbox made, renaming a chat session, and removing a score verdict you had given.
+
+### Fixed
+- **The review queue survives a restart.** A 90-day sweep put 110 proposals in it, the app was restarted, and every one vanished — leaving a card that read "recovery done, 0 to review", which says "I looked and there was nothing". It is now a table. The promise it is built on is unchanged: no subject, no body, no sender address. What is kept is the employer name, which is the same kind of fact the archive already holds for every offer, and a test searches every column of every table for a sentinel to keep it that way.
+- **The mailbox stopped proposing work nobody could do.** Measured across 853 real messages: 116 proposals, 66 of them unanswerable. "Your application was VIEWED by X" is not a confirmation that it was sent. A subject naming a company the archive has never heard of used to fall through and settle on an offer the message had just ruled out. And with nothing at all to go on, "ambiguous" handed back every open offer, so the screen asked about whichever one sorted first. Now 50 proposals, none of them noise, and nothing true lost.
+- **Years of experience written out in words were invisible.** Of 348 real postings fifteen spell the number rather than digit it, six of those state a genuine requirement, and the detector saw none of them — including a Project Manager role asking for four years sitting in the shortlist at 6/10 with no warning on it.
+- **The LinkedIn profile you paste now reaches the thing that decides your scores.** It was being appended for the cover letter and the interview prep, while the scan and the chat got the bare URL — which Privacy Mode then redacted to the literal text `[URL]`.
+- Two panels were written into elements that nothing ever revealed: the CV summary, including the reason an upload failed, and the provider key diagnostics.
+- The applications export printed `0` where an offer has no score, which is a score nobody gave.
+- Sweeping a mailbox is much faster: headers are fetched fifty at a time instead of one round-trip each — 1.554 of them in sixteen seconds.
+
 ## [1.8.3] — 2026-08-07
 
 ### Added

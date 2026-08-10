@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Una versión de tu CV adaptada a una oferta concreta.",
       "skillGapDesc": "Habilidades que se repiten en las ofertas pero faltan en tu CV.",
       "privacyMode": "Modo privacidad",
-      "privacyModeDesc": "Elimina nombre, correo, teléfono y dirección del CV antes de enviarlo a la IA. Activado por defecto."
+      "privacyModeDesc": "Elimina nombre, correo, teléfono y dirección del CV antes de enviarlo a la IA. Activado por defecto.",
+      "groupReminders": "Recordatorios",
+      "reminderNotifyDesc": "Una notificación de escritorio cuando vence un recordatorio. Sin ella, los recordatorios solo aparecen en el panel."
     },
     "linkedinPaste": "…o pega el texto de tu perfil (se usa si no se puede obtener de LinkedIn)",
     "linkedinPasteSaved": "Texto del perfil guardado",
@@ -249,14 +251,17 @@
       "salary": "Por debajo de tu mínimo",
       "salaryLong": "El salario declarado está por debajo del mínimo que fijaste",
       "shortDesc": "Descripción breve",
-      "heuristic": "Estimación local",
+      "heuristic": "Veredicto por reglas",
       "notEvaluated": "Sin evaluar",
       "aggregator": "Agregador",
       "aggregatorLong": "Republicado por un agregador: la empresa mostrada no es la que contrata",
       "location": "Ubicación fuera de zona",
       "experience": "Pide experiencia",
       "education": "Título superior",
-      "protected": "Reservada a categorías protegidas"
+      "protected": "Reservada a categorías protegidas",
+      "heuristicLong": "Ningún modelo leyó este anuncio: la puntuación se calcula a partir de una restricción dura (ubicación, nota mínima)",
+      "mailImport": "Del correo",
+      "mailImportLong": "Candidatura reconstruida a partir de un correo de confirmación: el anuncio nunca pasó por Job Finder, así que no hay título ni descripción que evaluar"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
@@ -274,7 +279,9 @@
     "rescoreFailed": "La reevaluación ha fallado",
     "rescoreInterrupted": "Reevaluación interrumpida: las ofertas ya hechas se han guardado.",
     "applyPending": "Esperando confirmación",
-    "notApplied": "No me he postulado"
+    "notApplied": "No me he postulado",
+    "csvApplications": "CSV candidaturas",
+    "undoMail": "Deshacer la marca del correo"
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -376,7 +383,9 @@
       "minScore": "Puntuación mín.",
       "runNow": "Ejecutar ahora",
       "autoscanStarted": "Escaneo iniciado",
-      "notify": "Notificación de escritorio para nuevos empleos con alta puntuación"
+      "notify": "Notificación de escritorio para nuevos empleos con alta puntuación",
+      "reminderNotify": "Avisarme cuando venza un recordatorio",
+      "staleDays": "Recordarme una candidatura parada tras (días)"
     },
     "dedup": {
       "title": "Ofertas duplicadas",
@@ -410,7 +419,8 @@
     "usage": {
       "limitLabel": "Límite de peticiones al día (0 = sin límite)",
       "limitSaved": "Límite diario actualizado."
-    }
+    },
+    "keysDiagnostics": "Diagnóstico de claves"
   },
   "coach": {
     "title": "Career Coach",
@@ -597,7 +607,8 @@
       "saved": "Ajustes del buzón guardados",
       "connected": "Buzón conectado",
       "disconnected": "Buzón desconectado",
-      "applied": "Marcada como enviada"
+      "applied": "Marcada como enviada",
+      "undone": "Marca deshecha."
     }
   },
   "update": {
@@ -650,7 +661,8 @@
     "unpin": "Quitar",
     "pinned": "Fijado al chat",
     "pinFailed": "Fallo al fijar",
-    "noResponse": "Sin respuesta disponible."
+    "noResponse": "Sin respuesta disponible.",
+    "renameSession": "Renombrar este chat"
   },
   "common": {
     "close": "Cerrar",
@@ -910,7 +922,9 @@
     "agreementLabel": "de acuerdo con la IA",
     "casesLabel": "ofertas valoradas",
     "avgGapLabel": "diferencia media",
-    "export": "Exportar casos (JSONL)"
+    "export": "Exportar casos (JSONL)",
+    "clear": "Quitar tu valoración",
+    "cleared": "Valoración eliminada."
   },
   "local": {
     "title": "Usa un modelo en este PC",
@@ -971,16 +985,22 @@
       "error": "No se pudo acceder al buzón"
     },
     "recovery": {
-      "start": "Buscar en los últimos 90 días",
-      "running": "Buscando en los últimos 90 días…",
+      "start": "Buscar candidaturas",
+      "running": "Buscando…",
       "done": "{n} mensajes por confirmar. No se ha cambiado nada.",
-      "truncated": "Solo se leyeron los mensajes más recientes."
+      "truncated": "Solo se leyeron los mensajes más recientes.",
+      "window": "Mirar atrás",
+      "days": "días",
+      "dry": "Contar primero (no escribe nada)",
+      "counted": "En {days} días: {checked} mensajes leídos, {n} habría que confirmar. No se escribió nada."
     },
     "review": {
-      "title": "Mensajes por confirmar",
-      "intro": "Parecen confirmaciones pero no se pudieron asignar por sí solos. No se ha cambiado nada.",
+      "title": "Candidaturas encontradas en el correo",
+      "intro": "Parecen confirmaciones de candidatura pero no pueden asignarse solas. Elige la oferta correcta o ignóralas. Hasta entonces no cambia nada.",
       "apply": "Marcar seleccionados como enviados",
-      "dismiss": "Ignorar todos"
+      "dismiss": "Ignorar todos",
+      "noCandidates": "No queda ninguna oferta correspondiente en el archivo.",
+      "createEntry": "Registrarla como candidatura propia"
     },
     "whereIdFrom": "¿De dónde saco un id de aplicación?",
     "idSource": {
@@ -988,6 +1008,15 @@
       "azure": "Una cuenta de Azure: los mismos pasos. El plan gratuito no cuesta nada pero pide una tarjeta para verificar tu identidad.",
       "none": "Ninguna de las dos: un Outlook personal no se puede conectar. Crea una regla que reenvíe los correos de confirmación a un buzón que funcione — Gmail, cualquiera con IMAP — y conecta ese.",
       "other": "Algunos clientes de correo de código abierto publican su propio id de aplicación, y se puede pegar aquí. Funciona, pero la pantalla de consentimiento mostrará su nombre en lugar de Job Finder, y revocar el acceso afecta a ambos."
+    },
+    "body": {
+      "label": "Título del puesto desde el cuerpo del mensaje",
+      "never": "No leer nunca el cuerpo",
+      "ask": "Solo cuando lo pida, mensaje a mensaje",
+      "always": "Siempre, para las confirmaciones",
+      "hint": "Elijas lo que elijas, el cuerpo se lee solo en memoria: nunca se guarda, nunca se registra, nunca se envía a un modelo.",
+      "fetchOne": "Recuperar el puesto",
+      "notFound": "Ningún título reconocible en este mensaje."
     }
   }
 }

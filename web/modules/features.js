@@ -9,6 +9,7 @@ import { appState } from "./state.js";
 
 export function readFeatureFlags(prefs) {
   const off = (v) => v === "0" || v === "false" || v === "off";
+  const on = (v) => v === "1" || v === "true" || v === "on";
   // Every flag defaults ON: a missing pref is undefined, off(undefined) is false,
   // so !off(...) is true. privacy_mode ships ON by design.
   return {
@@ -17,6 +18,11 @@ export function readFeatureFlags(prefs) {
     skill_gap: !off(prefs.feature_skill_gap),
     cv_review: !off(prefs.feature_cv_review),
     privacy_mode: !off(prefs.feature_privacy_mode),
+    // The exception, and read the other way round: a desktop notification
+    // interrupts, so it is opted into rather than inherited. The server reads
+    // the same preference with the same default, so the box and the behaviour
+    // cannot disagree.
+    reminder_notify: on(prefs.feature_reminder_notify),
   };
 }
 
@@ -98,11 +104,19 @@ function renderSkillGapLearning(data) {
     .join("");
 }
 
+//: Features that stay off until asked for, rather than on until refused.
+const OPT_IN_FEATURES = new Set(["reminder_notify"]);
+
 export function syncFeatureToggles() {
   // Global selector: toggles live in both the Settings card and the Profile card.
   document.querySelectorAll("input[data-feature]").forEach((cb) => {
     const key = cb.dataset.feature;
     if (key in appState.featureFlags) cb.checked = appState.featureFlags[key] !== false;
+    // Most features are on unless switched off, so "not stored yet" means on.
+    // Notifications are the exception: an interruption is opted into, never
+    // inherited, so an unset flag must render — and behave — as off, the same
+    // way the server reads it.
+    else if (OPT_IN_FEATURES.has(key)) cb.checked = false;
   });
   // The whole AI CV tools panel (Review + Improve) is gated by the cv_review flag.
   const cvTools = document.querySelector(".profile-cv-tools");
@@ -301,6 +315,26 @@ export function initFeatures({ loadJobs }) {
       saveSchedulerConfig({ interval_hours: parseInt(autoscanIntervalEl.value, 10) || 12 }),
     );
   }
+  // Read by list_reminders and, until now, settable nowhere at all: not in the
+  // UI, not through the preferences endpoint, only by editing the table.
+  const staleDaysEl = document.getElementById("reminderStaleDays");
+  if (staleDaysEl && !staleDaysEl.dataset.wired) {
+    staleDaysEl.dataset.wired = "1";
+    staleDaysEl.addEventListener("change", async () => {
+      const value = String(Math.max(1, Math.min(90, Number(staleDaysEl.value) || 7)));
+      staleDaysEl.value = value;
+      try {
+        await api("/api/preferences", {
+          method: "POST",
+          body: JSON.stringify({ key: "reminder_stale_days", value }),
+        });
+        showToast(t("settings.features.saved") || "Saved", "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+
   const autoscanThresholdEl = document.getElementById("autoscanThreshold");
   if (autoscanThresholdEl) {
     autoscanThresholdEl.addEventListener("change", () =>

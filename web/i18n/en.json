@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "A version of your CV tuned to a specific job.",
       "skillGapDesc": "Skills that recur in jobs but are missing from your CV.",
       "privacyMode": "Privacy Mode",
-      "privacyModeDesc": "Removes name, email, phone and address from the CV before it's sent to the AI. On by default."
+      "privacyModeDesc": "Removes name, email, phone and address from the CV before it's sent to the AI. On by default.",
+      "groupReminders": "Reminders",
+      "reminderNotifyDesc": "A desktop notification when a reminder comes due. Without it, reminders only show on the Dashboard."
     },
     "linkedinPaste": "…or paste your profile text (used if LinkedIn can't be fetched)",
     "linkedinPasteSaved": "Profile text saved",
@@ -249,14 +251,17 @@
       "salary": "Below your minimum",
       "salaryLong": "The declared pay is below the minimum you set",
       "shortDesc": "Short description",
-      "heuristic": "Local estimate",
+      "heuristic": "Rule-based verdict",
       "notEvaluated": "Not evaluated",
       "aggregator": "Aggregator",
       "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring",
       "location": "Out-of-area location",
       "experience": "Wants experience",
       "education": "Higher degree",
-      "protected": "Reserved to protected categories"
+      "protected": "Reserved to protected categories",
+      "heuristicLong": "No model read this posting: the score is computed from a hard constraint (location, minimum grade)",
+      "mailImport": "From your mailbox",
+      "mailImportLong": "Application rebuilt from a confirmation email: the posting never went through Job Finder, so there is no title or description to judge"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
@@ -274,7 +279,9 @@
     "rescoreFailed": "Re-scoring failed",
     "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved.",
     "applyPending": "Waiting for confirmation",
-    "notApplied": "I did not apply"
+    "notApplied": "I did not apply",
+    "csvApplications": "Applications CSV",
+    "undoMail": "Undo the mailbox marking"
   },
   "kanbanCols": {
     "open": "Open",
@@ -376,7 +383,9 @@
       "minScore": "Min score",
       "runNow": "Run now",
       "autoscanStarted": "Auto-scan started",
-      "notify": "Desktop notification for new high-scoring jobs"
+      "notify": "Desktop notification for new high-scoring jobs",
+      "reminderNotify": "Notify me when a reminder is due",
+      "staleDays": "Nudge me about an application after (days)"
     },
     "dedup": {
       "title": "Duplicate jobs",
@@ -410,7 +419,8 @@
     "usage": {
       "limitLabel": "Daily request limit (0 = no limit)",
       "limitSaved": "Daily limit updated."
-    }
+    },
+    "keysDiagnostics": "Key diagnostics"
   },
   "coach": {
     "title": "Career Coach",
@@ -597,7 +607,8 @@
       "saved": "Mailbox settings saved",
       "connected": "Mailbox connected",
       "disconnected": "Mailbox disconnected",
-      "applied": "Marked as applied"
+      "applied": "Marked as applied",
+      "undone": "Marking undone."
     }
   },
   "update": {
@@ -650,7 +661,8 @@
     "unpin": "Unpin",
     "pinned": "Pinned to chat",
     "pinFailed": "Pin failed",
-    "noResponse": "No response available."
+    "noResponse": "No response available.",
+    "renameSession": "Rename this chat"
   },
   "common": {
     "close": "Close",
@@ -910,7 +922,9 @@
     "agreementLabel": "agree with the AI",
     "casesLabel": "judged offers",
     "avgGapLabel": "average gap",
-    "export": "Export cases (JSONL)"
+    "export": "Export cases (JSONL)",
+    "clear": "Remove your verdict",
+    "cleared": "Verdict removed."
   },
   "local": {
     "title": "Run a model on this PC",
@@ -971,16 +985,22 @@
       "error": "Could not reach the mailbox"
     },
     "recovery": {
-      "start": "Look back 90 days",
-      "running": "Looking through the last 90 days…",
+      "start": "Find applications",
+      "running": "Searching…",
       "done": "{n} messages to confirm. Nothing has been changed.",
-      "truncated": "Only the most recent messages were read."
+      "truncated": "Only the most recent messages were read.",
+      "window": "Look back",
+      "days": "days",
+      "dry": "Count first (writes nothing)",
+      "counted": "Over {days} days: {checked} messages read, {n} would need confirming. Nothing was written."
     },
     "review": {
-      "title": "Messages to confirm",
-      "intro": "These look like confirmations but could not be assigned on their own. Nothing has been changed.",
+      "title": "Applications found in your mailbox",
+      "intro": "These look like application confirmations but cannot be assigned on their own. Pick the right offer, or ignore. Nothing changes until you do.",
       "apply": "Mark selected as applied",
-      "dismiss": "Ignore all"
+      "dismiss": "Ignore all",
+      "noCandidates": "No matching offer left in the archive.",
+      "createEntry": "Record it as a new application"
     },
     "whereIdFrom": "Where do I get an app id?",
     "idSource": {
@@ -988,6 +1008,15 @@
       "azure": "An Azure account: same steps. The free plan costs nothing but asks for a card to verify your identity.",
       "none": "Neither of the two: a personal Outlook cannot be connected. Set up a rule that forwards confirmation emails to a mailbox that works — Gmail, Libero, any IMAP one — and connect that instead.",
       "other": "Some open-source mail clients publish their own app id, and it can be pasted here. It works, but the consent screen will show their name instead of Job Finder, and revoking access affects both."
+    },
+    "body": {
+      "label": "Job title from the message body",
+      "never": "Never read the body",
+      "ask": "Only when I ask, message by message",
+      "always": "Always, for confirmations",
+      "hint": "Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.",
+      "fetchOne": "Get the job title",
+      "notFound": "No recognisable job title in this message."
     }
   }
 }

@@ -6,9 +6,11 @@ than trusted:
 * ``SELECT`` is issued read-only, so the server refuses any change this code
   could attempt — including the ``\\Seen`` flag. An app that silently marks a
   mailbox as read is worse than one that does not work.
-* Only headers are fetched, with ``BODY.PEEK``. Bodies are never downloaded, so
-  the message text cannot leak into a log, a database or an exception. It also
-  makes a 90-day sweep fast enough to be worth offering.
+* Sweeping fetches HEADERS only, with ``BODY.PEEK``. A body is downloaded in
+  exactly one place — :meth:`ImapMailbox.fetch_body`, never called from the
+  sweep — and only when the user's ``body_mode`` setting allows it, because the
+  job title exists nowhere else. Even then the message is parsed in memory and
+  never stored, never logged and never sent to a model.
 * ``smtplib`` is not imported anywhere in this package. Reading a mailbox and
   writing from it are different powers, and the second one is not needed.
 
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import email
 import imaplib
+import re
 import ssl
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
@@ -38,6 +41,21 @@ log = get_logger(__name__)
 
 #: Everything the matcher is allowed to see.
 _HEADER_FIELDS = "FROM TO SUBJECT DATE MESSAGE-ID LIST-ID REPLY-TO"
+
+#: Messages per FETCH command. ``imaplib`` is one round-trip per command, and a
+#: 365-day sweep of a real job-hunting mailbox is 1.550 messages — one command
+#: each turns a sweep into a coffee break. Measured against outlook.office365.com
+#: at fifty per command: 1.554 headers in 16 seconds, 98 a second.
+_FETCH_BATCH = 50
+
+#: A UID FETCH response always carries the UID back, but *where* is up to the
+#: server. Outlook puts it in the element AFTER the payload — the literal reply
+#: is ``(b'7913 (BODY[HEADER.FIELDS ...] {334}', b'Date: ...')`` followed by
+#: ``b' UID 69662)'`` — while others put it in the prefix. Both are read.
+#: Learned by pointing the batched reader at a real mailbox and getting zero
+#: headers back while every test stayed green: the fake server had been written
+#: to match the parser instead of the protocol.
+_UID_RE = re.compile(rb"UID\s+(\d+)")
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -147,26 +165,93 @@ class ImapMailbox:
         return out
 
     def fetch_headers(self, uids: Sequence[int]) -> Iterator[MailHeader]:
-        """Headers only, and without marking anything as read."""
-        for uid in uids:
+        """Headers only, in batches, and without marking anything as read."""
+        for start in range(0, len(uids), _FETCH_BATCH):
+            chunk = uids[start : start + _FETCH_BATCH]
+            if not chunk:
+                continue
             typ, data = self._conn.uid(
-                "fetch", str(uid), f"(BODY.PEEK[HEADER.FIELDS ({_HEADER_FIELDS})])"
+                "fetch",
+                ",".join(str(uid) for uid in chunk),
+                f"(BODY.PEEK[HEADER.FIELDS ({_HEADER_FIELDS})])",
             )
-            if typ != "OK" or not data or not data[0]:
+            if typ != "OK" or not data:
                 continue
-            payload = data[0][1] if isinstance(data[0], tuple) else data[0]
-            if not isinstance(payload, bytes | bytearray):
-                continue
-            message = email.message_from_bytes(bytes(payload))
-            yield MailHeader(
-                key=f"imap:{self.uidvalidity}:{uid}",
-                subject=_decode(message.get("Subject")),
-                from_addr=_decode(message.get("From")),
-                from_name=_decode(message.get("From")),
-                message_id=str(message.get("Message-ID") or "").strip(),
-                date=_parse_date(message.get("Date")),
-                list_id=str(message.get("List-Id") or "").strip(),
-            )
+            yield from self._parse_fetch(data)
+
+    def _parse_fetch(self, data: Sequence[Any]) -> Iterator[MailHeader]:
+        """Turn one FETCH response into headers, wherever the server put the UID.
+
+        The reply alternates ``(prefix, payload)`` tuples with bare bytes, and
+        the UID may be in either. A payload is only emitted once its UID is
+        known: pairing by position with the request would look right and file
+        every header under the wrong message the first time a server answered
+        out of order.
+        """
+        held: tuple[bytes, bytes] | None = None
+
+        def _uid(raw: bytes) -> int | None:
+            found = _UID_RE.search(raw)
+            return int(found.group(1)) if found else None
+
+        for item in data:
+            if isinstance(item, tuple) and len(item) >= 2:
+                if held is not None:
+                    # Previous payload never got a trailing UID line: its own
+                    # prefix is the only place left to look.
+                    uid = _uid(held[0])
+                    if uid is not None:
+                        yield self._header(uid, held[1])
+                    held = None
+                prefix = item[0] if isinstance(item[0], bytes | bytearray) else b""
+                if not isinstance(item[1], bytes | bytearray):
+                    continue
+                held = (bytes(prefix), bytes(item[1]))
+                uid = _uid(held[0])
+                if uid is not None:
+                    yield self._header(uid, held[1])
+                    held = None
+            elif held is not None and isinstance(item, bytes | bytearray):
+                uid = _uid(bytes(item))
+                if uid is not None:
+                    yield self._header(uid, held[1])
+                    held = None
+        if held is not None:
+            uid = _uid(held[0])
+            if uid is not None:
+                yield self._header(uid, held[1])
+
+    def fetch_body(self, uid: int) -> bytes:
+        """The whole message, for the one case the user asked for it.
+
+        Separate from :meth:`fetch_headers` and never called from it, so "does
+        this code path download a body" stays a question you can answer by
+        looking at the call sites. Still ``BODY.PEEK``: even when reading the
+        body, the mailbox is not marked as read.
+        """
+        typ, data = self._conn.uid("fetch", str(uid), "(BODY.PEEK[])")
+        if typ != "OK" or not data:
+            return b""
+        for item in data:
+            if (
+                isinstance(item, tuple)
+                and len(item) >= 2
+                and isinstance(item[1], bytes | bytearray)
+            ):
+                return bytes(item[1])
+        return b""
+
+    def _header(self, uid: int, payload: bytes) -> MailHeader:
+        message = email.message_from_bytes(payload)
+        return MailHeader(
+            key=f"imap:{self.uidvalidity}:{uid}",
+            subject=_decode(message.get("Subject")),
+            from_addr=_decode(message.get("From")),
+            from_name=_decode(message.get("From")),
+            message_id=str(message.get("Message-ID") or "").strip(),
+            date=_parse_date(message.get("Date")),
+            list_id=str(message.get("List-Id") or "").strip(),
+        )
 
 
 def _parse_uidvalidity(raw: Any) -> int:
