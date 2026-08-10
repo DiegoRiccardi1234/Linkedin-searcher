@@ -229,8 +229,13 @@ export function wireMailbox() {
     }
   });
 
-  $("mailRecoveryBtn")?.addEventListener("click", () => {
-    const source = new EventSource("/api/mail/recovery/stream?days=90");
+  // One runner for both buttons: the dry run and the real sweep differ by a
+  // query parameter and by what the final line says, not by their flow.
+  function _runRecovery(dryRun) {
+    const days = Number($("mailRecoveryDays")?.value || 90);
+    const source = new EventSource(
+      `/api/mail/recovery/stream?days=${days}${dryRun ? "&dry_run=1" : ""}`,
+    );
     _showOutput(t("mail.recovery.running"));
     source.onmessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -239,17 +244,24 @@ export function wireMailbox() {
       } else if (data.status === "complete") {
         source.close();
         const truncated = data.truncated ? ` ${t("mail.recovery.truncated")}` : "";
+        const key = data.dry_run ? "mail.recovery.counted" : "mail.recovery.done";
         _showOutput(
-          t("mail.recovery.done").replace("{n}", String(data.proposals ?? 0)) + truncated,
+          t(key)
+            .replace("{n}", String(data.proposals ?? 0))
+            .replace("{checked}", String(data.checked ?? 0))
+            .replace("{days}", String(data.days ?? days)) + truncated,
         );
-        await loadMailReview();
+        if (!data.dry_run) await loadMailReview();
       } else if (data.status === "error") {
         source.close();
         _showOutput(`${t("mail.state.error")}: ${data.error}`);
       }
     };
     source.onerror = () => source.close();
-  });
+  }
+
+  $("mailRecoveryDryBtn")?.addEventListener("click", () => _runRecovery(true));
+  $("mailRecoveryBtn")?.addEventListener("click", () => _runRecovery(false));
 
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
     const picked = [...document.querySelectorAll(".mail-review-pick:checked")].map((el) =>

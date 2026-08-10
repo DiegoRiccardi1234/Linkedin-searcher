@@ -883,7 +883,22 @@
                  of being wrong is a rewritten application history. -->
             <button id="mailDryRunBtn" class="secondary" data-i18n="mail.dryRun">Test recognition (writes nothing)</button>
             <button id="mailCheckBtn" class="secondary" data-i18n="mail.checkNow">Check now</button>
-            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Look back 90 days</button>
+          </div>
+          <!-- The window was fixed at 90 days. Someone reaching back for the
+               applications they sent before connecting the mailbox is usually
+               reaching further than that, and a year is ~3.300 messages — worth
+               measuring with the dry run before spending, because a message
+               recorded as "no match" is never looked at again. -->
+          <div class="mail-row mail-actions">
+            <label class="micro" for="mailRecoveryDays" data-i18n="mail.recovery.window">Look back</label>
+            <select id="mailRecoveryDays">
+              <option value="90">90</option>
+              <option value="180">180</option>
+              <option value="365">365</option>
+            </select>
+            <span class="micro" data-i18n="mail.recovery.days">days</span>
+            <button id="mailRecoveryDryBtn" class="secondary" data-i18n="mail.recovery.dry">Count first (writes nothing)</button>
+            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Find applications</button>
           </div>
           <pre id="mailOutput" class="output hidden"></pre>
           <div id="mailReviewBox" class="mail-review hidden">

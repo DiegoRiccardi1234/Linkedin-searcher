@@ -179,11 +179,26 @@ def test_teamtailor_actually_sends_from_teamtailor_mail_com() -> None:
 
 
 class FakeIMAP4:
-    """Stands in for imaplib.IMAP4_SSL and records every command received."""
+    """Stands in for imaplib.IMAP4_SSL and records every command received.
 
-    def __init__(self, host: str, port: int, ssl_context: object = None, timeout: float = 0) -> None:
+    ``uid_in_prefix`` picks which of the two real reply shapes to speak. Outlook
+    sends the UID in the element AFTER the payload; other servers put it in the
+    prefix. This fake used to invent a third shape that no server sends, which is
+    how a batched reader shipped green tests and returned zero headers from a
+    real mailbox.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        ssl_context: object = None,
+        timeout: float = 0,
+        uid_in_prefix: bool = False,
+    ) -> None:
         self.calls: list[tuple] = []
         self.messages: dict[int, bytes] = {}
+        self.uid_in_prefix = uid_in_prefix
 
     def login(self, user: str, password: str) -> tuple[str, list]:
         self.calls.append(("login", user))
@@ -204,8 +219,25 @@ class FakeIMAP4:
         self.calls.append(("uid", command, *args))
         if command == "search":
             return ("OK", [b" ".join(str(u).encode() for u in self.messages)])
-        uid = int(str(args[0]))
-        return ("OK", [(b"1 (UID)", self.messages[uid])])
+        # Transcribed from what outlook.office365.com actually sends back:
+        #   (b'7913 (BODY[HEADER.FIELDS (...)] {334}', b'Date: ...')
+        #   b' UID 69662)'
+        # one pair per message. The UID arrives AFTER the payload, which is the
+        # detail that matters and the one a hand-written fake gets wrong.
+        out: list[object] = []
+        for seq, raw in enumerate(str(args[0]).split(","), start=1):
+            uid = int(raw)
+            if uid not in self.messages:
+                continue
+            body = self.messages[uid]
+            fields = "BODY[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID LIST-ID REPLY-TO)]"
+            if self.uid_in_prefix:
+                out.append((f"{seq} (UID {uid} {fields} {{{len(body)}}}".encode(), body))
+                out.append(b")")
+            else:
+                out.append((f"{seq} ({fields} {{{len(body)}}}".encode(), body))
+                out.append(f" UID {uid})".encode())
+        return ("OK", out)
 
     def logout(self) -> tuple[str, list]:
         self.calls.append(("logout",))
@@ -247,6 +279,60 @@ def test_the_mailbox_is_opened_read_only_and_bodies_are_never_fetched() -> None:
     assert ("logout",) in fake.calls
     assert headers[0].subject.startswith("La tua candidatura")
     assert headers[0].key == "imap:42:7"
+
+
+def test_headers_are_fetched_in_batches_not_one_round_trip_each() -> None:
+    """A 365-day sweep is around 3.300 messages, and imaplib is one command each.
+
+    One FETCH per message turned "look back a year" into an afternoon. The UID is
+    read back out of each response line rather than zipped with the request:
+    servers may answer in any order, and pairing by position would silently file
+    every header under the wrong message.
+    """
+    from app.mail.config import MailAccount
+    from app.mail.imap_client import _FETCH_BATCH, ImapMailbox
+
+    fake = FakeIMAP4("h", 993)
+    uids = list(range(1, 121))
+    for uid in uids:
+        fake.messages[uid] = _RAW
+    account = MailAccount(address="me@libero.it", host="imapmail.libero.it", secret="pw")
+
+    with ImapMailbox(account, imap_factory=lambda *a, **k: fake) as box:
+        box.select_readonly("INBOX")
+        headers = list(box.fetch_headers(uids))
+
+    fetches = [c for c in fake.calls if c[0] == "uid" and c[1] == "fetch"]
+    assert len(fetches) == 3, f"120 messages in batches of {_FETCH_BATCH} is three commands"
+    assert len(headers) == 120, "every message still comes back"
+    assert [h.key for h in headers] == [f"imap:42:{uid}" for uid in uids]
+    for call in fetches:
+        sent = " ".join(str(a) for a in call[2:])
+        assert "BODY.PEEK[HEADER.FIELDS" in sent
+        assert "BODY[" not in sent.replace("BODY.PEEK[", ""), "still headers only"
+
+
+def test_the_uid_is_read_wherever_the_server_puts_it() -> None:
+    """Outlook sends it after the payload, other servers in the prefix.
+
+    Both shapes are real. Getting this wrong is silent: the reader returns
+    nothing at all, and every test written against a fake that speaks the
+    parser's own dialect stays green while a real mailbox yields zero headers.
+    """
+    from app.mail.config import MailAccount
+    from app.mail.imap_client import ImapMailbox
+
+    account = MailAccount(address="me@libero.it", host="imapmail.libero.it", secret="pw")
+    for uid_in_prefix in (False, True):
+        fake = FakeIMAP4("h", 993, uid_in_prefix=uid_in_prefix)
+        fake.messages[11] = _RAW
+        fake.messages[12] = _RAW
+        with ImapMailbox(account, imap_factory=lambda *a, **k: fake) as box:
+            box.select_readonly("INBOX")
+            headers = list(box.fetch_headers([11, 12]))
+        assert [h.key for h in headers] == ["imap:42:11", "imap:42:12"], (
+            f"uid_in_prefix={uid_in_prefix}"
+        )
 
 
 def test_microsoft_over_imap_authenticates_with_a_token_never_a_password() -> None:
@@ -401,6 +487,74 @@ def test_a_confirmation_marks_the_offer_applied_end_to_end(
     assert client.post(f"/api/mail/undo/{job_id}").status_code == 200
     listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
     assert listed[job_id]["status"] == "open"
+
+
+def test_the_historic_dry_run_counts_without_consuming_the_mailbox(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Measuring a year's worth of mailbox must not spend it.
+
+    A message the sweep files as ``no_match`` is recorded, and recorded means
+    never looked at again — so a "how many is this" run that wrote those rows
+    would burn the very messages a later, better rule would want to re-read.
+    """
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        db.upsert_job(
+            {
+                "titolo": "AI Consultant",
+                "azienda": "Reply",
+                "link": "https://www.linkedin.com/jobs/view/9",
+                "descrizione": "Consulenza AI.",
+            }
+        )
+    finally:
+        db.close()
+
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject("La tua candidatura è stata inviata a Reply").encode()
+        + b"\r\nDate: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <sent@linkedin.com>\r\n\r\n"
+    )
+    fake.messages[4] = (
+        b"From: Newsletter <news@example.com>\r\n"
+        b"Subject: Job alert: 12 nuove offerte per te\r\n"
+        b"Date: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <alert@example.com>\r\n\r\n"
+    )
+
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+
+    events = list(watcher.run_historic(365, dry_run=True))
+    done = events[-1]
+    assert done["status"] == "complete"
+    assert done["dry_run"] is True
+    assert done["checked"] == 2, "it read the mailbox"
+    assert done["proposals"] == 1, "and it counted what it found"
+
+    seen = client.app.state.container.db.conn.execute(  # type: ignore[attr-defined]
+        "SELECT COUNT(1) FROM mail_seen"
+    ).fetchone()[0]
+    assert seen == 0, "a dry run must not consume a single message"
+    assert client.get("/api/mail/status").json()["recovery_done"] is False
+
+    # And the real sweep afterwards still sees everything the dry run saw.
+    real = list(watcher.run_historic(365))[-1]
+    assert real["checked"] == 2 and real["proposals"] == 1
 
 
 def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:

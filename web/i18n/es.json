@@ -973,10 +973,14 @@
       "error": "No se pudo acceder al buzón"
     },
     "recovery": {
-      "start": "Buscar en los últimos 90 días",
-      "running": "Buscando en los últimos 90 días…",
+      "start": "Buscar candidaturas",
+      "running": "Buscando…",
       "done": "{n} mensajes por confirmar. No se ha cambiado nada.",
-      "truncated": "Solo se leyeron los mensajes más recientes."
+      "truncated": "Solo se leyeron los mensajes más recientes.",
+      "window": "Mirar atrás",
+      "days": "días",
+      "dry": "Contar primero (no escribe nada)",
+      "counted": "En {days} días: {checked} mensajes leídos, {n} habría que confirmar. No se escribió nada."
     },
     "review": {
       "title": "Mensajes por confirmar",

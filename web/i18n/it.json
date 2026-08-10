@@ -973,10 +973,14 @@
       "error": "Casella non raggiungibile"
     },
     "recovery": {
-      "start": "Cerca negli ultimi 90 giorni",
-      "running": "Ricerca negli ultimi 90 giorni…",
+      "start": "Cerca le candidature",
+      "running": "Ricerca in corso…",
       "done": "{n} messaggi da confermare. Non è stato cambiato nulla.",
-      "truncated": "Sono stati letti solo i messaggi più recenti."
+      "truncated": "Sono stati letti solo i messaggi più recenti.",
+      "window": "Guarda indietro",
+      "days": "giorni",
+      "dry": "Conta prima (non scrive nulla)",
+      "counted": "Su {days} giorni: {checked} messaggi letti, {n} sarebbero da confermare. Non è stato scritto niente."
     },
     "review": {
       "title": "Messaggi da confermare",

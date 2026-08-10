@@ -973,10 +973,14 @@
       "error": "Boîte inaccessible"
     },
     "recovery": {
-      "start": "Chercher sur 90 jours",
-      "running": "Recherche sur les 90 derniers jours…",
+      "start": "Chercher les candidatures",
+      "running": "Recherche en cours…",
       "done": "{n} messages à confirmer. Rien n'a été modifié.",
-      "truncated": "Seuls les messages les plus récents ont été lus."
+      "truncated": "Seuls les messages les plus récents ont été lus.",
+      "window": "Remonter",
+      "days": "jours",
+      "dry": "Compter d'abord (n'écrit rien)",
+      "counted": "Sur {days} jours : {checked} messages lus, {n} seraient à confirmer. Rien n'a été écrit."
     },
     "review": {
       "title": "Messages à confirmer",

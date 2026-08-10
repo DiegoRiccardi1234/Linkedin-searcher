@@ -53,8 +53,15 @@ log = get_logger(__name__)
 #: Ceiling per run. A mailbox can hold thousands of messages in a fortnight and
 #: a tick must stay a tick.
 MAX_PER_RUN = 300
-#: Ceiling for the one-off historic sweep, which reaches back 90 days.
-MAX_HISTORIC = 2000
+#: Ceiling for the one-off historic sweep, which reaches back up to a year.
+#:
+#: Was 2000, and the truncation keeps the NEWEST messages — so a year-long sweep
+#: over that ceiling would drop the oldest part in silence, which is the part
+#: someone reaching back a year is reaching for. Measured on a real job-hunting
+#: mailbox: 856 messages over 90 days, 1.068 over 180, 1.550 over 365. Set well
+#: clear of that, because a mailbox busier than this one is ordinary; when it
+#: still bites, ``truncated`` says so out loud rather than reporting "done".
+MAX_HISTORIC = 6000
 #: Reconnect at least this often so an idle grant does not expire unnoticed.
 KEEP_WARM_DAYS = 30
 
@@ -354,13 +361,19 @@ class MailWatcher:
             last_ok = 0.0
         return bool(self._clock() - last_ok > KEEP_WARM_DAYS * 86400)
 
-    def run_historic(self, days: int = 90) -> Iterator[dict[str, Any]]:
+    def run_historic(self, days: int = 90, *, dry_run: bool = False) -> Iterator[dict[str, Any]]:
         """One-off sweep for applications sent before the mailbox was connected.
 
         The evidence is weaker than in the normal run — nothing was opened from
         the app, so there is no click to anchor a message to, only the company
         name and a three-month window. Which is exactly why **nothing here is
         applied**: every hit is a proposal, and a human confirms it.
+
+        ``dry_run`` reports the same counts and writes nothing at all — not even
+        the ``no_match`` rows. It exists because the interesting question before
+        widening the window to a year is "how many messages is that, and how long
+        does it take", and answering it should not consume the messages: a
+        recorded ``no_match`` is never looked at again.
 
         Yields SSE-shaped events, like the scan and the bulk re-score.
         """
@@ -396,11 +409,13 @@ class MailWatcher:
                 result = classify(header, candidates, ttl_days=window)
                 if result.verdict in ("match", "ambiguous"):
                     found += 1
-                    # Deliberately reported as ambiguous whatever the rule said:
-                    # over three months a company name is not proof, and this
-                    # screen is where the user supplies the missing certainty.
-                    self._queue_review(header, _as_proposal(result), candidates)
-                else:
+                    if not dry_run:
+                        # Deliberately reported as ambiguous whatever the rule
+                        # said: over three months a company name is not proof,
+                        # and this screen is where the user supplies the missing
+                        # certainty.
+                        self._queue_review(header, _as_proposal(result), candidates)
+                elif not dry_run:
                     # Only the definite misses are written down. A candidate left
                     # unrecorded is re-found after a restart instead of lost.
                     self._db.record_mail_seen(
@@ -413,11 +428,14 @@ class MailWatcher:
                     )
                 if index % 25 == 0:
                     yield {"status": "progress", "current": index, "total": len(headers)}
-            self._db.set_preference(mail_config.PREF_RECOVERY_DONE, "1")
+            if not dry_run:
+                self._db.set_preference(mail_config.PREF_RECOVERY_DONE, "1")
             yield {
                 "status": "complete",
                 "proposals": found,
                 "checked": len(headers),
+                "days": window,
+                "dry_run": dry_run,
                 # Said out loud rather than hidden: a truncated sweep that
                 # reports "done" reads as "there was nothing else".
                 "truncated": truncated,
@@ -425,7 +443,11 @@ class MailWatcher:
         except MailError as exc:
             yield {"status": "error", "error": safe_error(exc)}
         finally:
-            self._db.set_preference(mail_config.PREF_LAST_RUN, str(int(self._clock())))
+            # Not on a dry run: the stamp exists to stop the scheduler retrying
+            # an unreachable mailbox every tick, and a sweep the user asked for
+            # has no business postponing the next automatic check.
+            if not dry_run:
+                self._db.set_preference(mail_config.PREF_LAST_RUN, str(int(self._clock())))
             self._control.end()
 
     def resolve_review(self, apply_ids: list[int], dismiss_ids: list[int]) -> dict[str, int]:

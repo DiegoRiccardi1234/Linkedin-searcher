@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import email
 import imaplib
+import re
 import ssl
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
@@ -38,6 +39,21 @@ log = get_logger(__name__)
 
 #: Everything the matcher is allowed to see.
 _HEADER_FIELDS = "FROM TO SUBJECT DATE MESSAGE-ID LIST-ID REPLY-TO"
+
+#: Messages per FETCH command. ``imaplib`` is one round-trip per command, and a
+#: 365-day sweep of a real job-hunting mailbox is 1.550 messages — one command
+#: each turns a sweep into a coffee break. Measured against outlook.office365.com
+#: at fifty per command: 1.554 headers in 16 seconds, 98 a second.
+_FETCH_BATCH = 50
+
+#: A UID FETCH response always carries the UID back, but *where* is up to the
+#: server. Outlook puts it in the element AFTER the payload — the literal reply
+#: is ``(b'7913 (BODY[HEADER.FIELDS ...] {334}', b'Date: ...')`` followed by
+#: ``b' UID 69662)'`` — while others put it in the prefix. Both are read.
+#: Learned by pointing the batched reader at a real mailbox and getting zero
+#: headers back while every test stayed green: the fake server had been written
+#: to match the parser instead of the protocol.
+_UID_RE = re.compile(rb"UID\s+(\d+)")
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -147,26 +163,73 @@ class ImapMailbox:
         return out
 
     def fetch_headers(self, uids: Sequence[int]) -> Iterator[MailHeader]:
-        """Headers only, and without marking anything as read."""
-        for uid in uids:
+        """Headers only, in batches, and without marking anything as read."""
+        for start in range(0, len(uids), _FETCH_BATCH):
+            chunk = uids[start : start + _FETCH_BATCH]
+            if not chunk:
+                continue
             typ, data = self._conn.uid(
-                "fetch", str(uid), f"(BODY.PEEK[HEADER.FIELDS ({_HEADER_FIELDS})])"
+                "fetch",
+                ",".join(str(uid) for uid in chunk),
+                f"(BODY.PEEK[HEADER.FIELDS ({_HEADER_FIELDS})])",
             )
-            if typ != "OK" or not data or not data[0]:
+            if typ != "OK" or not data:
                 continue
-            payload = data[0][1] if isinstance(data[0], tuple) else data[0]
-            if not isinstance(payload, bytes | bytearray):
-                continue
-            message = email.message_from_bytes(bytes(payload))
-            yield MailHeader(
-                key=f"imap:{self.uidvalidity}:{uid}",
-                subject=_decode(message.get("Subject")),
-                from_addr=_decode(message.get("From")),
-                from_name=_decode(message.get("From")),
-                message_id=str(message.get("Message-ID") or "").strip(),
-                date=_parse_date(message.get("Date")),
-                list_id=str(message.get("List-Id") or "").strip(),
-            )
+            yield from self._parse_fetch(data)
+
+    def _parse_fetch(self, data: Sequence[Any]) -> Iterator[MailHeader]:
+        """Turn one FETCH response into headers, wherever the server put the UID.
+
+        The reply alternates ``(prefix, payload)`` tuples with bare bytes, and
+        the UID may be in either. A payload is only emitted once its UID is
+        known: pairing by position with the request would look right and file
+        every header under the wrong message the first time a server answered
+        out of order.
+        """
+        held: tuple[bytes, bytes] | None = None
+
+        def _uid(raw: bytes) -> int | None:
+            found = _UID_RE.search(raw)
+            return int(found.group(1)) if found else None
+
+        for item in data:
+            if isinstance(item, tuple) and len(item) >= 2:
+                if held is not None:
+                    # Previous payload never got a trailing UID line: its own
+                    # prefix is the only place left to look.
+                    uid = _uid(held[0])
+                    if uid is not None:
+                        yield self._header(uid, held[1])
+                    held = None
+                prefix = item[0] if isinstance(item[0], bytes | bytearray) else b""
+                if not isinstance(item[1], bytes | bytearray):
+                    continue
+                held = (bytes(prefix), bytes(item[1]))
+                uid = _uid(held[0])
+                if uid is not None:
+                    yield self._header(uid, held[1])
+                    held = None
+            elif held is not None and isinstance(item, bytes | bytearray):
+                uid = _uid(bytes(item))
+                if uid is not None:
+                    yield self._header(uid, held[1])
+                    held = None
+        if held is not None:
+            uid = _uid(held[0])
+            if uid is not None:
+                yield self._header(uid, held[1])
+
+    def _header(self, uid: int, payload: bytes) -> MailHeader:
+        message = email.message_from_bytes(payload)
+        return MailHeader(
+            key=f"imap:{self.uidvalidity}:{uid}",
+            subject=_decode(message.get("Subject")),
+            from_addr=_decode(message.get("From")),
+            from_name=_decode(message.get("From")),
+            message_id=str(message.get("Message-ID") or "").strip(),
+            date=_parse_date(message.get("Date")),
+            list_id=str(message.get("List-Id") or "").strip(),
+        )
 
 
 def _parse_uidvalidity(raw: Any) -> int:

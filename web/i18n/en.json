@@ -973,10 +973,14 @@
       "error": "Could not reach the mailbox"
     },
     "recovery": {
-      "start": "Look back 90 days",
-      "running": "Looking through the last 90 days…",
+      "start": "Find applications",
+      "running": "Searching…",
       "done": "{n} messages to confirm. Nothing has been changed.",
-      "truncated": "Only the most recent messages were read."
+      "truncated": "Only the most recent messages were read.",
+      "window": "Look back",
+      "days": "days",
+      "dry": "Count first (writes nothing)",
+      "counted": "Over {days} days: {checked} messages read, {n} would need confirming. Nothing was written."
     },
     "review": {
       "title": "Messages to confirm",

@@ -973,10 +973,14 @@
       "error": "Postfach nicht erreichbar"
     },
     "recovery": {
-      "start": "90 Tage zurückschauen",
-      "running": "Suche in den letzten 90 Tagen…",
+      "start": "Bewerbungen suchen",
+      "running": "Suche läuft…",
       "done": "{n} Nachrichten zu bestätigen. Nichts wurde geändert.",
-      "truncated": "Es wurden nur die neuesten Nachrichten gelesen."
+      "truncated": "Es wurden nur die neuesten Nachrichten gelesen.",
+      "window": "Zurückblicken",
+      "days": "Tage",
+      "dry": "Erst zählen (schreibt nichts)",
+      "counted": "Über {days} Tage: {checked} Nachrichten gelesen, {n} wären zu bestätigen. Es wurde nichts geschrieben."
     },
     "review": {
       "title": "Nachrichten zum Bestätigen",

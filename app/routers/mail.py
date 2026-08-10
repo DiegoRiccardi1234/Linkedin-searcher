@@ -164,14 +164,25 @@ def build_router(container: AppContainer) -> APIRouter:
         return container.mailwatch.run_once(dry_run=True)
 
     @router.get("/api/mail/recovery/stream")
-    def mail_recovery(request: Request, days: int = Query(default=90, ge=1, le=365)):  # type: ignore[no-untyped-def]
+    def mail_recovery(  # type: ignore[no-untyped-def]
+        request: Request,
+        days: int = Query(default=90, ge=1, le=365),
+        dry_run: bool = Query(default=False),
+    ):
         """Look for applications sent before the mailbox was connected.
 
         Streams progress like a scan, and applies nothing: over three months the
         only link between a message and an offer is the company name, which is a
         reason to ask rather than to decide.
+
+        ``dry_run`` reports the same counts and writes nothing, which is how you
+        find out what a year's worth of mailbox costs before spending it — a
+        message recorded as ``no_match`` is never looked at again.
         """
-        rate_limit.check(request, bucket="mail_recovery", limit=2, window_seconds=600)
+        # Six a run rather than two: a dry run at 90, 180 and 365 days is three
+        # of them before the real sweep, and being rate-limited out of your own
+        # measurement is a poor way to encourage measuring first.
+        rate_limit.check(request, bucket="mail_recovery", limit=6, window_seconds=600)
         account = container.mailwatch.account()
         if not account or not account.configured:
             raise HTTPException(status_code=412, detail="mail_unconfigured")
@@ -182,7 +193,7 @@ def build_router(container: AppContainer) -> APIRouter:
             import json
 
             try:
-                for event in container.mailwatch.run_historic(days):
+                for event in container.mailwatch.run_historic(days, dry_run=dry_run):
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as exc:  # the stream must always close cleanly
                 yield f"data: {json.dumps({'status': 'error', 'error': safe_error(exc)})}\n\n"
