@@ -247,6 +247,10 @@ class MailReviewAttach(BaseModel):
 
 class MailReviewResolveRequest(BaseModel):
     attach: list[MailReviewAttach] = Field(default_factory=list)
+    #: Queued applications to record as offers of their own, by review id. Used
+    #: for the employers the archive has never seen — most of them, as it turns
+    #: out: 84 named in a year of real mail, 27 already known.
+    create: list[int] = Field(default_factory=list)
     dismiss: list[int] = Field(default_factory=list)
 
 

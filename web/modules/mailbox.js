@@ -105,13 +105,30 @@ export async function loadMailReview() {
         </label>`,
         )
         .join("");
+      // An import is an application to an employer the archive does not have.
+      // Any open offers from that employer come along as candidates, because
+      // attaching to the real posting beats a card with no title — but "record
+      // it on its own" stays available and is the default when nothing matches.
+      const createOption =
+        item.kind === "import"
+          ? `
+        <label class="mail-review-option">
+          <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
+                 data-review="${item.review_id}" value="create"${options ? "" : " checked"} />
+          <span data-i18n="mail.review.createEntry">Record it as a new application</span>
+        </label>`
+          : "";
+      const empty =
+        options || createOption
+          ? ""
+          : `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`;
       return `
       <div class="mail-review-row" data-review-row="${item.review_id}">
         <div class="mail-review-head">
           <strong>${escapeHtml(item.company || "?")}</strong>
           <span class="micro">${escapeHtml(when)}${from}</span>
         </div>
-        ${options || `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`}
+        ${options}${createOption}${empty}
       </div>`;
     })
     .join("");
@@ -282,14 +299,17 @@ export function wireMailbox() {
   $("mailRecoveryBtn")?.addEventListener("click", () => _runRecovery(false));
 
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
-    const attach = [...document.querySelectorAll(".mail-review-pick:checked")].map((el) => ({
-      review_id: Number(el.dataset.review),
-      job_id: Number(el.value),
-    }));
-    if (!attach.length) return;
+    const picked = [...document.querySelectorAll(".mail-review-pick:checked")];
+    const attach = picked
+      .filter((el) => el.value !== "create")
+      .map((el) => ({ review_id: Number(el.dataset.review), job_id: Number(el.value) }));
+    const create = picked
+      .filter((el) => el.value === "create")
+      .map((el) => Number(el.dataset.review));
+    if (!attach.length && !create.length) return;
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ attach, dismiss: [] }),
+      body: JSON.stringify({ attach, create, dismiss: [] }),
     });
     showToast(t("toast.mail.applied"), "info");
     await loadMailReview();

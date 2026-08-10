@@ -257,7 +257,9 @@
       "experience": "Wants experience",
       "education": "Higher degree",
       "protected": "Reserved to protected categories",
-      "heuristicLong": "No model read this posting: the score is computed from a hard constraint (location, minimum grade)"
+      "heuristicLong": "No model read this posting: the score is computed from a hard constraint (location, minimum grade)",
+      "mailImport": "From your mailbox",
+      "mailImportLong": "Application rebuilt from a confirmation email: the posting never went through Job Finder, so there is no title or description to judge"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
@@ -983,11 +985,12 @@
       "counted": "Over {days} days: {checked} messages read, {n} would need confirming. Nothing was written."
     },
     "review": {
-      "title": "Messages to confirm",
+      "title": "Applications found in your mailbox",
       "intro": "These look like application confirmations but cannot be assigned on their own. Pick the right offer, or ignore. Nothing changes until you do.",
       "apply": "Mark selected as applied",
       "dismiss": "Ignore all",
-      "noCandidates": "No matching offer left in the archive."
+      "noCandidates": "No matching offer left in the archive.",
+      "createEntry": "Record it as a new application"
     },
     "whereIdFrom": "Where do I get an app id?",
     "idSource": {

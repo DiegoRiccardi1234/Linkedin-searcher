@@ -48,6 +48,7 @@ from app.mail.matcher import (
     PendingJob,
     _subject_company,
     classify,
+    extract_application,
     is_known_sender,
     sender_domain,
 )
@@ -378,6 +379,41 @@ class MailWatcher:
             candidates=candidates,
         )
 
+    def _queue_import(self, account: MailAccount, header: MailHeader, evidence: Any) -> None:
+        """Queue "you applied to X on that day, and X is not in the archive".
+
+        Still a proposal, never an automatic write. The evidence is a company
+        name and a date, which is enough to record that it happened and not
+        enough to decide what it was — so the user sees it before anything is
+        created. Where the company IS in the archive with open offers, those come
+        along as candidates: attaching to the real posting beats a stub, and the
+        stub can never be improved into one (its description stays empty, so a
+        score would be computed on a text it does not contain).
+        """
+        day = evidence.sent_at.date().isoformat()
+        if self._db.applications_near(evidence.company, day):
+            # Already recorded, by hand or by an earlier sweep. Nothing to ask.
+            self._db.record_mail_seen(
+                account=account.address,
+                mail_key=header.key,
+                verdict="already_applied",
+                message_id=header.message_id,
+                received_at=header.date.isoformat() if header.date else "",
+                matched_rule=evidence.rule,
+            )
+            return
+        self._db.add_mail_review(
+            account=account.address,
+            mail_key=header.key,
+            kind="import",
+            message_id=header.message_id,
+            received_at=header.date.isoformat() if header.date else "",
+            company=evidence.company,
+            sender=_safe_sender(header),
+            rule=evidence.rule,
+            candidates=self._db.open_offers_from(evidence.company),
+        )
+
     def _keep_warm_due(self) -> bool:
         try:
             last_ok = float(str(self._db.get_preference(mail_config.PREF_LAST_OK, "0") or 0))
@@ -429,7 +465,12 @@ class MailWatcher:
             headers = self._headers_since(account, since, MAX_HISTORIC)
             truncated = len(headers) >= MAX_HISTORIC
             found = 0
+            imports = 0
             for index, header in enumerate(headers, start=1):
+                # Three questions in this order. Attach before import matters:
+                # a message about a company the archive already knows must offer
+                # to attach, not create a second entry beside the offer it is
+                # about.
                 result = classify(header, candidates, ttl_days=window)
                 if result.verdict in ("match", "ambiguous"):
                     found += 1
@@ -439,6 +480,10 @@ class MailWatcher:
                         # and this screen is where the user supplies the missing
                         # certainty.
                         self._queue_review(account, header, _as_proposal(result), candidates)
+                elif (evidence := extract_application(header)) is not None:
+                    imports += 1
+                    if not dry_run:
+                        self._queue_import(account, header, evidence)
                 elif not dry_run:
                     # Only the definite misses are written down. A candidate left
                     # unrecorded is re-found after a restart instead of lost.
@@ -457,6 +502,7 @@ class MailWatcher:
             yield {
                 "status": "complete",
                 "proposals": found,
+                "imports": imports,
                 "checked": len(headers),
                 "days": window,
                 "dry_run": dry_run,
@@ -479,7 +525,9 @@ class MailWatcher:
         account = self.account()
         return self._db.list_mail_review(account.address if account else None)
 
-    def resolve_review(self, attach: list[Any], dismiss: list[int]) -> dict[str, Any]:
+    def resolve_review(
+        self, attach: list[Any], dismiss: list[int], create: list[int] | None = None
+    ) -> dict[str, Any]:
         """Apply or drop what the user decided about the queued messages.
 
         ``attach`` is indexed by ``review_id`` rather than by ``job_id``, and the
@@ -502,8 +550,32 @@ class MailWatcher:
             ):
                 applied += 1
                 self._db.close_mail_review([review_id], "applied")
+
+        created: list[int] = []
+        for review_id in create or []:
+            row = by_id.get(review_id)
+            if not row or row["kind"] != "import":
+                refused.append(review_id)
+                continue
+            new_id = self._db.add_application_from_mail(
+                company=str(row.get("company") or ""),
+                applied_at=str(row.get("received_at") or ""),
+                message_id=str(row.get("message_id") or ""),
+                rule="import",
+            )
+            if new_id is not None:
+                created.append(new_id)
+            # Closed either way: an id already there means the application is
+            # recorded, which is the outcome the user asked for.
+            self._db.close_mail_review([review_id], "imported")
+
         dismissed = self._db.close_mail_review([i for i in dismiss if i in by_id], "dismissed")
-        return {"applied": applied, "dismissed": dismissed, "refused": refused}
+        return {
+            "applied": applied,
+            "created": created,
+            "dismissed": dismissed,
+            "refused": refused,
+        }
 
 
 def _as_proposal(result: Any) -> Any:

@@ -95,7 +95,13 @@ def select_job_ids(db: Database, scope: str, ids: list[int] | None = None) -> li
     """
     if ids:
         return list(dict.fromkeys(ids))
-    jobs = db.list_jobs(limit=2000)
+    # An offer with no description cannot be judged, and asking anyway is how a
+    # score gets invented. This became load-bearing with the mail import: those
+    # rows carry an employer and a date and nothing to read, and they are all
+    # unscored by construction — so "re-score the unscored" would have sent sixty
+    # empty descriptions to the model in one click. Measured on the real archive
+    # before adding the guard: it excludes none of the offers that were there.
+    jobs = [j for j in db.list_jobs(limit=2000) if (j.get("descrizione") or "").strip()]
     if scope == "unscored":
         return [j["id"] for j in jobs if j.get("punteggio_ai") is None]
     if scope == "applicable":

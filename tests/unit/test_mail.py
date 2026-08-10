@@ -731,6 +731,215 @@ def test_no_part_of_a_message_reaches_the_database(client: TestClient, tmp_path:
     assert not columns & {"subject", "from_addr", "body", "recipient"}
 
 
+# ── applications the archive never knew about ────────────────────────────────
+
+
+def test_extract_application_answers_a_different_question_than_classify() -> None:
+    """"Which offer is this about" and "did I apply, and to whom" are not the same.
+
+    ``classify`` must keep answering ``no_match`` when the subject names a
+    company the archive has never seen — that correction stopped 39 real
+    messages from marking the wrong offer. ``extract_application`` is what makes
+    those 39 useful instead of merely harmless.
+    """
+    from app.mail.matcher import extract_application
+
+    header = _header("La tua candidatura è stata inviata a Kirey", "jobs-noreply@linkedin.com")
+    assert classify(header, [_pending(company="Reply")]).rule == "named_company_absent"
+
+    evidence = extract_application(header)
+    assert evidence is not None
+    assert evidence.company == "Kirey"
+
+
+def test_extract_application_still_needs_two_independent_facts() -> None:
+    """Without a pending list to check against, the ATS sender is what is left.
+
+    Drop it and any message quoting the word "candidatura" could invent an
+    employer and write it into the record of what you applied for.
+    """
+    from app.mail.matcher import extract_application
+
+    assert extract_application(_header("Job alert per te", "jobs-noreply@linkedin.com")) is None
+    assert (
+        extract_application(
+            _header("La tua candidatura è stata inviata a Kirey", "amico@gmail.com")
+        )
+        is None
+    ), "a confirmation-shaped subject from anywhere is not evidence"
+    assert (
+        extract_application(_header("Grazie per la tua candidatura", "no-reply@myworkday.com"))
+        is None
+    ), "no employer named, nothing to record"
+    assert (
+        extract_application(
+            _header("Purtroppo non sei stato selezionato", "jobs-noreply@linkedin.com")
+        )
+        is None
+    ), "a rejection is not a record of sending"
+
+
+def test_two_applications_to_one_company_are_two_rows(tmp_path: Path) -> None:
+    """The reason this does not go through ``upsert_job``.
+
+    ``job_hash`` is sha256(title|company|link) and UNIQUE, so with an empty title
+    and an empty link the second application to the same employer would collide
+    with the first and silently overwrite it.
+    """
+    from app.db import Database
+
+    db = Database(tmp_path / "imp.db")
+    try:
+        first = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        second = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-07-15T10:00:00+00:00", message_id="<b>", rule="import"
+        )
+        assert first is not None and second is not None and first != second
+
+        # Same day twice is one application announced twice: LinkedIn says sent,
+        # the employer's ATS says received. Measured over a year of real mail, no
+        # (company, day) pair carries more than one genuine application.
+        again = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T18:30:00+00:00", message_id="<c>", rule="import"
+        )
+        assert again is None
+
+        rows = db.conn.execute(
+            "SELECT titolo, azienda, fonte, status, applied_at, applied_profile_id, punteggio_ai, "
+            "descrizione, link FROM jobs ORDER BY id"
+        ).fetchall()
+        assert len(rows) == 2
+        for row in rows:
+            assert row["titolo"] == "", "the mail names the employer, never the role"
+            assert row["azienda"] == "Kirey"
+            assert row["fonte"] == "mail"
+            assert row["status"] == "applied"
+            assert row["punteggio_ai"] is None, "never a score nobody gave"
+            assert row["applied_profile_id"] is None, "which CV, three months ago, is not knowable"
+            assert row["descrizione"] == "" and row["link"] == ""
+        assert rows[0]["applied_at"].startswith("2026-06-01"), "the date of the mail, not today"
+    finally:
+        db.close()
+
+
+def test_an_imported_application_is_never_sent_to_the_model(tmp_path: Path) -> None:
+    """The guard that keeps the import from turning into a quota bill.
+
+    "Re-score the unscored" would otherwise pick up every imported row — they are
+    unscored by construction — and post sixty empty descriptions to the provider.
+    """
+    from app.db import Database
+    from app.services.rescore_service import select_job_ids
+
+    db = Database(tmp_path / "g.db")
+    try:
+        real, _n, _s = db.upsert_job(
+            {
+                "titolo": "Analista funzionale",
+                "azienda": "BTO",
+                "link": "https://example.com/1",
+                "descrizione": "Analisi dei requisiti e data governance.",
+            }
+        )
+        imported = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        for scope in ("unscored", "applicable", "all"):
+            picked = select_job_ids(db, scope, None)
+            assert imported not in picked, f"{scope} would have scored an empty description"
+        assert real in select_job_ids(db, "unscored", None), "and real offers still qualify"
+    finally:
+        db.close()
+
+
+def test_importing_from_the_queue_creates_the_application(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """End to end: mailbox read, proposal queued, user says yes, archive changes."""
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    _sweep(client, "La tua candidatura è stata inviata a Kirey")
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert [i["kind"] for i in items] == ["import"]
+    assert items[0]["company"] == "Kirey"
+    assert items[0]["candidates"] == [], "no Kirey offer in the archive to attach to"
+
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [], "create": [items[0]["review_id"]], "dismiss": []},
+    ).json()
+    assert len(out["created"]) == 1
+
+    jobs = {j["azienda"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert jobs["Kirey"]["status"] == "applied"
+    assert jobs["Kirey"]["punteggio_ai"] is None
+    assert jobs["Kirey"]["fonte"] == "mail"
+    assert client.get("/api/mail/review").json()["items"] == [], "and the question is closed"
+
+
+def test_an_application_already_in_the_archive_is_not_imported_twice(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Third dedup level: it may already be recorded, by hand or by an earlier sweep."""
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        job_id, _n, _s = db.upsert_job(
+            {
+                "titolo": "Consulente applicativo",
+                "azienda": "Kirey",
+                "link": "https://example.com/k",
+                "descrizione": "Integrazione applicativa.",
+            }
+        )
+        db.set_job_action(job_id=job_id, action="applied", notes="manual")
+    finally:
+        db.close()
+
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Kirey")
+
+    assert client.get("/api/mail/review").json()["items"] == [], "nothing to ask: already recorded"
+    assert len(client.get("/api/jobs").json()["jobs"]) == 1, "and no second row was created"
+
+
+def test_the_charts_do_not_count_imports_as_a_scoring_failure(tmp_path: Path) -> None:
+    """Sixty rows nobody could score would read as sixty the scorer missed."""
+    from app.db import Database
+
+    db = Database(tmp_path / "a.db")
+    try:
+        job_id, _n, _s = db.upsert_job(
+            {
+                "titolo": "Analista",
+                "azienda": "BTO",
+                "link": "https://example.com/1",
+                "descrizione": "Analisi.",
+            }
+        )
+        db.update_job_analysis(job_id=job_id, analysis={"punteggio": 8, "consiglio": "Candidati"})
+        db.add_application_from_mail(
+            company="Kirey", applied_at="2026-06-01T10:00:00+00:00", message_id="<a>", rule="import"
+        )
+        stats = db.get_analytics()
+        assert stats["unscored"] == 0, "an application with no posting is not an unscored posting"
+        assert stats["from_mail"] == 1, "but it is counted, and said out loud"
+        assert stats["total"] == 2, "it is still in the archive"
+        assert stats["jobs_by_status"]["applied"] == 1, "and still an application"
+    finally:
+        db.close()
+
+
 def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:
     """Without this, the extra_tasks wiring can vanish and every other test here
     stays green — the exact shape of the audit bug this project already had."""

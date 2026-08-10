@@ -104,6 +104,11 @@ def build_router(container: AppContainer) -> APIRouter:
         job = container.db.get_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if not str(job.get("descrizione") or "").strip():
+            # Nothing to read, so nothing to judge. An application imported from
+            # a confirmation email is exactly this: an employer and a date. The
+            # model would answer anyway, and the answer would be about nothing.
+            raise HTTPException(status_code=422, detail="no_description")
 
         ctx = build_context(container.db, privacy=container.feature_enabled("privacy_mode", True))
         analysis = rescore_job(container.providers, job, ctx)

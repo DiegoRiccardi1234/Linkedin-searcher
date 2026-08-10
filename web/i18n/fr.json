@@ -257,7 +257,9 @@
       "experience": "Demande de l'expérience",
       "education": "Diplôme supérieur",
       "protected": "Réservée aux catégories protégées",
-      "heuristicLong": "Aucun modèle n'a lu cette annonce : la note est calculée à partir d'une contrainte ferme (lieu, note minimale)"
+      "heuristicLong": "Aucun modèle n'a lu cette annonce : la note est calculée à partir d'une contrainte ferme (lieu, note minimale)",
+      "mailImport": "Depuis la boîte mail",
+      "mailImportLong": "Candidature reconstituée à partir d'un courriel de confirmation : l'annonce n'est jamais passée par Job Finder, il n'y a donc ni titre ni description à évaluer"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
@@ -983,11 +985,12 @@
       "counted": "Sur {days} jours : {checked} messages lus, {n} seraient à confirmer. Rien n'a été écrit."
     },
     "review": {
-      "title": "Messages à confirmer",
+      "title": "Candidatures trouvées dans la boîte mail",
       "intro": "Ces messages ressemblent à des confirmations de candidature mais ne peuvent pas s'attribuer seuls. Choisissez la bonne offre, ou ignorez. Rien ne change tant que vous n'avez pas choisi.",
       "apply": "Marquer la sélection comme envoyée",
       "dismiss": "Tout ignorer",
-      "noCandidates": "Aucune offre correspondante ne subsiste dans l'archive."
+      "noCandidates": "Aucune offre correspondante ne subsiste dans l'archive.",
+      "createEntry": "L'enregistrer comme candidature à part"
     },
     "whereIdFrom": "Où trouver un id d'application ?",
     "idSource": {

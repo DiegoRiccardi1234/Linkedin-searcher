@@ -621,6 +621,95 @@ class Database:
         return len(rows)
 
     @_synchronized
+    def add_application_from_mail(
+        self, *, company: str, applied_at: str, message_id: str, rule: str
+    ) -> int | None:
+        """Record an application to a company the archive has never seen.
+
+        Deliberately NOT ``upsert_job``. Two reasons, both verified:
+
+        * ``add_manual_job`` calls the model on every insert, and these rows have
+          no description to read — sixty of them would spend quota producing
+          nothing;
+        * ``job_hash`` is ``sha256(titolo|azienda|link)`` and UNIQUE, so two
+          applications to the same company with an empty title and an empty link
+          collide, and the second silently overwrites the first.
+
+        So the hash is built from what actually identifies this thing: the mail
+        source, the canonical company, and the DAY. The day is the right grain —
+        measured over a year of a real mailbox, no (company, day) pair carries
+        more than one confirmation, so keying on it collapses the "LinkedIn says
+        sent / the ATS says received" pair for one application without merging
+        two genuine ones.
+
+        Returns the new job id, or ``None`` when the row already existed.
+
+        What is deliberately left empty: the TITLE, because a LinkedIn
+        confirmation names the employer and never the role, and inventing one is
+        the same sin as inventing a score; ``applied_profile_id``, because which
+        CV was used three months ago is not knowable and today's active profile
+        is a guess wearing a fact's clothes; and every scoring column, which is
+        the shape the archive already uses for "collected, not judged".
+        """
+        canonical = canonical_company(company) or company.strip().lower()
+        day = (applied_at or "")[:10]
+        job_hash = hashlib.sha256(f"mail|{canonical}|{day}".encode()).hexdigest()
+        if self.conn.execute("SELECT 1 FROM jobs WHERE job_hash = ?", (job_hash,)).fetchone():
+            return None
+        stamp = now_iso()
+        cur = self.conn.execute(
+            # punteggio_ai is written as an explicit NULL: the column carries
+            # DEFAULT 0, so leaving it out would store a zero — a score nobody
+            # gave, on a row nobody could score, in the one app that refuses
+            # fallback scores everywhere else.
+            "INSERT INTO jobs (job_hash, titolo, azienda, descrizione, sede, fonte, link, "
+            "ricerca_usata, modalita, dedup_key, status, applied_at, apply_confirmed_by, "
+            "apply_confirm_message_id, first_seen_at, last_seen_at, updated_at, is_new, "
+            "punteggio_ai) "
+            "VALUES (?, '', ?, '', '', 'mail', '', 'mail_import', '', ?, 'applied', ?, "
+            "'email', ?, ?, ?, ?, 0, NULL)",
+            (job_hash, company.strip(), job_hash, applied_at, message_id, stamp, stamp, stamp),
+        )
+        job_id = int(cur.lastrowid or 0)
+        self.conn.execute(
+            "INSERT INTO job_actions (job_id, action, notes, created_at) VALUES (?, ?, ?, ?)",
+            (job_id, "applied", f"auto:mail:{rule}", stamp),
+        )
+        self.conn.commit()
+        return job_id
+
+    def applications_near(self, company: str, day: str, window_days: int = 7) -> list[int]:
+        """Offers from this company already marked applied around that date.
+
+        The third and last dedup level: the application may well be in the
+        archive already, entered by hand or matched by an earlier sweep, and a
+        second stub for it would be a duplicate nobody asked for.
+        """
+        canonical = canonical_company(company)
+        if not canonical or not day:
+            return []
+        rows = self.conn.execute(
+            "SELECT id, azienda FROM jobs WHERE applied_at IS NOT NULL AND applied_at <> '' "
+            "AND date(applied_at) BETWEEN date(?, ?) AND date(?, ?)",
+            (day, f"-{window_days} days", day, f"+{window_days} days"),
+        ).fetchall()
+        from app.services.scan.companies import company_matches
+
+        return [int(r["id"]) for r in rows if company_matches(str(r["azienda"] or ""), company)]
+
+    def open_offers_from(self, company: str) -> list[int]:
+        """Open, unapplied offers from this company — the ones worth asking about."""
+        if not canonical_company(company):
+            return []
+        rows = self.conn.execute(
+            "SELECT id, azienda FROM jobs WHERE status = 'open' "
+            "AND (applied_at IS NULL OR applied_at = '')"
+        ).fetchall()
+        from app.services.scan.companies import company_matches
+
+        return [int(r["id"]) for r in rows if company_matches(str(r["azienda"] or ""), company)]
+
+    @_synchronized
     def confirm_application_from_mail(self, job_id: int, message_id: str, rule: str) -> bool:
         """Mark an offer as applied because a confirmation message said so.
 
@@ -1490,13 +1579,26 @@ class Database:
         self.conn.commit()
 
     def get_analytics(self) -> dict[str, Any]:
+        """Charts of what the scan found — which is not the same as the archive.
+
+        Applications rebuilt from confirmation emails (``fonte = 'mail'``) are
+        left out of the score charts on purpose. They are real applications and
+        they belong in the archive, but they carry no posting: counting sixty
+        rows that nobody could score into "unscored" would say the scoring is
+        failing, when in fact there was never anything to read. They stay in the
+        funnel counts, because that is precisely what they are evidence of.
+        """
         cursor = self.conn.cursor()
+        scored_pool = "fonte IS NULL OR fonte <> 'mail'"
         total = cursor.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] or 0
         applied = (
             cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'applied'").fetchone()[0] or 0
         )
         rejected = (
             cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = 'rejected'").fetchone()[0] or 0
+        )
+        from_mail = (
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE fonte = 'mail'").fetchone()[0] or 0
         )
 
         jobs_by_status: dict[str, int] = {
@@ -1516,7 +1618,8 @@ class Database:
 
         score_distribution: dict[str, int] = {str(i): 0 for i in range(11)}
         for row in cursor.execute(
-            "SELECT punteggio_ai, COUNT(*) AS count FROM jobs GROUP BY punteggio_ai"
+            f"SELECT punteggio_ai, COUNT(*) AS count FROM jobs WHERE {scored_pool} "
+            "GROUP BY punteggio_ai"
         ).fetchall():
             try:
                 score = int(row[0])
@@ -1530,7 +1633,9 @@ class Database:
         # and the loop above drops them silently — which would make them vanish
         # from a chart whose bars are supposed to add up to the archive.
         unscored = (
-            cursor.execute("SELECT COUNT(*) FROM jobs WHERE punteggio_ai IS NULL").fetchone()[0]
+            cursor.execute(
+                f"SELECT COUNT(*) FROM jobs WHERE punteggio_ai IS NULL AND ({scored_pool})"
+            ).fetchone()[0]
             or 0
         )
 
@@ -1548,6 +1653,7 @@ class Database:
             "jobs_by_status": jobs_by_status,
             "score_distribution": score_distribution,
             "unscored": int(unscored),
+            "from_mail": int(from_mail),
             "top_companies": top_companies,
         }
 

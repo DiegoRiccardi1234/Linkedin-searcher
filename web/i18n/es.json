@@ -257,7 +257,9 @@
       "experience": "Pide experiencia",
       "education": "Título superior",
       "protected": "Reservada a categorías protegidas",
-      "heuristicLong": "Ningún modelo leyó este anuncio: la puntuación se calcula a partir de una restricción dura (ubicación, nota mínima)"
+      "heuristicLong": "Ningún modelo leyó este anuncio: la puntuación se calcula a partir de una restricción dura (ubicación, nota mínima)",
+      "mailImport": "Del correo",
+      "mailImportLong": "Candidatura reconstruida a partir de un correo de confirmación: el anuncio nunca pasó por Job Finder, así que no hay título ni descripción que evaluar"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
@@ -983,11 +985,12 @@
       "counted": "En {days} días: {checked} mensajes leídos, {n} habría que confirmar. No se escribió nada."
     },
     "review": {
-      "title": "Mensajes por confirmar",
+      "title": "Candidaturas encontradas en el correo",
       "intro": "Parecen confirmaciones de candidatura pero no pueden asignarse solas. Elige la oferta correcta o ignóralas. Hasta entonces no cambia nada.",
       "apply": "Marcar seleccionados como enviados",
       "dismiss": "Ignorar todos",
-      "noCandidates": "No queda ninguna oferta correspondiente en el archivo."
+      "noCandidates": "No queda ninguna oferta correspondiente en el archivo.",
+      "createEntry": "Registrarla como candidatura propia"
     },
     "whereIdFrom": "¿De dónde saco un id de aplicación?",
     "idSource": {

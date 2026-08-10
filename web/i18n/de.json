@@ -257,7 +257,9 @@
       "experience": "Verlangt Erfahrung",
       "education": "Höherer Abschluss",
       "protected": "Geschützten Kategorien vorbehalten",
-      "heuristicLong": "Kein Modell hat diese Anzeige gelesen: Die Bewertung folgt aus einer harten Vorgabe (Standort, Mindestnote)"
+      "heuristicLong": "Kein Modell hat diese Anzeige gelesen: Die Bewertung folgt aus einer harten Vorgabe (Standort, Mindestnote)",
+      "mailImport": "Aus dem Postfach",
+      "mailImportLong": "Aus einer Bestätigungsmail rekonstruierte Bewerbung: Die Anzeige lief nie über Job Finder, es gibt also weder Titel noch Beschreibung zu bewerten"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
@@ -983,11 +985,12 @@
       "counted": "Über {days} Tage: {checked} Nachrichten gelesen, {n} wären zu bestätigen. Es wurde nichts geschrieben."
     },
     "review": {
-      "title": "Nachrichten zum Bestätigen",
+      "title": "Im Postfach gefundene Bewerbungen",
       "intro": "Das sehen nach Bewerbungsbestätigungen aus, lassen sich aber nicht von allein zuordnen. Wähle das richtige Angebot oder ignoriere es. Bis dahin ändert sich nichts.",
       "apply": "Ausgewählte als beworben markieren",
       "dismiss": "Alle ignorieren",
-      "noCandidates": "Kein passendes Angebot mehr im Archiv."
+      "noCandidates": "Kein passendes Angebot mehr im Archiv.",
+      "createEntry": "Als eigene Bewerbung erfassen"
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {

@@ -229,7 +229,10 @@ def build_router(container: AppContainer) -> APIRouter:
                 }
                 for item in items
             ],
-            "counts": {"attach": sum(1 for i in items if i["kind"] == "attach")},
+            "counts": {
+                "attach": sum(1 for i in items if i["kind"] == "attach"),
+                "import": sum(1 for i in items if i["kind"] == "import"),
+            },
         }
 
     @router.post("/api/mail/review/resolve")
@@ -241,7 +244,7 @@ def build_router(container: AppContainer) -> APIRouter:
         should pick. Nothing persisted used the old shape — the queue lived in
         memory — so there is no compatibility to keep.
         """
-        result = container.mailwatch.resolve_review(payload.attach, payload.dismiss)
+        result = container.mailwatch.resolve_review(payload.attach, payload.dismiss, payload.create)
         return {"ok": True, **result}
 
     @router.post("/api/mail/undo/{job_id}")

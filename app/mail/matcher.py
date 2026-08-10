@@ -332,3 +332,46 @@ def _same_company(stored: str, named: str) -> bool:
     from app.services.scan.companies import company_matches
 
     return company_matches(stored, named)
+
+
+@dataclass(frozen=True)
+class ApplicationEvidence:
+    """A message saying an application was sent, and to whom."""
+
+    company: str
+    sent_at: datetime
+    rule: str
+
+
+def extract_application(header: MailHeader) -> ApplicationEvidence | None:
+    """Does this message record an application, and to which employer?
+
+    A different question from :func:`classify`, and deliberately a separate
+    function. ``classify`` asks "which offer ALREADY IN THE ARCHIVE does this
+    message confirm", and for that, a subject naming a company the archive has
+    never heard of is a ``no_match`` — reading on would settle on an offer the
+    message just ruled out, which is what it used to do on 39 real messages.
+
+    This one does not look at the archive at all. It asks what the message says
+    happened, and the answer is worth having precisely in the case ``classify``
+    rejects: a real mailbox named 84 employers over a year, and only 27 of them
+    were offers the app had ever seen. The other 57 are applications that exist
+    and that Job Finder believed had never happened.
+
+    The sender still has to be a recognised hiring platform. Without a list of
+    pending offers to check against, that is the only thing left holding up the
+    "two independent facts" rule the whole matcher is built on — the subject
+    alone would let any message that quotes the word "candidatura" invent an
+    employer.
+    """
+    subject = str(header.subject or "")
+    if _REJECT_SUBJECT_RE.search(subject):
+        return None
+    if not _CONFIRM_SUBJECT_RE.search(subject):
+        return None
+    if not is_known_sender(header.from_addr, header.list_id):
+        return None
+    named = _subject_company(subject)
+    if not named or header.date is None:
+        return None
+    return ApplicationEvidence(company=named[:80], sent_at=header.date, rule="subject_company")
