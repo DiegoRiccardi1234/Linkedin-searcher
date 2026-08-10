@@ -79,10 +79,11 @@ def build_router(container: AppContainer) -> APIRouter:
     def mail_disconnect() -> dict[str, Any]:
         account = container.mailwatch.account()
         if account:
+            # Takes the examined-messages log AND the pending queue: proposals
+            # about a mailbox that is no longer attached cannot be answered.
             container.db.purge_mail_seen(account.address)
         mail_config.forget_account(container.db, container.settings.data_dir)
         container.db.set_preference(mail_config.PREF_ENABLED, "0")
-        container.mailwatch.review.clear()
         return {"ok": True}
 
     @router.post("/api/mail/oauth/start")
@@ -202,25 +203,45 @@ def build_router(container: AppContainer) -> APIRouter:
 
     @router.get("/api/mail/review")
     def mail_review() -> dict[str, Any]:
+        """The pending queue. Read from the table, so a restart does not empty it.
+
+        No subject and no sender address: an employer name, a date, the rule that
+        fired, and the offers it could be about.
+        """
+        items = container.mailwatch.review_items()
         return {
             "items": [
                 {
-                    "job_id": item.job_id,
-                    "job_title": item.job_title,
-                    "company": item.company,
-                    "subject": item.subject,
-                    "from_domain": item.from_domain,
-                    "received_at": item.received_at,
-                    "rule": item.rule,
-                    "candidates": list(item.candidates),
+                    "review_id": int(item["id"]),
+                    "kind": item["kind"],
+                    "company": item.get("company") or "",
+                    "sender": item.get("sender") or "",
+                    "received_at": item.get("received_at") or "",
+                    "rule": item.get("rule") or "",
+                    "candidates": [
+                        {
+                            "job_id": int(c["id"]),
+                            "titolo": c.get("titolo") or "",
+                            "azienda": c.get("azienda") or "",
+                        }
+                        for c in item["candidates"]
+                    ],
                 }
-                for item in container.mailwatch.review
-            ]
+                for item in items
+            ],
+            "counts": {"attach": sum(1 for i in items if i["kind"] == "attach")},
         }
 
     @router.post("/api/mail/review/resolve")
     def mail_review_resolve(payload: MailReviewResolveRequest) -> dict[str, Any]:
-        result = container.mailwatch.resolve_review(payload.apply, payload.dismiss)
+        """Answer queued proposals.
+
+        Indexed by ``review_id``, not by ``job_id``: a proposal can name several
+        offers, so "which one" is part of the answer and not something the server
+        should pick. Nothing persisted used the old shape — the queue lived in
+        memory — so there is no compatibility to keep.
+        """
+        result = container.mailwatch.resolve_review(payload.attach, payload.dismiss)
         return {"ok": True, **result}
 
     @router.post("/api/mail/undo/{job_id}")

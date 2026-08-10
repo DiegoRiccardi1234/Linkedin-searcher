@@ -984,9 +984,10 @@
     },
     "review": {
       "title": "Messages to confirm",
-      "intro": "These look like confirmations but could not be assigned on their own. Nothing has been changed.",
+      "intro": "These look like application confirmations but cannot be assigned on their own. Pick the right offer, or ignore. Nothing changes until you do.",
       "apply": "Mark selected as applied",
-      "dismiss": "Ignore all"
+      "dismiss": "Ignore all",
+      "noCandidates": "No matching offer left in the archive."
     },
     "whereIdFrom": "Where do I get an app id?",
     "idSource": {

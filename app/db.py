@@ -492,14 +492,133 @@ class Database:
 
     @_synchronized
     def purge_mail_seen(self, account: str | None = None) -> int:
-        """Forget the examined-messages log, for one account or all of them."""
-        cur = (
-            self.conn.execute("DELETE FROM mail_seen WHERE account = ?", (account,))
-            if account
-            else self.conn.execute("DELETE FROM mail_seen")
+        """Forget everything read from a mailbox: the log AND the pending queue.
+
+        Disconnecting has to take both. Leaving the queue behind would keep
+        proposals about a mailbox the user just detached, and they would be
+        unanswerable — there is no longer an account to check them against.
+        """
+        deleted = 0
+        for table in ("mail_seen", "mail_review"):
+            cur = (
+                self.conn.execute(f"DELETE FROM {table} WHERE account = ?", (account,))
+                if account
+                else self.conn.execute(f"DELETE FROM {table}")
+            )
+            deleted += int(cur.rowcount or 0)
+        self.conn.commit()
+        return deleted
+
+    # ── the queue of messages waiting for a human ───────────────────────────
+
+    @_synchronized
+    def add_mail_review(
+        self,
+        *,
+        account: str,
+        mail_key: str,
+        kind: str,
+        message_id: str = "",
+        received_at: str = "",
+        company: str = "",
+        sender: str = "",
+        rule: str = "",
+        candidates: Sequence[int] = (),
+    ) -> None:
+        """Queue a proposal. Idempotent per message, so a re-sweep does not double it."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mail_review"
+            "(account, mail_key, message_id, received_at, kind, company, sender, rule, "
+            "candidates_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                account,
+                mail_key,
+                message_id,
+                received_at,
+                kind,
+                company,
+                sender,
+                rule,
+                json.dumps(list(candidates)),
+                now_iso(),
+            ),
         )
         self.conn.commit()
-        return int(cur.rowcount or 0)
+
+    def list_mail_review(self, account: str | None = None) -> list[dict[str, Any]]:
+        """The pending proposals, with their candidate offers resolved.
+
+        Candidates are looked up now rather than stored denormalised: this user
+        has deleted 159 offers by hand, and a proposal pointing at one of them
+        must lose that option, not show a row that leads nowhere.
+        """
+        sql = "SELECT * FROM mail_review"
+        params: list[Any] = []
+        if account:
+            sql += " WHERE account = ?"
+            params.append(account)
+        sql += " ORDER BY received_at DESC, id DESC"
+        out: list[dict[str, Any]] = []
+        for row in self.conn.execute(sql, params).fetchall():
+            item = dict(row)
+            try:
+                ids = [int(i) for i in json.loads(item.pop("candidates_json") or "[]")]
+            except (TypeError, ValueError):
+                ids = []
+            item["candidates"] = self._resolve_candidates(ids)
+            out.append(item)
+        return out
+
+    def _resolve_candidates(self, ids: Sequence[int]) -> list[dict[str, Any]]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        rows = self.conn.execute(
+            f"SELECT id, titolo, azienda, first_seen_at, status FROM jobs "
+            f"WHERE id IN ({placeholders})",
+            tuple(ids),
+        ).fetchall()
+        found = {int(r["id"]): dict(r) for r in rows}
+        return [found[i] for i in ids if i in found]
+
+    @_synchronized
+    def close_mail_review(self, review_ids: Sequence[int], verdict: str) -> int:
+        """Take proposals off the queue and record that they were answered.
+
+        The row moves from ``mail_review`` to ``mail_seen``: the question is
+        closed, and ``filter_unseen_mail`` will not offer the message again. That
+        is the part that was missing — a dismissed proposal used to come back on
+        the next sweep, because nothing was written down about it either way.
+        """
+        if not review_ids:
+            return 0
+        placeholders = ",".join("?" for _ in review_ids)
+        rows = self.conn.execute(
+            f"SELECT * FROM mail_review WHERE id IN ({placeholders})",
+            tuple(review_ids),
+        ).fetchall()
+        for row in rows:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO mail_seen"
+                "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, "
+                "seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row["account"],
+                    row["mail_key"],
+                    row["message_id"],
+                    row["received_at"],
+                    verdict,
+                    None,
+                    row["rule"],
+                    now_iso(),
+                ),
+            )
+        self.conn.execute(
+            f"DELETE FROM mail_review WHERE id IN ({placeholders})",
+            tuple(review_ids),
+        )
+        self.conn.commit()
+        return len(rows)
 
     @_synchronized
     def confirm_application_from_mail(self, job_id: int, message_id: str, rule: str) -> bool:

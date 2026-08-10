@@ -87,15 +87,33 @@ export async function loadMailReview() {
     return;
   }
   box.classList.toggle("hidden", items.length === 0);
+  // One row per message, and the choice of WHICH offer is a radio inside it.
+  // Before, a proposal that could be about any of 275 offers rendered as a
+  // single checkbox naming whichever one happened to sort first — a question
+  // about Hays presented as a question about somebody else.
   list.innerHTML = items
-    .map(
-      (item) => `
-      <label class="mail-review-row">
-        <input type="checkbox" class="mail-review-pick" value="${item.job_id}" />
-        <span class="mail-review-job">${escapeHtml(item.job_title || "?")} — ${escapeHtml(item.company || "?")}</span>
-        <span class="micro">${escapeHtml(item.subject || "")} · ${escapeHtml(item.from_domain || "")}</span>
-      </label>`,
-    )
+    .map((item) => {
+      const when = (item.received_at || "").slice(0, 10);
+      const from = item.sender ? ` · ${escapeHtml(item.sender)}` : "";
+      const options = (item.candidates || [])
+        .map(
+          (c) => `
+        <label class="mail-review-option">
+          <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
+                 data-review="${item.review_id}" value="${c.job_id}" />
+          <span>${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}</span>
+        </label>`,
+        )
+        .join("");
+      return `
+      <div class="mail-review-row" data-review-row="${item.review_id}">
+        <div class="mail-review-head">
+          <strong>${escapeHtml(item.company || "?")}</strong>
+          <span class="micro">${escapeHtml(when)}${from}</span>
+        </div>
+        ${options || `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`}
+      </div>`;
+    })
     .join("");
   applyTranslations(box);
 }
@@ -264,13 +282,14 @@ export function wireMailbox() {
   $("mailRecoveryBtn")?.addEventListener("click", () => _runRecovery(false));
 
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
-    const picked = [...document.querySelectorAll(".mail-review-pick:checked")].map((el) =>
-      Number(el.value),
-    );
-    if (!picked.length) return;
+    const attach = [...document.querySelectorAll(".mail-review-pick:checked")].map((el) => ({
+      review_id: Number(el.dataset.review),
+      job_id: Number(el.value),
+    }));
+    if (!attach.length) return;
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ apply: picked, dismiss: [] }),
+      body: JSON.stringify({ attach, dismiss: [] }),
     });
     showToast(t("toast.mail.applied"), "info");
     await loadMailReview();
@@ -278,10 +297,14 @@ export function wireMailbox() {
   });
 
   $("mailReviewDismissBtn")?.addEventListener("click", async () => {
-    const all = [...document.querySelectorAll(".mail-review-pick")].map((el) => Number(el.value));
+    // Every queued message, not every candidate: the unit the user is dismissing
+    // is the message, and one message can offer several offers.
+    const all = [...document.querySelectorAll("[data-review-row]")].map((el) =>
+      Number(el.dataset.reviewRow),
+    );
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ apply: [], dismiss: all }),
+      body: JSON.stringify({ attach: [], dismiss: all }),
     });
     await loadMailReview();
   });

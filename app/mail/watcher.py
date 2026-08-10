@@ -42,7 +42,15 @@ from app.mail.errors import (
 )
 from app.mail.graph_client import GraphMailbox
 from app.mail.imap_client import ImapMailbox
-from app.mail.matcher import CLOCK_SLACK, MailHeader, PendingJob, classify
+from app.mail.matcher import (
+    CLOCK_SLACK,
+    MailHeader,
+    PendingJob,
+    _subject_company,
+    classify,
+    is_known_sender,
+    sender_domain,
+)
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -76,8 +84,16 @@ STATE_ERROR = "error"
 class ReviewItem:
     """A message that could be a confirmation but cannot be assigned alone.
 
-    Held in memory, never written down: showing it needs the subject and the
-    sender, and those are exactly what this feature promises not to keep.
+    Used to be held in memory and never written down, on the grounds that showing
+    it needs the subject and the sender. That reasoning had a hole: a 90-day
+    sweep of a real mailbox produced **110 of these**, the app was restarted, and
+    all of them vanished — leaving a card that said "recovery done, 0 to review",
+    which reads as "there was nothing".
+
+    What the queue actually needs to show is not the message but the FACT read
+    out of it: which employer, and when. That is the same class of data as
+    ``jobs.azienda``, so it is written to ``mail_review`` and survives. The
+    subject and the sender's address still never touch the disk.
     """
 
     job_id: int
@@ -111,7 +127,6 @@ class MailWatcher:
         self._graph_factory = graph_factory
         self._access_token = ""
         self._access_expires = 0.0
-        self.review: list[ReviewItem] = []
 
     # ── settings ────────────────────────────────────────────────────────────
 
@@ -167,7 +182,7 @@ class MailWatcher:
             "last_error": str(self._db.get_preference(mail_config.PREF_LAST_ERROR, "") or ""),
             "last_run_ts": str(self._db.get_preference(mail_config.PREF_LAST_RUN, "") or ""),
             "pending_count": len(self._db.list_pending_applications(self.pending_days())),
-            "review_count": len(self.review),
+            "review_count": len(self.review_items()),
             "recovery_done": str(self._db.get_preference(mail_config.PREF_RECOVERY_DONE, "") or "")
             == "1",
             "running": self._control.running,
@@ -311,7 +326,8 @@ class MailWatcher:
                     pending = [job for job in pending if job.job_id != result.job_id]
             elif result.verdict == "ambiguous":
                 ambiguous += 1
-                self._queue_review(header, result, pending)
+                if not dry_run:
+                    self._queue_review(account, header, result, pending)
             if not dry_run:
                 self._db.record_mail_seen(
                     account=account.address,
@@ -332,27 +348,35 @@ class MailWatcher:
             "dry_run": dry_run,
         }
 
-    def _queue_review(self, header: MailHeader, result: Any, pending: list[PendingJob]) -> None:
-        from app.mail.matcher import sender_domain
-
+    def _queue_review(
+        self, account: MailAccount, header: MailHeader, result: Any, pending: list[PendingJob]
+    ) -> None:
+        """Write a proposal to the queue, keeping only facts and never the message."""
         by_id = {job.job_id: job for job in pending}
-        candidates = result.candidates or ()
-        first = by_id.get(candidates[0]) if candidates else None
-        item = ReviewItem(
-            job_id=first.job_id if first else 0,
-            job_title=first.title if first else "",
-            company=first.company if first else "",
-            subject=header.subject[:160],
-            from_domain=sender_domain(header.from_addr),
+        candidates = [c for c in (result.candidates or ()) if c in by_id]
+        # The employer the message names, when it names one. Falls back to the
+        # first candidate's company, which is a fact the archive already holds.
+        #
+        # Truncated, because the extractor takes everything after "inviata a" to
+        # the end of the subject: on a real LinkedIn confirmation that is exactly
+        # the employer, but the column must not become a place where a long tail
+        # of somebody's subject line can end up. The part of the subject BEFORE
+        # the employer — "Diego, la tua candidatura…", which carries the user's
+        # own name — never reaches this at all.
+        company = _subject_company(header.subject)[:80]
+        if not company and candidates:
+            company = by_id[candidates[0]].company
+        self._db.add_mail_review(
+            account=account.address,
+            mail_key=header.key,
+            kind="attach",
+            message_id=header.message_id,
             received_at=header.date.isoformat() if header.date else "",
+            company=company,
+            sender=_safe_sender(header),
             rule=result.rule,
-            candidates=tuple(candidates),
+            candidates=candidates,
         )
-        if not any(
-            existing.subject == item.subject and existing.received_at == item.received_at
-            for existing in self.review
-        ):
-            self.review.append(item)
 
     def _keep_warm_due(self) -> bool:
         try:
@@ -414,7 +438,7 @@ class MailWatcher:
                         # said: over three months a company name is not proof,
                         # and this screen is where the user supplies the missing
                         # certainty.
-                        self._queue_review(header, _as_proposal(result), candidates)
+                        self._queue_review(account, header, _as_proposal(result), candidates)
                 elif not dry_run:
                     # Only the definite misses are written down. A candidate left
                     # unrecorded is re-found after a restart instead of lost.
@@ -450,17 +474,36 @@ class MailWatcher:
                 self._db.set_preference(mail_config.PREF_LAST_RUN, str(int(self._clock())))
             self._control.end()
 
-    def resolve_review(self, apply_ids: list[int], dismiss_ids: list[int]) -> dict[str, int]:
-        """Apply or drop what the user decided about the queued messages."""
-        applied = 0
-        for job_id in apply_ids:
-            if self._db.confirm_application_from_mail(job_id, "", "manual_review"):
+    def review_items(self) -> list[dict[str, Any]]:
+        """The pending queue, read from the table it now lives in."""
+        account = self.account()
+        return self._db.list_mail_review(account.address if account else None)
+
+    def resolve_review(self, attach: list[Any], dismiss: list[int]) -> dict[str, Any]:
+        """Apply or drop what the user decided about the queued messages.
+
+        ``attach`` is indexed by ``review_id`` rather than by ``job_id``, and the
+        offer named has to be one of that row's own candidates. Without that
+        check a mistaken UI could mark any offer in the archive as applied, and
+        the point of this whole feature is that it writes to the record of what
+        you applied for.
+        """
+        by_id = {int(item["id"]): item for item in self.review_items()}
+        applied, refused = 0, []
+        for choice in attach:
+            review_id = int(getattr(choice, "review_id", 0) or 0)
+            job_id = int(getattr(choice, "job_id", 0) or 0)
+            row = by_id.get(review_id)
+            if not row or job_id not in {int(c["id"]) for c in row["candidates"]}:
+                refused.append(review_id)
+                continue
+            if self._db.confirm_application_from_mail(
+                job_id, str(row.get("message_id") or ""), "manual_review"
+            ):
                 applied += 1
-        resolved = set(apply_ids) | set(dismiss_ids)
-        self.review = [
-            item for item in self.review if not (resolved & (set(item.candidates) | {item.job_id}))
-        ]
-        return {"applied": applied, "dismissed": len(dismiss_ids)}
+                self._db.close_mail_review([review_id], "applied")
+        dismissed = self._db.close_mail_review([i for i in dismiss if i in by_id], "dismissed")
+        return {"applied": applied, "dismissed": dismissed, "refused": refused}
 
 
 def _as_proposal(result: Any) -> Any:
@@ -469,6 +512,22 @@ def _as_proposal(result: Any) -> Any:
 
     candidates = result.candidates or ((result.job_id,) if result.job_id else ())
     return MatchResult("ambiguous", None, f"historic:{result.rule}", tuple(candidates))
+
+
+def _safe_sender(header: MailHeader) -> str:
+    """The sending domain, but ONLY when it is a recognised hiring platform.
+
+    The queue is more useful when it can say a confirmation came from
+    linkedin.com rather than from somewhere. It is also a mailbox, so the rule is
+    drawn where it can be checked: the value is written only if
+    ``is_known_sender`` says the domain is one of the twenty-five in
+    ``_KNOWN_SENDER_DOMAINS``. Anything else — an employer's own address, a
+    person — is stored as the empty string, so the column cannot hold somebody's
+    identity even in principle.
+    """
+    if not is_known_sender(header.from_addr, header.list_id):
+        return ""
+    return sender_domain(header.from_addr) or sender_domain(header.list_id)
 
 
 def _now() -> datetime:

@@ -234,8 +234,19 @@ class MailConfigRequest(BaseModel):
     interval_minutes: int | None = Field(default=None, ge=5, le=240)
 
 
+class MailReviewAttach(BaseModel):
+    """One answer: this queued message is about that offer.
+
+    Both halves are required: a proposal can name several offers, and choosing
+    between them is the user's answer, not the server's guess.
+    """
+
+    review_id: int
+    job_id: int
+
+
 class MailReviewResolveRequest(BaseModel):
-    apply: list[int] = Field(default_factory=list)
+    attach: list[MailReviewAttach] = Field(default_factory=list)
     dismiss: list[int] = Field(default_factory=list)
 
 

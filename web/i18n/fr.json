@@ -984,9 +984,10 @@
     },
     "review": {
       "title": "Messages à confirmer",
-      "intro": "Ils ressemblent à des confirmations mais n'ont pas pu être attribués seuls. Rien n'a été modifié.",
+      "intro": "Ces messages ressemblent à des confirmations de candidature mais ne peuvent pas s'attribuer seuls. Choisissez la bonne offre, ou ignorez. Rien ne change tant que vous n'avez pas choisi.",
       "apply": "Marquer la sélection comme envoyée",
-      "dismiss": "Tout ignorer"
+      "dismiss": "Tout ignorer",
+      "noCandidates": "Aucune offre correspondante ne subsiste dans l'archive."
     },
     "whereIdFrom": "Où trouver un id d'application ?",
     "idSource": {

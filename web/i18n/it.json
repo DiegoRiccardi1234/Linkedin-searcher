@@ -984,9 +984,10 @@
     },
     "review": {
       "title": "Messaggi da confermare",
-      "intro": "Sembrano conferme ma non è stato possibile assegnarli da soli. Non è stato cambiato nulla.",
+      "intro": "Sembrano conferme di candidatura ma non si assegnano da sole. Scegli l'offerta giusta, oppure ignora. Finché non scegli, non cambia niente.",
       "apply": "Segna i selezionati come candidatura",
-      "dismiss": "Ignora tutti"
+      "dismiss": "Ignora tutti",
+      "noCandidates": "Nessuna offerta corrispondente rimasta in archivio."
     },
     "whereIdFrom": "Dove si prende un id applicazione?",
     "idSource": {

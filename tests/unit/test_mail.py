@@ -557,6 +557,180 @@ def test_the_historic_dry_run_counts_without_consuming_the_mailbox(
     assert real["checked"] == 2 and real["proposals"] == 1
 
 
+def _seed_two_reply_offers(path: Path) -> None:
+    from app.db import Database
+
+    db = Database(path)
+    try:
+        for n in (1, 2):
+            db.upsert_job(
+                {
+                    "titolo": f"AI Consultant {n}",
+                    "azienda": "Reply",
+                    "link": f"https://www.linkedin.com/jobs/view/{n}",
+                    "descrizione": "Consulenza AI.",
+                }
+            )
+    finally:
+        db.close()
+
+
+def _sweep(client: TestClient, subject: str, uid: int = 3) -> None:
+    fake = FakeIMAP4("h", 993)
+    fake.messages[uid] = (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject(subject).encode() + b"\r\n"
+        b"Date: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <sent@linkedin.com>\r\n\r\n"
+    )
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+
+
+def test_the_review_queue_survives_a_restart(client: TestClient, tmp_path: Path) -> None:
+    """The failure this whole table exists for.
+
+    On 7 August a real 90-day sweep put 110 proposals in a Python list, the app
+    was restarted, and every one was gone — leaving a card that said "recovery
+    done, 0 to review", which reads as "there was nothing".
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert len(items) == 1
+    assert items[0]["company"] == "Reply"
+    assert {c["job_id"] for c in items[0]["candidates"]}, "it names the offers it could be about"
+
+    # The restart: a brand new watcher over the same database.
+    from app.mail.watcher import MailWatcher
+    from app.services.scan_control import ScanControl
+
+    container = client.app.state.container  # type: ignore[attr-defined]
+    reborn = MailWatcher(container.db, container.settings.data_dir, ScanControl())
+    assert len(reborn.review_items()) == 1, "the queue outlives the process"
+    assert reborn.status()["review_count"] == 1
+
+
+def test_answering_a_proposal_closes_it_for_good(client: TestClient, tmp_path: Path) -> None:
+    """A dismissed message used to come back on the next sweep.
+
+    Nothing was written down about it either way, so the sweep re-proposed it
+    forever. Answering now moves the row into ``mail_seen``, which is the record
+    ``filter_unseen_mail`` reads.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    item = client.get("/api/mail/review").json()["items"][0]
+
+    resolved = client.post(
+        "/api/mail/review/resolve", json={"attach": [], "dismiss": [item["review_id"]]}
+    ).json()
+    assert resolved["dismissed"] == 1
+    assert client.get("/api/mail/review").json()["items"] == []
+
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    assert client.get("/api/mail/review").json()["items"] == [], "and it stays answered"
+
+
+def test_a_proposal_can_only_be_attached_to_an_offer_it_named(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The guard that keeps a wrong click from rewriting your history.
+
+    This endpoint writes to the record of what you applied for. A review row
+    that could be about two Reply offers must not be usable to mark a third one.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    from app.db import Database
+
+    db = Database(tmp_path / "data" / "searcher.db")
+    try:
+        other, _n, _s = db.upsert_job(
+            {
+                "titolo": "Frontend Developer",
+                "azienda": "Zucchetti",
+                "link": "https://www.linkedin.com/jobs/view/99",
+                "descrizione": "React.",
+            }
+        )
+    finally:
+        db.close()
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+    item = client.get("/api/mail/review").json()["items"][0]
+
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [{"review_id": item["review_id"], "job_id": other}], "dismiss": []},
+    ).json()
+    assert out["applied"] == 0
+    assert out["refused"] == [item["review_id"]]
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[other]["status"] == "open", "an offer it never named is untouched"
+
+    chosen = item["candidates"][0]["job_id"]
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [{"review_id": item["review_id"], "job_id": chosen}], "dismiss": []},
+    ).json()
+    assert out["applied"] == 1
+    listed = {j["id"]: j for j in client.get("/api/jobs").json()["jobs"]}
+    assert listed[chosen]["status"] == "applied"
+
+
+def test_no_part_of_a_message_reaches_the_database(client: TestClient, tmp_path: Path) -> None:
+    """The promise, checked by searching the whole file rather than trusting it.
+
+    "No subject, no sender address, no body" is the claim this feature is sold
+    on. The sentinel sits where the real risk is: LinkedIn opens every one of
+    these subjects with the user's own first name — "Diego, la tua candidatura è
+    stata inviata a Reply" — so the queue must keep the employer and nothing
+    around it. Then every text column of every table is searched.
+    """
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    sentinel = "ZZSENTINELZZ"
+    _sweep(client, f"{sentinel}, la tua candidatura è stata inviata a Reply")
+
+    assert client.get("/api/mail/review").json()["items"][0]["company"] == "Reply"
+
+    conn = client.app.state.container.db.conn  # type: ignore[attr-defined]
+    tables = [
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    ]
+    for table in tables:
+        columns = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        for column in columns:
+            rows = conn.execute(
+                f'SELECT COUNT(1) FROM "{table}" WHERE CAST("{column}" AS TEXT) LIKE ?',  # noqa: S608
+                (f"%{sentinel}%",),
+            ).fetchone()
+            assert rows[0] == 0, f"the subject leaked into {table}.{column}"
+
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(mail_review)").fetchall()}
+    assert not columns & {"subject", "from_addr", "body", "recipient"}
+
+
 def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:
     """Without this, the extra_tasks wiring can vanish and every other test here
     stays green — the exact shape of the audit bug this project already had."""

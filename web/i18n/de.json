@@ -984,9 +984,10 @@
     },
     "review": {
       "title": "Nachrichten zum Bestätigen",
-      "intro": "Sie sehen wie Bestätigungen aus, konnten aber nicht allein zugeordnet werden. Nichts wurde geändert.",
+      "intro": "Das sehen nach Bewerbungsbestätigungen aus, lassen sich aber nicht von allein zuordnen. Wähle das richtige Angebot oder ignoriere es. Bis dahin ändert sich nichts.",
       "apply": "Ausgewählte als beworben markieren",
-      "dismiss": "Alle ignorieren"
+      "dismiss": "Alle ignorieren",
+      "noCandidates": "Kein passendes Angebot mehr im Archiv."
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {
