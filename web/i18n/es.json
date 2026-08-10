@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Una versión de tu CV adaptada a una oferta concreta.",
       "skillGapDesc": "Habilidades que se repiten en las ofertas pero faltan en tu CV.",
       "privacyMode": "Modo privacidad",
-      "privacyModeDesc": "Elimina nombre, correo, teléfono y dirección del CV antes de enviarlo a la IA. Activado por defecto."
+      "privacyModeDesc": "Elimina nombre, correo, teléfono y dirección del CV antes de enviarlo a la IA. Activado por defecto.",
+      "groupReminders": "Recordatorios",
+      "reminderNotifyDesc": "Una notificación de escritorio cuando vence un recordatorio. Sin ella, los recordatorios solo aparecen en el panel."
     },
     "linkedinPaste": "…o pega el texto de tu perfil (se usa si no se puede obtener de LinkedIn)",
     "linkedinPasteSaved": "Texto del perfil guardado",
@@ -277,7 +279,9 @@
     "rescoreFailed": "La reevaluación ha fallado",
     "rescoreInterrupted": "Reevaluación interrumpida: las ofertas ya hechas se han guardado.",
     "applyPending": "Esperando confirmación",
-    "notApplied": "No me he postulado"
+    "notApplied": "No me he postulado",
+    "csvApplications": "CSV candidaturas",
+    "undoMail": "Deshacer la marca del correo"
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -379,7 +383,9 @@
       "minScore": "Puntuación mín.",
       "runNow": "Ejecutar ahora",
       "autoscanStarted": "Escaneo iniciado",
-      "notify": "Notificación de escritorio para nuevos empleos con alta puntuación"
+      "notify": "Notificación de escritorio para nuevos empleos con alta puntuación",
+      "reminderNotify": "Avisarme cuando venza un recordatorio",
+      "staleDays": "Recordarme una candidatura parada tras (días)"
     },
     "dedup": {
       "title": "Ofertas duplicadas",
@@ -601,7 +607,8 @@
       "saved": "Ajustes del buzón guardados",
       "connected": "Buzón conectado",
       "disconnected": "Buzón desconectado",
-      "applied": "Marcada como enviada"
+      "applied": "Marcada como enviada",
+      "undone": "Marca deshecha."
     }
   },
   "update": {
@@ -654,7 +661,8 @@
     "unpin": "Quitar",
     "pinned": "Fijado al chat",
     "pinFailed": "Fallo al fijar",
-    "noResponse": "Sin respuesta disponible."
+    "noResponse": "Sin respuesta disponible.",
+    "renameSession": "Renombrar este chat"
   },
   "common": {
     "close": "Cerrar",
@@ -914,7 +922,9 @@
     "agreementLabel": "de acuerdo con la IA",
     "casesLabel": "ofertas valoradas",
     "avgGapLabel": "diferencia media",
-    "export": "Exportar casos (JSONL)"
+    "export": "Exportar casos (JSONL)",
+    "clear": "Quitar tu valoración",
+    "cleared": "Valoración eliminada."
   },
   "local": {
     "title": "Usa un modelo en este PC",

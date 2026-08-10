@@ -22,6 +22,13 @@ export function scoreFeedbackHtml(current) {
         <button type="button" id="scoreFbDown" class="ghost-btn small${verdict === "down" ? " is-active" : ""}" aria-pressed="${verdict === "down"}" title="${t("feedback.disagree")}">
           <span class="material-symbols-outlined">thumb_down</span>
         </button>
+        ${
+          verdict
+            ? `<button type="button" id="scoreFbClear" class="ghost-btn small" title="${t("feedback.clear")}">
+          <span class="material-symbols-outlined">backspace</span>
+        </button>`
+            : ""
+        }
       </div>
       <details class="score-feedback-more"${detailsOpen}>
         <summary>${t("feedback.addDetail")}</summary>
@@ -64,6 +71,22 @@ export function wireScoreFeedback(jobId) {
 
   up.addEventListener("click", () => send("up"));
   down.addEventListener("click", () => send("down"));
+
+  // You could give a verdict and never take it back: the DELETE endpoint has
+  // been there, and tested, with nothing to press.
+  document.getElementById("scoreFbClear")?.addEventListener("click", async () => {
+    try {
+      await api(`/api/jobs/${jobId}/score-feedback`, { method: "DELETE" });
+      for (const button of [up, down]) {
+        button.classList.remove("is-active");
+        button.setAttribute("aria-pressed", "false");
+      }
+      document.getElementById("scoreFbClear")?.remove();
+      showToast(t("feedback.cleared"), "info");
+    } catch (err) {
+      showToast(`${t("toast.actionError")}: ${err.message}`, "error");
+    }
+  });
 }
 
 // Summary card in Analytics: how often the scores match the user's own reading.

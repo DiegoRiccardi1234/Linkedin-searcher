@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Eine auf eine bestimmte Stelle zugeschnittene CV-Version.",
       "skillGapDesc": "Skills, die in Stellen oft vorkommen, aber in deinem CV fehlen.",
       "privacyMode": "Datenschutzmodus",
-      "privacyModeDesc": "Entfernt Name, E-Mail, Telefon und Adresse aus dem CV, bevor es an die KI geht. Standardmäßig aktiv."
+      "privacyModeDesc": "Entfernt Name, E-Mail, Telefon und Adresse aus dem CV, bevor es an die KI geht. Standardmäßig aktiv.",
+      "groupReminders": "Erinnerungen",
+      "reminderNotifyDesc": "Eine Desktop-Benachrichtigung, wenn eine Erinnerung fällig wird. Ohne sie erscheinen Erinnerungen nur im Dashboard."
     },
     "linkedinPaste": "…oder füge deinen Profiltext ein (wird genutzt, wenn LinkedIn nicht abrufbar ist)",
     "linkedinPasteSaved": "Profiltext gespeichert",
@@ -277,7 +279,9 @@
     "rescoreFailed": "Neubewertung fehlgeschlagen",
     "rescoreInterrupted": "Neubewertung abgebrochen: bereits bewertete Angebote sind gespeichert.",
     "applyPending": "Warte auf Bestätigung",
-    "notApplied": "Ich habe mich nicht beworben"
+    "notApplied": "Ich habe mich nicht beworben",
+    "csvApplications": "Bewerbungen als CSV",
+    "undoMail": "Postfach-Markierung rückgängig machen"
   },
   "kanbanCols": {
     "open": "Offen",
@@ -379,7 +383,9 @@
       "minScore": "Mindestscore",
       "runNow": "Jetzt ausführen",
       "autoscanStarted": "Auto-Scan gestartet",
-      "notify": "Desktop-Benachrichtigung für neue Top-Jobs"
+      "notify": "Desktop-Benachrichtigung für neue Top-Jobs",
+      "reminderNotify": "Benachrichtigen, wenn eine Erinnerung fällig ist",
+      "staleDays": "An eine Bewerbung erinnern nach (Tagen)"
     },
     "dedup": {
       "title": "Doppelte Jobs",
@@ -601,7 +607,8 @@
       "saved": "Postfach-Einstellungen gespeichert",
       "connected": "Postfach verbunden",
       "disconnected": "Postfach getrennt",
-      "applied": "Als beworben markiert"
+      "applied": "Als beworben markiert",
+      "undone": "Markierung rückgängig gemacht."
     }
   },
   "update": {
@@ -654,7 +661,8 @@
     "unpin": "Lösen",
     "pinned": "An Chat angeheftet",
     "pinFailed": "Anheften fehlgeschlagen",
-    "noResponse": "Keine Antwort verfügbar."
+    "noResponse": "Keine Antwort verfügbar.",
+    "renameSession": "Diesen Chat umbenennen"
   },
   "common": {
     "close": "Schließen",
@@ -914,7 +922,9 @@
     "agreementLabel": "Übereinstimmung mit der KI",
     "casesLabel": "bewertete Angebote",
     "avgGapLabel": "durchschnittliche Abweichung",
-    "export": "Fälle exportieren (JSONL)"
+    "export": "Fälle exportieren (JSONL)",
+    "clear": "Bewertung entfernen",
+    "cleared": "Bewertung entfernt."
   },
   "local": {
     "title": "Ein Modell auf diesem PC nutzen",

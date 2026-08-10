@@ -185,3 +185,62 @@ def test_the_mailbox_actions_refuse_to_run_unconfigured(client: TestClient) -> N
     """412, not a traceback: there is no mailbox to reach yet."""
     assert client.post("/api/mail/dry-run").status_code == 412
     assert client.post("/api/mail/check").status_code == 412
+
+
+# ── reminders that actually remind ──────────────────────────────────────────
+
+
+def test_a_due_reminder_is_announced_once_and_only_if_asked_for(tmp_path: Path) -> None:
+    """Reminders were a list you had to remember to go and read.
+
+    Two rules keep the fix from becoming noise: it is opt-in, and each reminder
+    fires once — "overdue" stays true forever, so without a record of what has
+    been said the tray would fire every minute until the date is changed.
+    """
+    from app.db import Database
+    from app.notify import register_notifier
+    from app.services import reminder_watch
+
+    fired: list[tuple[str, str]] = []
+    register_notifier(lambda title, message: fired.append((title, message)))
+    db = Database(tmp_path / "r.db")
+    try:
+        job_id, _n, _s = db.upsert_job(
+            {
+                "titolo": "Analista funzionale",
+                "azienda": "BTO",
+                "link": "https://example.com/1",
+                "descrizione": "Analisi.",
+            }
+        )
+        db.set_job_reminder(job_id, "2020-01-01T09:00:00+00:00", "richiamare")
+
+        assert reminder_watch.check_due(db) == 0, "off by default: nothing interrupts"
+        assert fired == []
+
+        db.set_preference(reminder_watch.PREF_ENABLED, "1")
+        assert reminder_watch.check_due(db) == 1
+        assert len(fired) == 1
+        assert "Analista funzionale" in fired[0][1]
+
+        assert reminder_watch.check_due(db) == 0, "said once, not every tick"
+        assert len(fired) == 1
+
+        # Moving the date makes it a new thing to say.
+        db.set_job_reminder(job_id, "2020-02-02T09:00:00+00:00", "richiamare")
+        assert reminder_watch.check_due(db) == 1
+    finally:
+        register_notifier(lambda *_: None)
+        db.close()
+
+
+def test_the_stale_nudge_window_can_finally_be_set(client: TestClient) -> None:
+    """Read by list_reminders since it was written, settable nowhere at all."""
+    assert (
+        client.post(
+            "/api/preferences", json={"key": "reminder_stale_days", "value": "21"}
+        ).status_code
+        == 200
+    )
+    prefs = client.get("/api/preferences").json()["preferences"]
+    assert prefs["reminder_stale_days"] == "21"

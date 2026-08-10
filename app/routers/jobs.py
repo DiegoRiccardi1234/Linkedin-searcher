@@ -562,12 +562,9 @@ def build_router(container: AppContainer) -> APIRouter:
     @router.get("/api/reminders")
     def list_reminders() -> dict[str, Any]:
         """Manual reminders due + auto nudges for stale applications (F4)."""
-        raw = container.db.get_preference("reminder_stale_days", "7")
-        try:
-            stale_days = max(1, int(raw))
-        except (TypeError, ValueError):
-            stale_days = 7
-        return container.db.list_reminders(stale_days=stale_days)
+        from app.services.reminder_watch import stale_days
+
+        return container.db.list_reminders(stale_days=stale_days(container.db))
 
     @router.post("/api/jobs/{job_id}/favorite")
     def set_favorite(job_id: int, payload: FavoriteRequest) -> dict[str, Any]:

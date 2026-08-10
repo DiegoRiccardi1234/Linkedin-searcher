@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "A version of your CV tuned to a specific job.",
       "skillGapDesc": "Skills that recur in jobs but are missing from your CV.",
       "privacyMode": "Privacy Mode",
-      "privacyModeDesc": "Removes name, email, phone and address from the CV before it's sent to the AI. On by default."
+      "privacyModeDesc": "Removes name, email, phone and address from the CV before it's sent to the AI. On by default.",
+      "groupReminders": "Reminders",
+      "reminderNotifyDesc": "A desktop notification when a reminder comes due. Without it, reminders only show on the Dashboard."
     },
     "linkedinPaste": "…or paste your profile text (used if LinkedIn can't be fetched)",
     "linkedinPasteSaved": "Profile text saved",
@@ -277,7 +279,9 @@
     "rescoreFailed": "Re-scoring failed",
     "rescoreInterrupted": "Re-scoring stopped: the offers already done are saved.",
     "applyPending": "Waiting for confirmation",
-    "notApplied": "I did not apply"
+    "notApplied": "I did not apply",
+    "csvApplications": "Applications CSV",
+    "undoMail": "Undo the mailbox marking"
   },
   "kanbanCols": {
     "open": "Open",
@@ -379,7 +383,9 @@
       "minScore": "Min score",
       "runNow": "Run now",
       "autoscanStarted": "Auto-scan started",
-      "notify": "Desktop notification for new high-scoring jobs"
+      "notify": "Desktop notification for new high-scoring jobs",
+      "reminderNotify": "Notify me when a reminder is due",
+      "staleDays": "Nudge me about an application after (days)"
     },
     "dedup": {
       "title": "Duplicate jobs",
@@ -601,7 +607,8 @@
       "saved": "Mailbox settings saved",
       "connected": "Mailbox connected",
       "disconnected": "Mailbox disconnected",
-      "applied": "Marked as applied"
+      "applied": "Marked as applied",
+      "undone": "Marking undone."
     }
   },
   "update": {
@@ -654,7 +661,8 @@
     "unpin": "Unpin",
     "pinned": "Pinned to chat",
     "pinFailed": "Pin failed",
-    "noResponse": "No response available."
+    "noResponse": "No response available.",
+    "renameSession": "Rename this chat"
   },
   "common": {
     "close": "Close",
@@ -914,7 +922,9 @@
     "agreementLabel": "agree with the AI",
     "casesLabel": "judged offers",
     "avgGapLabel": "average gap",
-    "export": "Export cases (JSONL)"
+    "export": "Export cases (JSONL)",
+    "clear": "Remove your verdict",
+    "cleared": "Verdict removed."
   },
   "local": {
     "title": "Run a model on this PC",

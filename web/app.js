@@ -919,6 +919,22 @@ document.getElementById("detailApplyNowBtn").addEventListener("click", async () 
   }
 });
 
+const undoMailBtn = document.getElementById("detailUndoMailBtn");
+if (undoMailBtn) {
+  undoMailBtn.addEventListener("click", async () => {
+    const jobId = Number(undoMailBtn.dataset.jobId || appState.selectedJobId);
+    if (!jobId) return;
+    try {
+      await api(`/api/mail/undo/${jobId}`, { method: "POST", body: "{}" });
+      undoMailBtn.style.display = "none";
+      showToast(t("toast.mail.undone"), "info");
+      await loadJobs();
+    } catch (error) {
+      showToast(`${t("toast.actionError")}: ${error.message}`, "info");
+    }
+  });
+}
+
 const notAppliedBtn = document.getElementById("detailNotAppliedBtn");
 if (notAppliedBtn) {
   notAppliedBtn.addEventListener("click", async () => {
@@ -1039,6 +1055,18 @@ document.getElementById("exportCsvBtn").addEventListener("click", () => {
   // Let the browser download the CSV instead of writing a file server-side.
   const a = document.createElement("a");
   a.href = "/api/export/csv";
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+// The applications, not the whole archive: what was sent, with which CV, and how
+// it ended. A plain link, like the score-feedback export — no JS needed to
+// download a file the server already knows how to produce.
+document.getElementById("exportApplicationsBtn")?.addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = "/api/applications/export?format=csv";
   a.download = "";
   document.body.appendChild(a);
   a.click();
@@ -1616,6 +1644,29 @@ function renderChatSessionDropdown() {
 
 function wireChatSessionUI() {
   const sel = document.getElementById("chatSessionSelect");
+  // The translation for "chat renamed" has existed in all five languages since
+  // the endpoint was written. The button never did.
+  const renameBtn = document.getElementById("chatSessionRename");
+  if (renameBtn && !renameBtn.dataset.wired) {
+    renameBtn.dataset.wired = "1";
+    renameBtn.addEventListener("click", async () => {
+      const current = ChatSessions.list.find((x) => x.id === ChatSessions.active);
+      const title = prompt(t("chat.renameSession"), current?.title || "");
+      if (title === null) return;
+      try {
+        await api(`/api/chat/sessions/${ChatSessions.active}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: title.trim() }),
+        });
+        await refreshChatSessions();
+        renderChatSessionDropdown();
+        showToast(t("toast.chatRenamed"), "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+
   const newBtn = document.getElementById("chatSessionNew");
   const delBtn = document.getElementById("chatSessionDelete");
   if (sel) {

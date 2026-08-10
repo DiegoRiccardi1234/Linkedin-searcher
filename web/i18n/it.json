@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Una versione del CV adattata a una specifica offerta.",
       "skillGapDesc": "Skill che ricorrono nelle offerte ma mancano nel tuo CV.",
       "privacyMode": "Modalità Privacy",
-      "privacyModeDesc": "Rimuove nome, email, telefono e indirizzo dal CV prima di inviarlo all'IA. Attivo di default."
+      "privacyModeDesc": "Rimuove nome, email, telefono e indirizzo dal CV prima di inviarlo all'IA. Attivo di default.",
+      "groupReminders": "Promemoria",
+      "reminderNotifyDesc": "Una notifica di sistema quando un promemoria scade. Senza, i promemoria si vedono solo aprendo la Dashboard."
     },
     "linkedinPaste": "…oppure incolla il testo del tuo profilo (usato se LinkedIn non è recuperabile)",
     "linkedinPasteSaved": "Testo profilo salvato",
@@ -277,7 +279,9 @@
     "rescoreFailed": "Rivalutazione non riuscita",
     "rescoreInterrupted": "Rivalutazione interrotta: le offerte gia' fatte sono salvate.",
     "applyPending": "In attesa di conferma",
-    "notApplied": "Non mi sono candidato"
+    "notApplied": "Non mi sono candidato",
+    "csvApplications": "CSV candidature",
+    "undoMail": "Annulla la marcatura della posta"
   },
   "kanbanCols": {
     "open": "Aperto",
@@ -379,7 +383,9 @@
       "minScore": "Punteggio min",
       "runNow": "Esegui ora",
       "autoscanStarted": "Scansione avviata",
-      "notify": "Notifica desktop per nuovi lavori ad alto punteggio"
+      "notify": "Notifica desktop per nuovi lavori ad alto punteggio",
+      "reminderNotify": "Avvisami quando scade un promemoria",
+      "staleDays": "Ricordami una candidatura ferma da (giorni)"
     },
     "dedup": {
       "title": "Offerte duplicate",
@@ -601,7 +607,8 @@
       "saved": "Impostazioni casella salvate",
       "connected": "Casella collegata",
       "disconnected": "Casella scollegata",
-      "applied": "Segnata come candidatura"
+      "applied": "Segnata come candidatura",
+      "undone": "Marcatura annullata."
     }
   },
   "update": {
@@ -654,7 +661,8 @@
     "unpin": "Rimuovi",
     "pinned": "Fissato nella chat",
     "pinFailed": "Pin fallito",
-    "noResponse": "Nessuna risposta disponibile."
+    "noResponse": "Nessuna risposta disponibile.",
+    "renameSession": "Rinomina questa chat"
   },
   "common": {
     "close": "Chiudi",
@@ -914,7 +922,9 @@
     "agreementLabel": "d'accordo con l'IA",
     "casesLabel": "offerte giudicate",
     "avgGapLabel": "scarto medio",
-    "export": "Esporta i casi (JSONL)"
+    "export": "Esporta i casi (JSONL)",
+    "clear": "Togli il tuo giudizio",
+    "cleared": "Giudizio rimosso."
   },
   "local": {
     "title": "Usa un modello su questo PC",

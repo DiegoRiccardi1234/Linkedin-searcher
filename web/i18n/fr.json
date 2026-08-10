@@ -76,7 +76,9 @@
       "resumeTailoringDesc": "Une version de votre CV adaptée à une offre précise.",
       "skillGapDesc": "Compétences fréquentes dans les offres mais absentes de votre CV.",
       "privacyMode": "Mode confidentialité",
-      "privacyModeDesc": "Retire nom, e-mail, téléphone et adresse du CV avant l'envoi à l'IA. Activé par défaut."
+      "privacyModeDesc": "Retire nom, e-mail, téléphone et adresse du CV avant l'envoi à l'IA. Activé par défaut.",
+      "groupReminders": "Rappels",
+      "reminderNotifyDesc": "Une notification système quand un rappel arrive à échéance. Sans elle, les rappels n'apparaissent que sur le tableau de bord."
     },
     "linkedinPaste": "…ou collez le texte de votre profil (utilisé si LinkedIn ne peut pas être récupéré)",
     "linkedinPasteSaved": "Texte du profil enregistré",
@@ -277,7 +279,9 @@
     "rescoreFailed": "Échec de la réévaluation",
     "rescoreInterrupted": "Réévaluation interrompue : les offres déjà traitées sont enregistrées.",
     "applyPending": "En attente de confirmation",
-    "notApplied": "Je n'ai pas postulé"
+    "notApplied": "Je n'ai pas postulé",
+    "csvApplications": "CSV candidatures",
+    "undoMail": "Annuler le marquage par la boîte mail"
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -379,7 +383,9 @@
       "minScore": "Score min",
       "runNow": "Lancer maintenant",
       "autoscanStarted": "Scan lancé",
-      "notify": "Notification bureau pour les nouvelles offres bien notées"
+      "notify": "Notification bureau pour les nouvelles offres bien notées",
+      "reminderNotify": "M'avertir quand un rappel arrive à échéance",
+      "staleDays": "Me relancer sur une candidature après (jours)"
     },
     "dedup": {
       "title": "Offres en double",
@@ -601,7 +607,8 @@
       "saved": "Paramètres de la boîte enregistrés",
       "connected": "Boîte connectée",
       "disconnected": "Boîte déconnectée",
-      "applied": "Marquée comme envoyée"
+      "applied": "Marquée comme envoyée",
+      "undone": "Marquage annulé."
     }
   },
   "update": {
@@ -654,7 +661,8 @@
     "unpin": "Détacher",
     "pinned": "Épinglé au chat",
     "pinFailed": "Échec de l'épinglage",
-    "noResponse": "Aucune réponse disponible."
+    "noResponse": "Aucune réponse disponible.",
+    "renameSession": "Renommer cette conversation"
   },
   "common": {
     "close": "Fermer",
@@ -914,7 +922,9 @@
     "agreementLabel": "d'accord avec l'IA",
     "casesLabel": "offres jugées",
     "avgGapLabel": "écart moyen",
-    "export": "Exporter les cas (JSONL)"
+    "export": "Exporter les cas (JSONL)",
+    "clear": "Retirer votre avis",
+    "cleared": "Avis retiré."
   },
   "local": {
     "title": "Utiliser un modèle sur ce PC",

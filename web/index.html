@@ -269,6 +269,9 @@
                it an open could only be resolved by moving the offer along the
                funnel, which says something the user may not mean. -->
           <button id="detailNotAppliedBtn" class="secondary" style="display:none;" data-i18n="jobs.notApplied">Non mi sono candidato</button>
+          <!-- Taking back a marking the mailbox made. Manual ones are left
+               alone by the endpoint, and the button follows the same rule. -->
+          <button id="detailUndoMailBtn" class="secondary" style="display:none;" data-i18n="jobs.undoMail">Undo the mailbox marking</button>
         </div>
         <div id="jobDetailContainer"></div>
         <div class="cover-letter-section">
@@ -359,6 +362,10 @@
           </select>
           <button id="refreshJobsBtn" type="button" class="ghost-btn" aria-label="Refresh jobs"><span class="material-symbols-outlined">refresh</span></button>
           <button id="exportCsvBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">download</span> <span data-i18n="jobs.csv">CSV</span></button>
+          <!-- The applications, not the archive: status, which CV went with
+               it, how it ended. The endpoint has always been there and had no
+               button, so the only way to reach it was to type the URL. -->
+          <button id="exportApplicationsBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">fact_check</span> <span data-i18n="jobs.csvApplications">Applications CSV</span></button>
           <select id="rescoreScope" data-i18n-title="jobs.rescoreScopeHint" title="Which offers to re-score">
             <option value="unscored" data-i18n="jobs.rescoreScopeUnscored">Unscored only</option>
             <option value="applicable" data-i18n="jobs.rescoreScopeApplicable">Applicable</option>
@@ -612,6 +619,16 @@
               <small class="feature-desc" data-i18n="profile.features.resumeTailoringDesc">A version of your CV tuned to a specific job.</small>
               <label class="feature-toggle"><input type="checkbox" data-feature="skill_gap" /> <span data-i18n="settings.features.skillGap">Skill-gap analysis</span></label>
               <small class="feature-desc" data-i18n="profile.features.skillGapDesc">Skills that recur in jobs but are missing from your CV.</small>
+            </div>
+            <div class="feature-group">
+              <span class="feature-group-title" data-i18n="profile.features.groupReminders">Reminders</span>
+              <!-- The list always worked; nothing ever announced one, so a
+                   reminder only reached you if you went looking for it. Opt-in,
+                   because a notification is an interruption. -->
+              <label class="feature-toggle"><input type="checkbox" data-feature="reminder_notify" /> <span data-i18n="settings.features.reminderNotify">Notify me when a reminder is due</span></label>
+              <small class="feature-desc" data-i18n="profile.features.reminderNotifyDesc">A desktop notification when a reminder comes due. Without it, reminders only show on the Dashboard.</small>
+              <label class="micro" for="reminderStaleDays" data-i18n="settings.features.staleDays">Nudge me about an application after (days)</label>
+              <input id="reminderStaleDays" type="number" min="1" max="90" step="1" value="7" />
             </div>
             <div class="feature-group">
               <span class="feature-group-title" data-i18n="profile.features.groupPrivacy">Privacy</span>
@@ -1054,6 +1071,7 @@
         </div>
         <div class="chat-session-bar">
           <select id="chatSessionSelect" class="mini-select" title="Switch chat"></select>
+          <button type="button" id="chatSessionRename" class="ghost-btn small" data-i18n-title="chat.renameSession" title="Rename chat"><span class="material-symbols-outlined">edit</span></button>
           <button type="button" id="chatSessionNew" class="ghost-btn small" title="New chat"><span class="material-symbols-outlined">add</span></button>
           <button type="button" id="chatSessionDelete" class="ghost-btn small danger" title="Delete chat"><span class="material-symbols-outlined">delete</span></button>
         </div>
