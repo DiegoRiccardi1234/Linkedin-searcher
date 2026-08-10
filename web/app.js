@@ -295,6 +295,11 @@ async function loadHealth() {
   if (linkedinText && prefs.linkedin_profile_text) {
     linkedinText.value = prefs.linkedin_profile_text;
   }
+  // Read back, or the field shows the placeholder 7 whatever you saved — the
+  // same "written and never re-read" shape as the panels that were invisible.
+  const staleDays = document.getElementById("reminderStaleDays");
+  if (staleDays && prefs.reminder_stale_days) staleDays.value = prefs.reminder_stale_days;
+
   const dedupSel = document.getElementById("dedupModeSelect");
   if (dedupSel) {
     const mode = prefs.dedup_mode || "city";

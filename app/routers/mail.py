@@ -40,6 +40,14 @@ def build_router(container: AppContainer) -> APIRouter:
 
     @router.post("/api/mail/config")
     def mail_configure(payload: MailConfigRequest) -> dict[str, Any]:
+        # Written before the address is validated, because it is not part of the
+        # account: it is a decision about what this app is allowed to read, and
+        # someone must be able to set it to "never" BEFORE connecting anything.
+        # Behind the check it was silently discarded along with a 400 whenever
+        # the address field happened to be empty.
+        if payload.body_mode in mail_config.BODY_MODES:
+            container.db.set_preference(mail_config.PREF_BODY_MODE, payload.body_mode)
+
         address = payload.address.strip()
         if "@" not in address:
             raise HTTPException(status_code=400, detail="invalid_address")
@@ -68,8 +76,6 @@ def build_router(container: AppContainer) -> APIRouter:
             container.db.set_preference(mail_config.PREF_ENABLED, "1" if payload.enabled else "0")
         if payload.interval_minutes is not None:
             container.db.set_preference(mail_config.PREF_INTERVAL, str(payload.interval_minutes))
-        if payload.body_mode in mail_config.BODY_MODES:
-            container.db.set_preference(mail_config.PREF_BODY_MODE, payload.body_mode)
         return {"ok": True, "status": container.mailwatch.status()}
 
     @router.post("/api/mail/test")
