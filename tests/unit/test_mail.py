@@ -115,6 +115,66 @@ def test_a_short_company_name_does_not_swallow_a_longer_one() -> None:
     assert classify(header, [_pending(company="bit")]).verdict != "match"
 
 
+# ── the three ways a real mailbox produced answers nobody could use ──────────
+# Each of these was measured on one real 90-day Outlook mailbox (853 messages,
+# 275 offers in the archive) before it was written: the rules produced 116
+# proposals, 66 of which no human could have resolved. After these three, 50
+# proposals and nothing true was lost.
+
+
+def test_an_application_merely_viewed_is_not_a_confirmation_of_sending() -> None:
+    """LinkedIn says "visualizzata da X" when someone OPENS it, not when it is sent.
+
+    21 of them in one real mailbox, and not one is assignable: the regex that
+    reads the employer out of a subject wants "inviata a".
+    """
+    header = _header(
+        "La tua candidatura è stata visualizzata da Hays", "jobs-noreply@linkedin.com"
+    )
+    assert classify(header, [_pending(company="Hays")]).verdict == "no_match"
+
+
+def test_a_subject_naming_an_employer_we_never_saved_is_not_a_proposal() -> None:
+    """The message says who it is about, and it is nobody in the archive.
+
+    Falling through to the weaker rules would look for the offer elsewhere and
+    settle on one the message just said it is NOT about.
+    """
+    header = _header("La tua candidatura è stata inviata a Kirey", "jobs-noreply@linkedin.com")
+    result = classify(header, [_pending(company="Reply")])
+    assert result.verdict == "no_match"
+    assert result.rule == "named_company_absent"
+
+
+def test_with_no_evidence_at_all_the_answer_is_no_not_a_random_offer() -> None:
+    """No employer in the subject, none in the sender, several offers open.
+
+    The old answer was "ambiguous" carrying every pending id, and the review
+    screen shows the first one — a question about Hays presented as a question
+    about whatever sorted first.
+    """
+    header = _header("Grazie per la tua candidatura", "no-reply@myworkday.com")
+    result = classify(header, [_pending(1), _pending(2, company="Accenture")])
+    assert result.verdict == "no_match"
+    assert result.rule == "no_evidence"
+    assert result.candidates == ()
+
+
+def test_one_offer_open_is_still_worth_asking_about() -> None:
+    """The narrowing above must not swallow the case that IS answerable."""
+    header = _header("Grazie per la tua candidatura", "no-reply@myworkday.com")
+    result = classify(header, [_pending(1)])
+    assert result.verdict == "ambiguous"
+    assert result.rule == "single_pending"
+    assert result.candidates == (1,)
+
+
+def test_teamtailor_actually_sends_from_teamtailor_mail_com() -> None:
+    """A list bug, not an omission: "teamtailor.com" never matches the real one."""
+    assert is_known_sender("noreply@finomnia.teamtailor-mail.com")
+    assert is_known_sender("candidature@join.com")
+
+
 # ── the mailbox cannot be written to ─────────────────────────────────────────
 
 

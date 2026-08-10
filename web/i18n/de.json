@@ -249,14 +249,15 @@
       "salary": "Unter deinem Minimum",
       "salaryLong": "Die angegebene Vergütung liegt unter deinem Minimum",
       "shortDesc": "Kurze Beschreibung",
-      "heuristic": "Lokale Schätzung",
+      "heuristic": "Regelbasiertes Urteil",
       "notEvaluated": "Nicht bewertet",
       "aggregator": "Aggregator",
       "aggregatorLong": "Von einer Jobbörse erneut veröffentlicht: Das gezeigte Unternehmen stellt nicht ein",
       "location": "Standort außerhalb",
       "experience": "Verlangt Erfahrung",
       "education": "Höherer Abschluss",
-      "protected": "Geschützten Kategorien vorbehalten"
+      "protected": "Geschützten Kategorien vorbehalten",
+      "heuristicLong": "Kein Modell hat diese Anzeige gelesen: Die Bewertung folgt aus einer harten Vorgabe (Standort, Mindestnote)"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",
@@ -410,7 +411,8 @@
     "usage": {
       "limitLabel": "Tägliches Anfragelimit (0 = kein Limit)",
       "limitSaved": "Tägliches Limit aktualisiert."
-    }
+    },
+    "keysDiagnostics": "Schlüssel-Diagnose"
   },
   "coach": {
     "title": "Career Coach",

@@ -100,6 +100,39 @@ def test_experience_ignores_a_time_window() -> None:
     assert _estimate_experience_band(window_only) == "Non specificato"
 
 
+def test_experience_written_out_in_words_still_counts() -> None:
+    """"Almeno quattro anni" is not a rarer way of writing "almeno 4".
+
+    Measured on 348 real postings: fifteen spell the number out, six of those
+    state a genuine requirement, and the detector saw none of them. One was a
+    Project Manager role asking for four years, sitting in the shortlist at 6/10
+    with no warning on it at all.
+    """
+    assert _estimate_experience_band("almeno quattro anni di esperienza nel ruolo") == "3+"
+    assert _estimate_experience_band("esperienza pregressa di almeno due anni in test") == "2"
+    assert _estimate_experience_band("with at least two years' experience in avionics") == "2"
+    assert _estimate_experience_band("you have at least six years of product experience") == "3+"
+    # A range still reads at its lower bound, words or digits.
+    assert _estimate_experience_band("esperienza di uno o due anni come specialist") == "1"
+
+
+def test_experience_ignores_how_long_the_programme_lasts() -> None:
+    """"Al termine dei due anni otterrai il diploma" is a duration, not a demand.
+
+    Real Lidl apprenticeship posting. Widening the detector to spelled-out
+    numbers made this one fire, and an ad whose entire premise is that it wants
+    people with no experience is the worst possible thing to hide.
+    """
+    text = (
+        "contratto di apprendistato con retribuzione per ore di lavoro e formazione. "
+        "al termine dei due anni, al superamento degli esami, otterrai il diploma its "
+        "e maturerai esperienza sul campo."
+    )
+    # Nothing in the sentence demands experience, so nothing is known — and an
+    # unknown requirement blocks nothing, which is the whole point.
+    assert _estimate_experience_band(text) == "Non specificato"
+
+
 def test_experience_ignores_the_companys_own_years() -> None:
     """The company's age is not the candidate's experience.
 

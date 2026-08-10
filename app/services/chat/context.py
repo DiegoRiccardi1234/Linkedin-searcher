@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from app.db import Database
-from app.services.onboarding import onboarding_context
+from app.services.onboarding import linkedin_suffix, onboarding_context
 from app.services.pii import redact_pii
 
 
@@ -113,9 +113,9 @@ def build_profile_context(db: Database) -> str:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    linkedin_url = db.get_preference("linkedin_url", "")
-    if linkedin_url:
-        profile_text += f"\nLinkedIn: {linkedin_url}"
+    # The pasted profile text when there is one, the URL only as a fallback: the
+    # coach was being handed a link it cannot open.
+    profile_text += linkedin_suffix(db)
 
     # Privacy Mode (default ON): strip contact PII (email/phone/address/URL)
     # before the CV context reaches the LLM. name=None keeps the candidate's

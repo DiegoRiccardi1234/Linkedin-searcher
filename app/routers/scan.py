@@ -82,28 +82,13 @@ def build_router(container: AppContainer) -> APIRouter:
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-    @router.post("/api/scan")
-    def scan(request: Request, payload: ScanRequest) -> dict[str, Any]:
-        rate_limit.check(request, bucket="scan", limit=5, window_seconds=60)
-        container.require_provider()
-        if not container.scan_control.try_begin():
-            raise HTTPException(status_code=409, detail="scan_in_progress")
-        result = {}
-        try:
-            for event in run_scan(
-                db=container.db,
-                settings=container.settings,
-                provider_manager=container.providers,
-                payload=payload,
-                cancel_check=container.scan_control.is_cancelled,
-            ):
-                if event.get("status") == "complete":
-                    result = event
-                elif "error" in event:
-                    raise HTTPException(status_code=500, detail=event["error"])
-        finally:
-            container.scan_control.end()
-        return result
+    # There was a blocking POST /api/scan here that ran the same scan and
+    # returned only the final event. Nothing called it: the UI has always used
+    # the SSE stream above, because a scan takes ten minutes and a request that
+    # holds a connection open that long is a timeout waiting to happen. It had
+    # no test either, so a second, unexercised way to spend LLM quota sat behind
+    # a rate limiter nobody checked. Removed rather than tested: the stream is
+    # the interface.
 
     @router.post("/api/scan/cancel")
     def scan_cancel() -> dict[str, Any]:

@@ -249,14 +249,15 @@
       "salary": "Sotto la tua RAL minima",
       "salaryLong": "La retribuzione dichiarata è sotto la minima che hai impostato",
       "shortDesc": "Descrizione breve",
-      "heuristic": "Stima locale",
+      "heuristic": "Verdetto da regole",
       "notEvaluated": "Da valutare",
       "aggregator": "Aggregatore",
       "aggregatorLong": "Annuncio ripubblicato da un aggregatore: l'azienda mostrata non è quella che assume",
       "location": "Sede fuori zona",
       "experience": "Chiede esperienza",
       "education": "Titolo superiore",
-      "protected": "Riservata alle categorie protette"
+      "protected": "Riservata alle categorie protette",
+      "heuristicLong": "Nessun modello ha letto questo annuncio: il punteggio è calcolato da un vincolo certo (sede, voto minimo)"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",
@@ -410,7 +411,8 @@
     "usage": {
       "limitLabel": "Limite richieste al giorno (0 = nessun limite)",
       "limitSaved": "Limite giornaliero aggiornato."
-    }
+    },
+    "keysDiagnostics": "Diagnostica chiavi"
   },
   "coach": {
     "title": "Career Coach",

@@ -46,7 +46,7 @@ from app.providers.model_selector import SCORING_MIN_SIZE_B
 from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
 from app.services import local_models, quota
 from app.services.candidate_facts import candidate_facts
-from app.services.onboarding import onboarding_context, onboarding_ral
+from app.services.onboarding import linkedin_suffix, onboarding_context, onboarding_ral
 from app.services.pii import redact_pii
 from app.services.recruiter_scrape import fetch_linkedin_description, fetch_recruiter
 from app.services.scan.companies import canonical_company, company_matches
@@ -987,9 +987,11 @@ def run_scan(
     # across every batch went unnoticed.
     audit_pool: list[dict[str, Any]] = []
 
-    linkedin_url = db.get_preference("linkedin_url", "")
-    if linkedin_url:
-        profile_markdown += f"\n\nLinkedIn profile: {linkedin_url}"
+    # Was appending the bare URL. A model cannot open a link, so that line was
+    # noise in every scoring prompt, while the profile text the user had pasted —
+    # projects and certifications the CV has no room for — never reached the one
+    # place that decides the scores.
+    profile_markdown += linkedin_suffix(db)
 
     # Privacy Mode + onboarding preferences, resolved once for every job in this
     # scan. feature_privacy_mode mirrors container.feature_enabled semantics.

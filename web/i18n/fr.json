@@ -249,14 +249,15 @@
       "salary": "Sous ton minimum",
       "salaryLong": "La rémunération annoncée est inférieure à ton minimum",
       "shortDesc": "Description courte",
-      "heuristic": "Estimation locale",
+      "heuristic": "Verdict par règles",
       "notEvaluated": "Non évaluée",
       "aggregator": "Agrégateur",
       "aggregatorLong": "Republiée par un agrégateur : l'entreprise affichée n'est pas celle qui recrute",
       "location": "Lieu hors zone",
       "experience": "Demande de l'expérience",
       "education": "Diplôme supérieur",
-      "protected": "Réservée aux catégories protégées"
+      "protected": "Réservée aux catégories protégées",
+      "heuristicLong": "Aucun modèle n'a lu cette annonce : la note est calculée à partir d'une contrainte ferme (lieu, note minimale)"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
@@ -410,7 +411,8 @@
     "usage": {
       "limitLabel": "Limite de requêtes par jour (0 = aucune limite)",
       "limitSaved": "Limite quotidienne mise à jour."
-    }
+    },
+    "keysDiagnostics": "Diagnostic des clés"
   },
   "coach": {
     "title": "Career Coach",

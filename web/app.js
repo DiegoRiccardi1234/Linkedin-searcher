@@ -307,7 +307,7 @@ async function loadHealth() {
   updateProvidersMetadata(health.provider || {}, keys.preferred_model || "");
   renderProviderCards(keys, health.provider || {});
   loadProviderHealth();
-  setText("keysStatus", JSON.stringify(status, null, 2));
+  showKeysStatus(status);
 }
 
 async function loadKeysStatus() {
@@ -319,7 +319,18 @@ async function loadKeysStatus() {
   updateProvidersMetadata(provider, keys.preferred_model || "");
   renderProviderCards(keys, provider);
   loadProviderHealth();
-  setText("keysStatus", JSON.stringify(status, null, 2));
+  showKeysStatus(status);
+}
+
+// #keysStatus ships with class="hidden" and nothing ever took it off, so this
+// JSON was written into an element nobody could see. It is a diagnostic dump,
+// not a feature: the provider cards above are the real UI. Kept, but behind a
+// details element that starts closed, instead of written into the void.
+function showKeysStatus(status) {
+  const el = document.getElementById("keysStatus");
+  if (!el) return;
+  el.textContent = JSON.stringify(status, null, 2);
+  el.classList.remove("hidden");
 }
 
 async function loadProfiles() {
@@ -533,7 +544,7 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
       },
     );
     if (!response.ok) {
-      setText("cvSummary", `${t("toast.uploadError")}: ${await response.text()}`);
+      showCvSummary(`${t("toast.uploadError")}: ${await response.text()}`);
       showToast(t("toast.uploadError") || "Upload failed", "error");
       return;
     }
@@ -541,7 +552,7 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     const payload = await response.json();
     // Was JSON.stringify(payload) — the user got the raw API response dumped
     // into the page. Show what the AI actually understood.
-    setText("cvSummary", cvSummaryText(payload));
+    showCvSummary(cvSummaryText(payload));
     await loadProfiles();
     await loadProfileView();
     await loadRecommendations();
@@ -570,6 +581,15 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     dropzone?.classList.remove("is-busy");
   }
 });
+
+// #cvSummary ships with class="hidden" and nothing ever took it off, so both
+// the summary of what the AI understood AND the server's reason for a failed
+// upload were written into an element nobody could see — the user got a generic
+// "Upload failed" toast and no way to find out why.
+function showCvSummary(text) {
+  setText("cvSummary", text);
+  document.getElementById("cvSummary")?.classList.toggle("hidden", !text);
+}
 
 // The upload response is a status envelope; the readable part is the profile
 // the parser built from the CV.

@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services.generation import generate_with_profile
 from app.services.job_import import extract_job_fields, fetch_page_text
+from app.services.onboarding import linkedin_suffix as _linkedin_suffix
 from app.services.onboarding import onboarding_context
 from app.services.rescore_service import (
     SCOPES,
@@ -30,9 +31,6 @@ from app.services.rescore_service import (
     rescore_job,
     rescore_jobs,
     select_job_ids,
-)
-from app.services.rescore_service import (
-    linkedin_suffix as _linkedin_suffix,
 )
 from app.services.scan.companies import WATCHLIST_SUGGESTIONS, canonical_company
 from app.services.scanner_service import BLOCKING_FLAGS, analyze_offer, is_unevaluated
@@ -703,7 +701,10 @@ def build_router(container: AppContainer) -> APIRouter:
                 "company": r[1] or "",
                 "location": r[2] or "",
                 "status": r[3] or "",
-                "ai_score": r[4] or 0,
+                # NOT `or 0`: an unjudged offer has punteggio_ai NULL, and a 0 in
+                # this column is a score nobody gave. The app refuses invented
+                # scores everywhere else; this export was the back door.
+                "ai_score": "" if r[4] is None else r[4],
                 "advice": r[5] or "",
                 "url": r[6] or "",
                 "updated_at": r[7] or "",

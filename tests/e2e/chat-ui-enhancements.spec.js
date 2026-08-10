@@ -99,14 +99,30 @@ test.describe("Chat UI enhancements", () => {
     await page.goto("/");
     await page.fill("#chatInput", "voglio fare cloud");
     await page.locator("#chatForm button[type='submit']").click();
+    // The pill handler loads the profile BEFORE it saves, so the POST lands
+    // some milliseconds after the click resolves. Reading `shortlistCalls`
+    // straight after the click measured that race, not the feature — and this
+    // test had been red since before 07/08 for exactly that reason, unnoticed
+    // because the e2e suite does not run in CI.
+    const shortlistPost = page.waitForRequest(
+      (r) => r.url().includes("/api/roles/shortlist") && r.method() === "POST",
+    );
     await page.locator(".role-pill").first().click();
-
-    expect(shortlistCalls.length).toBeGreaterThan(0);
-    expect(shortlistCalls[0].roles).toEqual(expect.arrayContaining(["Cloud Engineer"]));
+    // Read the payload off the request itself: the route callback that fills
+    // `shortlistCalls` is not guaranteed to have run when waitForRequest
+    // resolves, so asserting on the closure is a second race on top of the first.
+    const sent = JSON.parse((await shortlistPost).postData() || "{}");
+    expect(sent.roles).toEqual(expect.arrayContaining(["Cloud Engineer"]));
+    await expect.poll(() => shortlistCalls.length).toBeGreaterThan(0);
 
     // Tag added to Step 2 keywords input
-    const tags = await page.locator("#keywordsContainer .tag-item, #keywordsContainer .tag").allTextContents();
-    expect(tags.join(" ")).toMatch(/Cloud Engineer/);
+    await expect
+      .poll(async () =>
+        (
+          await page.locator("#keywordsContainer .tag-item, #keywordsContainer .tag").allTextContents()
+        ).join(" "),
+      )
+      .toMatch(/Cloud Engineer/);
   });
 
   test("coach panel resizes with viewport", async ({ page }) => {

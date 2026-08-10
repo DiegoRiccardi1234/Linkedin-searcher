@@ -12,6 +12,7 @@ import pytest
 from app.db import Database
 from app.services.chat.context import (
     CHIP_TEMPLATES,
+    build_profile_context,
     suggest_chat_prompts,
     suggest_keywords_from_profile,
     suggest_locations,
@@ -93,3 +94,33 @@ def test_suggest_locations_respects_full_remote(empty_db: Database) -> None:
 def test_suggest_locations_uses_last_scan_location(empty_db: Database) -> None:
     empty_db.set_preference("last_scan_location", "Milano")
     assert suggest_locations(empty_db) == ["Milano"]
+
+
+def test_the_chat_gets_the_pasted_linkedin_text_not_just_the_link(empty_db: Database) -> None:
+    """A URL in a prompt is noise: the model cannot open it.
+
+    The chat and the scan each built their own suffix appending the bare URL,
+    while the profile text the user pasted — the only part a model can read —
+    reached neither. Both now share ``onboarding.linkedin_suffix``.
+    """
+    _save_cv(empty_db, "Backend engineer.")
+    empty_db.set_preference("linkedin_url", "https://www.linkedin.com/in/example")
+    empty_db.set_preference("linkedin_profile_text", "Certificazione Anthropic Academy")
+
+    context = build_profile_context(empty_db)
+    assert "Certificazione Anthropic Academy" in context
+
+
+def test_the_bare_url_was_useless_twice_over(empty_db: Database) -> None:
+    """Without pasted text there is nothing to send, and the link is redacted anyway.
+
+    Privacy Mode is on by default and strips URLs from the CV context, so the
+    old "LinkedIn: <url>" line reached the model as the literal string ``[URL]``.
+    Pinned here because it is the measurement that makes the fix worth having,
+    not a behaviour worth restoring.
+    """
+    _save_cv(empty_db, "Backend engineer.")
+    empty_db.set_preference("linkedin_url", "https://www.linkedin.com/in/example")
+    context = build_profile_context(empty_db)
+    assert "linkedin.com/in/example" not in context
+    assert "[URL]" in context

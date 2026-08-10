@@ -796,7 +796,15 @@
           <select id="preferredModel" class="hidden" aria-hidden="true">
             <option value=""></option>
           </select>
-          <pre id="keysStatus" class="output hidden"></pre>
+          <!-- A diagnostic dump, not a feature: the provider cards above are the
+               real UI. It used to be written into an element that nothing ever
+               un-hid, so the text existed and nobody could read it. Collapsed
+               by default rather than deleted: it is what you paste when a key
+               "is there" and the provider still says it is not. -->
+          <details class="keys-status-details">
+            <summary class="micro" data-i18n="settings.keysDiagnostics">Key diagnostics</summary>
+            <pre id="keysStatus" class="output hidden"></pre>
+          </details>
         </article>
         <!-- Reading the mailbox to find out which applications were actually
              sent. Off until connected, and read-only for good: on Microsoft the

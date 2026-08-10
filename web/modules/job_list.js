@@ -78,9 +78,16 @@ export function flagBadgesHtml(flags, { compact = false } = {}) {
   return FLAG_BADGES.filter((f) => codes.has(f.code))
     .map((f) => {
       const label = t(f.key);
+      // The tooltip repeated the label, which told a hovering user nothing.
+      // Where a "…Long" key exists it explains the badge instead. A missing key
+      // comes back as the key itself, so the check is against that, not against
+      // falsiness.
+      const longKey = `${f.key}Long`;
+      const long = t(longKey);
+      const title = long === longKey ? label : long;
       const text = compact ? "" : `<span>${escapeHtml(label)}</span>`;
       return (
-        `<span class="job-flag ${f.cls}" title="${escapeHtml(label)}">` +
+        `<span class="job-flag ${f.cls}" title="${escapeHtml(title)}">` +
         `<span class="material-symbols-outlined">${f.icon}</span>${text}</span>`
       );
     })

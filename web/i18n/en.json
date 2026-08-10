@@ -249,14 +249,15 @@
       "salary": "Below your minimum",
       "salaryLong": "The declared pay is below the minimum you set",
       "shortDesc": "Short description",
-      "heuristic": "Local estimate",
+      "heuristic": "Rule-based verdict",
       "notEvaluated": "Not evaluated",
       "aggregator": "Aggregator",
       "aggregatorLong": "Reposted by a job board: the company shown is not the one hiring",
       "location": "Out-of-area location",
       "experience": "Wants experience",
       "education": "Higher degree",
-      "protected": "Reserved to protected categories"
+      "protected": "Reserved to protected categories",
+      "heuristicLong": "No model read this posting: the score is computed from a hard constraint (location, minimum grade)"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",
@@ -410,7 +411,8 @@
     "usage": {
       "limitLabel": "Daily request limit (0 = no limit)",
       "limitSaved": "Daily limit updated."
-    }
+    },
+    "keysDiagnostics": "Key diagnostics"
   },
   "coach": {
     "title": "Career Coach",
