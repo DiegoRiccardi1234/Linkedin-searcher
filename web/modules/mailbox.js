@@ -19,6 +19,10 @@ export function initMailbox(deps) {
 
 const $ = (id) => document.getElementById(id);
 
+// Which affordance a queued row shows depends on the body-reading mode, and
+// the row renderer has no status object of its own.
+let _bodyMode = "ask";
+
 function _setState(text, kind = "info") {
   const el = $("mailState");
   if (!el) return;
@@ -65,6 +69,8 @@ export async function loadMailboxStatus() {
   if ($("mailFolder") && !$("mailFolder").value) $("mailFolder").value = status.folder || "INBOX";
   if ($("mailEnabled")) $("mailEnabled").checked = Boolean(status.enabled);
   if ($("mailInterval")) $("mailInterval").value = status.interval_minutes || 15;
+  _bodyMode = status.body_mode || "ask";
+  if ($("mailBodyMode")) $("mailBodyMode").value = _bodyMode;
   _toggleAuthBlocks();
 
   const key = _STATE_KEYS[status.state] || "mail.state.unconfigured";
@@ -122,10 +128,19 @@ export async function loadMailReview() {
         options || createOption
           ? ""
           : `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`;
+      // "Ask" mode: the title lives in the body, and the body is only read for
+      // the one message you press this on.
+      const roleBit = item.role
+        ? `<span class="mail-review-role">${escapeHtml(item.role)}</span>`
+        : item.kind === "import" && _bodyMode === "ask"
+          ? `<button type="button" class="ghost-btn small mail-review-role-btn"
+                     data-review="${item.review_id}" data-i18n="mail.body.fetchOne">Get the job title</button>`
+          : "";
       return `
       <div class="mail-review-row" data-review-row="${item.review_id}">
         <div class="mail-review-head">
           <strong>${escapeHtml(item.company || "?")}</strong>
+          ${roleBit}
           <span class="micro">${escapeHtml(when)}${from}</span>
         </div>
         ${options}${createOption}${empty}
@@ -143,6 +158,7 @@ async function _save() {
     folder: $("mailFolder")?.value.trim() || "INBOX",
     enabled: Boolean($("mailEnabled")?.checked),
     interval_minutes: Number($("mailInterval")?.value || 15),
+    body_mode: $("mailBodyMode")?.value || "",
   };
   // Empty means "leave what is stored" here, not "delete it": a user reopening
   // settings must not wipe the password by pressing Save.
@@ -297,6 +313,24 @@ export function wireMailbox() {
 
   $("mailRecoveryDryBtn")?.addEventListener("click", () => _runRecovery(true));
   $("mailRecoveryBtn")?.addEventListener("click", () => _runRecovery(false));
+
+  $("mailReviewList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest?.(".mail-review-role-btn");
+    if (!button) return;
+    button.disabled = true;
+    try {
+      const out = await api(`/api/mail/review/${button.dataset.review}/role`, {
+        method: "POST",
+        body: "{}",
+      });
+      if (out.role) await loadMailReview();
+      else showToast(t("mail.body.notFound"), "info");
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
     const picked = [...document.querySelectorAll(".mail-review-pick:checked")];

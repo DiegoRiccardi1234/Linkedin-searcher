@@ -877,6 +877,21 @@
             <label class="micro" for="mailInterval" data-i18n="mail.intervalMinutes">Every (minutes)</label>
             <input id="mailInterval" type="number" min="5" max="240" step="5" value="15" />
           </div>
+          <!-- The subject of a confirmation names the employer and never the
+               role, so a recovered application has no job title unless the body
+               is read — and not reading bodies is something this app promised.
+               Rather than quietly redefine the promise, it becomes a choice with
+               three honest positions. Default: nothing is read until you ask,
+               for the one message you asked about. -->
+          <div class="mail-row">
+            <label class="micro" for="mailBodyMode" data-i18n="mail.body.label">Job title from the message body</label>
+            <select id="mailBodyMode">
+              <option value="never" data-i18n="mail.body.never">Never read the body</option>
+              <option value="ask" data-i18n="mail.body.ask">Only when I ask, message by message</option>
+              <option value="always" data-i18n="mail.body.always">Always, for confirmations</option>
+            </select>
+          </div>
+          <p class="micro" data-i18n="mail.body.hint">Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.</p>
           <div class="mail-row mail-actions">
             <!-- Runs the rules and reports what they WOULD have marked. How well
                  they do is unknown until they meet a real mailbox, and the cost

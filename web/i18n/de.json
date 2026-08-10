@@ -998,6 +998,15 @@
       "azure": "Ein Azure-Konto: dieselben Schritte. Der kostenlose Tarif kostet nichts, verlangt aber eine Karte zur Identitätsprüfung.",
       "none": "Keines von beiden: ein privates Outlook lässt sich nicht verbinden. Richte eine Regel ein, die Bestätigungsmails an ein funktionierendes Postfach weiterleitet — Gmail oder ein beliebiges IMAP-Postfach — und verbinde dieses.",
       "other": "Manche Open-Source-Mailprogramme veröffentlichen ihre eigene App-ID, die man hier einfügen kann. Das funktioniert, aber der Zustimmungsdialog zeigt deren Namen statt Job Finder, und ein Widerruf betrifft beide."
+    },
+    "body": {
+      "label": "Stellenbezeichnung aus dem Nachrichtentext",
+      "never": "Nachrichtentext nie lesen",
+      "ask": "Nur auf Anfrage, Nachricht für Nachricht",
+      "always": "Immer, bei Bestätigungen",
+      "hint": "Was auch immer du wählst: Der Text wird nur im Speicher gelesen — nie gespeichert, nie protokolliert, nie an ein Modell geschickt.",
+      "fetchOne": "Stellenbezeichnung holen",
+      "notFound": "Keine erkennbare Stellenbezeichnung in dieser Nachricht."
     }
   }
 }

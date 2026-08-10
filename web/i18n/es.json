@@ -998,6 +998,15 @@
       "azure": "Una cuenta de Azure: los mismos pasos. El plan gratuito no cuesta nada pero pide una tarjeta para verificar tu identidad.",
       "none": "Ninguna de las dos: un Outlook personal no se puede conectar. Crea una regla que reenvíe los correos de confirmación a un buzón que funcione — Gmail, cualquiera con IMAP — y conecta ese.",
       "other": "Algunos clientes de correo de código abierto publican su propio id de aplicación, y se puede pegar aquí. Funciona, pero la pantalla de consentimiento mostrará su nombre en lugar de Job Finder, y revocar el acceso afecta a ambos."
+    },
+    "body": {
+      "label": "Título del puesto desde el cuerpo del mensaje",
+      "never": "No leer nunca el cuerpo",
+      "ask": "Solo cuando lo pida, mensaje a mensaje",
+      "always": "Siempre, para las confirmaciones",
+      "hint": "Elijas lo que elijas, el cuerpo se lee solo en memoria: nunca se guarda, nunca se registra, nunca se envía a un modelo.",
+      "fetchOne": "Recuperar el puesto",
+      "notFound": "Ningún título reconocible en este mensaje."
     }
   }
 }

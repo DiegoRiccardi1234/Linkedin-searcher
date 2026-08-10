@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 from app.log import get_logger
 from app.mail import config as mail_config
 from app.mail.auth import refresh_access_token, scope_for
+from app.mail.body import role_from_body
 from app.mail.config import MailAccount
 from app.mail.errors import (
     MailAuthError,
@@ -164,6 +165,45 @@ class MailWatcher:
             value = mail_config.DEFAULT_PENDING_DAYS
         return max(1, min(90, value))
 
+    def body_mode(self) -> str:
+        raw = str(self._db.get_preference(mail_config.PREF_BODY_MODE, "") or "").strip().lower()
+        return raw if raw in mail_config.BODY_MODES else mail_config.DEFAULT_BODY_MODE
+
+    def fetch_role(self, mail_key: str, company: str) -> str:
+        """Read the job title out of one message's body, on request.
+
+        The only place in this package that downloads a body, and it does so for
+        a single message the user pointed at. Refuses outright in ``never`` mode
+        rather than quietly obliging: a setting that can be bypassed by an
+        endpoint is not a setting.
+        """
+        if self.body_mode() == mail_config.BODY_MODE_NEVER:
+            raise MailConfigError("body reading is switched off")
+        account = self.account()
+        if not account or not account.configured:
+            raise MailConfigError("mailbox not connected")
+        raw = self._fetch_body(account, mail_key)
+        return role_from_body(raw, company) if raw else ""
+
+    def _fetch_body(self, account: MailAccount, mail_key: str) -> bytes:
+        """One message, whole, in memory. Graph is not wired for this yet."""
+        if account.auth == "graph" or not mail_key.startswith("imap:"):
+            return b""
+        try:
+            uid = int(mail_key.rsplit(":", 1)[-1])
+        except ValueError:
+            return b""
+        if account.auth == "imap_oauth":
+            token = self._oauth_token(account)
+            factory = self._imap_factory or (
+                lambda acc: ImapMailbox(acc, token_provider=lambda: token)
+            )
+        else:
+            factory = self._imap_factory or (lambda acc: ImapMailbox(acc))
+        with factory(account) as box:
+            box.select_readonly(account.folder or "INBOX")
+            return bytes(box.fetch_body(uid))
+
     def _set_state(self, state: str, error: str = "") -> None:
         self._db.set_preference(mail_config.PREF_STATE, state)
         self._db.set_preference(mail_config.PREF_LAST_ERROR, error)
@@ -184,6 +224,7 @@ class MailWatcher:
             "last_run_ts": str(self._db.get_preference(mail_config.PREF_LAST_RUN, "") or ""),
             "pending_count": len(self._db.list_pending_applications(self.pending_days())),
             "review_count": len(self.review_items()),
+            "body_mode": self.body_mode(),
             "recovery_done": str(self._db.get_preference(mail_config.PREF_RECOVERY_DONE, "") or "")
             == "1",
             "running": self._control.running,
@@ -402,6 +443,15 @@ class MailWatcher:
                 matched_rule=evidence.rule,
             )
             return
+        # In "always" the title is read here, once, while the sweep is already
+        # talking to the server. A failure is not an error: the application is
+        # recorded titleless, which is what "never" produces anyway.
+        role = ""
+        if self.body_mode() == mail_config.BODY_MODE_ALWAYS:
+            try:
+                role = self.fetch_role(header.key, evidence.company)
+            except (MailError, OSError) as exc:
+                log.debug("could not read the role: %s", safe_error(exc))
         self._db.add_mail_review(
             account=account.address,
             mail_key=header.key,
@@ -411,6 +461,7 @@ class MailWatcher:
             company=evidence.company,
             sender=_safe_sender(header),
             rule=evidence.rule,
+            role=role,
             candidates=self._db.open_offers_from(evidence.company),
         )
 
@@ -458,9 +509,11 @@ class MailWatcher:
                 if str(row.get("status") or "open") == "open" or not row.get("applied_at")
             ]
             yield {"status": "searching", "candidates": len(candidates)}
-            if not candidates:
-                yield {"status": "complete", "proposals": 0, "checked": 0, "truncated": False}
-                return
+            # No early return on an empty archive any more. It used to make
+            # sense — with nothing to attach to there was nothing to ask — but
+            # the import path does not need candidates at all: it reads what the
+            # message says happened. Returning here left someone who connects a
+            # mailbox before running a scan with no way to recover anything.
 
             headers = self._headers_since(account, since, MAX_HISTORIC)
             truncated = len(headers) >= MAX_HISTORIC
@@ -562,6 +615,7 @@ class MailWatcher:
                 applied_at=str(row.get("received_at") or ""),
                 message_id=str(row.get("message_id") or ""),
                 rule="import",
+                role=str(row.get("role") or ""),
             )
             if new_id is not None:
                 created.append(new_id)

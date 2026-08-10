@@ -998,6 +998,15 @@
       "azure": "Un compte Azure : mêmes étapes. Le plan gratuit ne coûte rien mais demande une carte pour vérifier votre identité.",
       "none": "Ni l'un ni l'autre : un Outlook personnel ne peut pas être connecté. Créez une règle qui transfère les mails de confirmation vers une boîte qui fonctionne — Gmail, ou toute boîte IMAP — et connectez celle-là.",
       "other": "Certains clients de messagerie open source publient leur propre id d'application, que l'on peut coller ici. Cela fonctionne, mais l'écran de consentement affichera leur nom au lieu de Job Finder, et révoquer l'accès concerne les deux."
+    },
+    "body": {
+      "label": "Intitulé du poste depuis le corps du message",
+      "never": "Ne jamais lire le corps",
+      "ask": "Seulement à ma demande, message par message",
+      "always": "Toujours, pour les confirmations",
+      "hint": "Quel que soit votre choix, le corps est lu en mémoire uniquement : jamais enregistré, jamais journalisé, jamais envoyé à un modèle.",
+      "fetchOne": "Récupérer l'intitulé",
+      "notFound": "Aucun intitulé reconnaissable dans ce message."
     }
   }
 }

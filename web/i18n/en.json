@@ -998,6 +998,15 @@
       "azure": "An Azure account: same steps. The free plan costs nothing but asks for a card to verify your identity.",
       "none": "Neither of the two: a personal Outlook cannot be connected. Set up a rule that forwards confirmation emails to a mailbox that works — Gmail, Libero, any IMAP one — and connect that instead.",
       "other": "Some open-source mail clients publish their own app id, and it can be pasted here. It works, but the consent screen will show their name instead of Job Finder, and revoking access affects both."
+    },
+    "body": {
+      "label": "Job title from the message body",
+      "never": "Never read the body",
+      "ask": "Only when I ask, message by message",
+      "always": "Always, for confirmations",
+      "hint": "Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.",
+      "fetchOne": "Get the job title",
+      "notFound": "No recognisable job title in this message."
     }
   }
 }

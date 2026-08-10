@@ -68,6 +68,8 @@ def build_router(container: AppContainer) -> APIRouter:
             container.db.set_preference(mail_config.PREF_ENABLED, "1" if payload.enabled else "0")
         if payload.interval_minutes is not None:
             container.db.set_preference(mail_config.PREF_INTERVAL, str(payload.interval_minutes))
+        if payload.body_mode in mail_config.BODY_MODES:
+            container.db.set_preference(mail_config.PREF_BODY_MODE, payload.body_mode)
         return {"ok": True, "status": container.mailwatch.status()}
 
     @router.post("/api/mail/test")
@@ -215,6 +217,7 @@ def build_router(container: AppContainer) -> APIRouter:
                     "review_id": int(item["id"]),
                     "kind": item["kind"],
                     "company": item.get("company") or "",
+                    "role": item.get("role") or "",
                     "sender": item.get("sender") or "",
                     "received_at": item.get("received_at") or "",
                     "rule": item.get("rule") or "",
@@ -234,6 +237,31 @@ def build_router(container: AppContainer) -> APIRouter:
                 "import": sum(1 for i in items if i["kind"] == "import"),
             },
         }
+
+    @router.post("/api/mail/review/{review_id}/role")
+    def mail_review_role(review_id: int, request: Request) -> dict[str, Any]:
+        """Read the job title out of THIS message's body, because you asked.
+
+        The one action in this package that downloads a body, for one message,
+        on an explicit press. Refused outright when the setting says never.
+        """
+        rate_limit.check(request, bucket="mail_check", limit=30, window_seconds=60)
+        row = next(
+            (i for i in container.mailwatch.review_items() if int(i["id"]) == review_id), None
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="not_found")
+        if container.mailwatch.body_mode() == mail_config.BODY_MODE_NEVER:
+            raise HTTPException(status_code=409, detail="body_reading_off")
+        try:
+            role = container.mailwatch.fetch_role(
+                str(row["mail_key"]), str(row.get("company") or "")
+            )
+        except MailError as exc:
+            raise HTTPException(status_code=502, detail=safe_error(exc)) from exc
+        if role:
+            container.db.set_mail_review_role(review_id, role)
+        return {"ok": True, "review_id": review_id, "role": role}
 
     @router.post("/api/mail/review/resolve")
     def mail_review_resolve(payload: MailReviewResolveRequest) -> dict[str, Any]:

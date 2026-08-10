@@ -523,13 +523,14 @@ class Database:
         company: str = "",
         sender: str = "",
         rule: str = "",
+        role: str = "",
         candidates: Sequence[int] = (),
     ) -> None:
         """Queue a proposal. Idempotent per message, so a re-sweep does not double it."""
         self.conn.execute(
             "INSERT OR IGNORE INTO mail_review"
-            "(account, mail_key, message_id, received_at, kind, company, sender, rule, "
-            "candidates_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(account, mail_key, message_id, received_at, kind, company, sender, rule, role, "
+            "candidates_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 account,
                 mail_key,
@@ -539,6 +540,7 @@ class Database:
                 company,
                 sender,
                 rule,
+                role,
                 json.dumps(list(candidates)),
                 now_iso(),
             ),
@@ -582,6 +584,14 @@ class Database:
         return [found[i] for i in ids if i in found]
 
     @_synchronized
+    def set_mail_review_role(self, review_id: int, role: str) -> None:
+        """Remember the title read from a body, so the list does not reconnect to show it."""
+        self.conn.execute(
+            "UPDATE mail_review SET role = ? WHERE id = ?", (role.strip()[:120], review_id)
+        )
+        self.conn.commit()
+
+    @_synchronized
     def close_mail_review(self, review_ids: Sequence[int], verdict: str) -> int:
         """Take proposals off the queue and record that they were answered.
 
@@ -622,7 +632,7 @@ class Database:
 
     @_synchronized
     def add_application_from_mail(
-        self, *, company: str, applied_at: str, message_id: str, rule: str
+        self, *, company: str, applied_at: str, message_id: str, rule: str, role: str = ""
     ) -> int | None:
         """Record an application to a company the archive has never seen.
 
@@ -666,9 +676,21 @@ class Database:
             "ricerca_usata, modalita, dedup_key, status, applied_at, apply_confirmed_by, "
             "apply_confirm_message_id, first_seen_at, last_seen_at, updated_at, is_new, "
             "punteggio_ai) "
-            "VALUES (?, '', ?, '', '', 'mail', '', 'mail_import', '', ?, 'applied', ?, "
+            "VALUES (?, ?, ?, '', '', 'mail', '', 'mail_import', '', ?, 'applied', ?, "
             "'email', ?, ?, ?, ?, 0, NULL)",
-            (job_hash, company.strip(), job_hash, applied_at, message_id, stamp, stamp, stamp),
+            (
+                job_hash,
+                # Empty unless the body was read and gave one up: the subject
+                # names the employer and never the role.
+                role.strip(),
+                company.strip(),
+                job_hash,
+                applied_at,
+                message_id,
+                stamp,
+                stamp,
+                stamp,
+            ),
         )
         job_id = int(cur.lastrowid or 0)
         self.conn.execute(

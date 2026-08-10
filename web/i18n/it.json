@@ -998,6 +998,15 @@
       "azure": "Un account Azure: stessi passi. Il piano gratuito non costa nulla ma chiede una carta per verificare l'identità.",
       "none": "Nessuno dei due: un Outlook personale non si può collegare. Crea una regola che inoltri le mail di conferma a una casella che funziona — Gmail, Libero, una qualsiasi IMAP — e collega quella.",
       "other": "Alcuni client di posta open source pubblicano il proprio id applicazione, e si può incollare qui. Funziona, ma la schermata di consenso mostrerà il loro nome al posto di Job Finder, e revocare l'accesso vale per entrambi."
+    },
+    "body": {
+      "label": "Titolo del ruolo dal corpo del messaggio",
+      "never": "Mai leggere il corpo",
+      "ask": "Solo quando lo chiedo, messaggio per messaggio",
+      "always": "Sempre, per le conferme",
+      "hint": "Qualunque cosa scegli, il corpo viene letto solo in memoria: mai salvato, mai nei log, mai spedito a un modello.",
+      "fetchOne": "Recupera il ruolo",
+      "notFound": "Nessun titolo riconoscibile in questo messaggio."
     }
   }
 }

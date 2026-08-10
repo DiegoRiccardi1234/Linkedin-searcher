@@ -232,6 +232,11 @@ class MailConfigRequest(BaseModel):
     client_id: str | None = None
     enabled: bool | None = None
     interval_minutes: int | None = Field(default=None, ge=5, le=240)
+    #: ``never`` | ``ask`` | ``always`` — whether a message BODY may be read to
+    #: recover the job title, which the subject never carries. Anything else is
+    #: ignored rather than rejected: an unknown value must not be able to turn
+    #: body reading on by accident.
+    body_mode: str = ""
 
 
 class MailReviewAttach(BaseModel):

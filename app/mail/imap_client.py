@@ -6,9 +6,11 @@ than trusted:
 * ``SELECT`` is issued read-only, so the server refuses any change this code
   could attempt — including the ``\\Seen`` flag. An app that silently marks a
   mailbox as read is worse than one that does not work.
-* Only headers are fetched, with ``BODY.PEEK``. Bodies are never downloaded, so
-  the message text cannot leak into a log, a database or an exception. It also
-  makes a 90-day sweep fast enough to be worth offering.
+* Sweeping fetches HEADERS only, with ``BODY.PEEK``. A body is downloaded in
+  exactly one place — :meth:`ImapMailbox.fetch_body`, never called from the
+  sweep — and only when the user's ``body_mode`` setting allows it, because the
+  job title exists nowhere else. Even then the message is parsed in memory and
+  never stored, never logged and never sent to a model.
 * ``smtplib`` is not imported anywhere in this package. Reading a mailbox and
   writing from it are different powers, and the second one is not needed.
 
@@ -218,6 +220,26 @@ class ImapMailbox:
             uid = _uid(held[0])
             if uid is not None:
                 yield self._header(uid, held[1])
+
+    def fetch_body(self, uid: int) -> bytes:
+        """The whole message, for the one case the user asked for it.
+
+        Separate from :meth:`fetch_headers` and never called from it, so "does
+        this code path download a body" stays a question you can answer by
+        looking at the call sites. Still ``BODY.PEEK``: even when reading the
+        body, the mailbox is not marked as read.
+        """
+        typ, data = self._conn.uid("fetch", str(uid), "(BODY.PEEK[])")
+        if typ != "OK" or not data:
+            return b""
+        for item in data:
+            if (
+                isinstance(item, tuple)
+                and len(item) >= 2
+                and isinstance(item[1], bytes | bytearray)
+            ):
+                return bytes(item[1])
+        return b""
 
     def _header(self, uid: int, payload: bytes) -> MailHeader:
         message = email.message_from_bytes(payload)

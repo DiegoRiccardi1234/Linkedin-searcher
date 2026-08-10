@@ -940,6 +940,181 @@ def test_the_charts_do_not_count_imports_as_a_scoring_failure(tmp_path: Path) ->
         db.close()
 
 
+# ── the job title, and the promise it costs ──────────────────────────────────
+
+def _linkedin_message() -> bytes:
+    """A whole confirmation: the headers the sweep reads, and the body it does not.
+
+    Both in one blob because the fake server, like a real one, holds one message
+    — what differs is which parts of it a given FETCH asks for.
+    """
+    return (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject("La tua candidatura è stata inviata a AGM SOLUTIONS").encode()
+        + b"\r\nDate: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <agm@linkedin.com>\r\n"
+        b"MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"La tua candidatura e' stata inviata a AGM SOLUTIONS\r\n"
+        b"AI Developer\r\n"
+        b"AGM SOLUTIONS\r\n"
+        b"Italia\r\n"
+        b"---------------------------------------------------------\r\n"
+        b"Ora fai cosi' per avere ancora piu' successo\r\n"
+        b"Visualizza offerte di lavoro simili che potrebbero interessarti\r\n"
+        b"Software Engineer (Junior) - AI Systems\r\n"
+        b"DAIDALOS\r\n"
+    )
+
+
+
+def test_the_role_comes_from_the_anchor_not_from_a_search() -> None:
+    """Below the confirmation sit the recommendations, and they look like jobs.
+
+    Transcribed from a real LinkedIn confirmation. Anything that goes hunting
+    for "a line that reads like a job title" finds DAIDALOS's opening and files
+    somebody else's job as yours. Measured on 30 real confirmations from six
+    senders: 29 titles, none wrong.
+    """
+    from app.mail.body import role_from_body
+
+    assert role_from_body(_linkedin_message(), "AGM SOLUTIONS") == "AI Developer"
+
+
+def test_the_role_is_refused_when_the_company_does_not_corroborate_it() -> None:
+    """The second independent fact: the employer has to follow the title."""
+    from app.mail.body import role_from_body
+
+    assert role_from_body(_linkedin_message(), "Reply") == ""
+    assert role_from_body(b"", "AGM SOLUTIONS") == ""
+
+
+def test_never_mode_issues_no_command_that_could_fetch_a_body(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The original guarantee, still checkable on the literal IMAP command."""
+    client.post(
+        "/api/mail/config",
+        json={
+            "address": "me@libero.it",
+            "auth": "password",
+            "secret": "pw",
+            "body_mode": "never",
+        },
+    )
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    assert watcher.body_mode() == "never"
+    list(watcher.run_historic(90))
+
+    for call in fake.calls:
+        sent = " ".join(str(a) for a in call)
+        assert "BODY.PEEK[]" not in sent, "a whole message was downloaded in 'never' mode"
+
+    # And the endpoint cannot be used to go round the setting.
+    items = client.get("/api/mail/review").json()["items"]
+    if items:
+        assert (
+            client.post(f"/api/mail/review/{items[0]['review_id']}/role").status_code == 409
+        )
+
+
+def test_a_sweep_works_on_an_empty_archive(client: TestClient, tmp_path: Path) -> None:
+    """Connecting the mailbox before ever running a scan used to recover nothing.
+
+    The sweep returned early when there was nothing to attach to, which was true
+    before the import path existed: that one does not need candidates, it reads
+    what the message says happened.
+    """
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw", "body_mode": "never"},
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    assert client.get("/api/jobs").json()["jobs"] == []
+    done = list(watcher.run_historic(90))[-1]
+    assert done["imports"] == 1
+    assert client.get("/api/mail/review").json()["items"][0]["company"] == "AGM SOLUTIONS"
+
+
+def test_ask_mode_reads_one_body_and_only_when_pressed(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The default. Nothing is downloaded until a button names a message."""
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw", "body_mode": "ask"},
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+    assert not any("BODY.PEEK[]" in " ".join(str(a) for a in c) for c in fake.calls), (
+        "the sweep itself must not read bodies in 'ask'"
+    )
+
+    item = client.get("/api/mail/review").json()["items"][0]
+    assert item["role"] == ""
+    out = client.post(f"/api/mail/review/{item['review_id']}/role").json()
+    assert out["role"] == "AI Developer"
+    assert any("BODY.PEEK[]" in " ".join(str(a) for a in c) for c in fake.calls)
+
+    # And it sticks, so the list does not reconnect to show it.
+    assert client.get("/api/mail/review").json()["items"][0]["role"] == "AI Developer"
+
+
+def test_always_mode_titles_the_application_it_creates(
+    client: TestClient, tmp_path: Path
+) -> None:
+    client.post(
+        "/api/mail/config",
+        json={
+            "address": "me@libero.it",
+            "auth": "password",
+            "secret": "pw",
+            "body_mode": "always",
+        },
+    )
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = _linkedin_message()
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    list(watcher.run_historic(90))
+
+    item = client.get("/api/mail/review").json()["items"][0]
+    assert item["role"] == "AI Developer", "read during the sweep, without being asked twice"
+
+    client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [], "create": [item["review_id"]], "dismiss": []},
+    )
+    job = next(j for j in client.get("/api/jobs").json()["jobs"] if j["azienda"] == "AGM SOLUTIONS")
+    assert job["titolo"] == "AI Developer"
+    assert job["punteggio_ai"] is None, "a title is not a judgement"
+
+
 def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:
     """Without this, the extra_tasks wiring can vanish and every other test here
     stays green — the exact shape of the audit bug this project already had."""
