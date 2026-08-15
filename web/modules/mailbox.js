@@ -70,7 +70,11 @@ export async function loadMailboxStatus() {
   if ($("mailEnabled")) $("mailEnabled").checked = Boolean(status.enabled);
   if ($("mailInterval")) $("mailInterval").value = status.interval_minutes || 15;
   _bodyMode = status.body_mode || "ask";
-  if ($("mailBodyMode")) $("mailBodyMode").value = _bodyMode;
+  // Only while the user has not touched it. Since the mailbox got its own tab
+  // this function also runs on every visit, and it was overwriting a choice
+  // made a second earlier — so the next save posted the old value back.
+  const bodySelect = $("mailBodyMode");
+  if (bodySelect && bodySelect.dataset.touched !== "1") bodySelect.value = _bodyMode;
   _toggleAuthBlocks();
 
   const key = _STATE_KEYS[status.state] || "mail.state.unconfigured";
@@ -236,6 +240,9 @@ async function _connectMicrosoft() {
 }
 
 export function wireMailbox() {
+  $("mailBodyMode")?.addEventListener("change", (event) => {
+    event.currentTarget.dataset.touched = "1";
+  });
   $("mailAuth")?.addEventListener("change", _toggleAuthBlocks);
 
   $("mailSaveBtn")?.addEventListener("click", async () => {

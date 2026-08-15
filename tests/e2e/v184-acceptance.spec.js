@@ -92,7 +92,7 @@ test("the mailbox card exposes the window, the dry run and the three body modes"
   page,
 }) => {
   await open(page);
-  await page.locator('.topnav .nav-link[data-view="settings"]').click();
+  await page.locator('.topnav .nav-link[data-view="mail"]').click();
 
   await expect(page.locator("#mailRecoveryDryBtn")).toBeVisible();
   await expect(page.locator("#mailRecoveryDays option")).toHaveText(["90", "180", "365"]);
@@ -117,7 +117,7 @@ test("the mailbox card exposes the window, the dry run and the three body modes"
     await page.locator("#mailSaveBtn").click();
     await saved;
     await page.reload();
-    await page.locator('.topnav .nav-link[data-view="settings"]').click();
+    await page.locator('.topnav .nav-link[data-view="mail"]').click();
     await expect(page.locator("#mailBodyMode")).toHaveValue(wanted);
   }
 });
@@ -127,6 +127,7 @@ test("the reminder settings save, and the notification is off until asked for", 
 }) => {
   await open(page);
   await page.locator('.topnav .nav-link[data-view="profile"]').click();
+  await page.locator('[data-subtabs="profile"] [data-subtab="tools"]').click();
 
   const toggle = page.locator('input[data-feature="reminder_notify"]');
   await expect(toggle).toBeVisible();

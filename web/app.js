@@ -1064,6 +1064,23 @@ document.getElementById("remoteOnly").addEventListener("change", loadJobs);
 document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
 initJobSorting();
 initJobBuckets();
+// Wired here rather than at the end of bootstrap(): a tab strip needs no
+// data, and bootstrap awaits a dozen requests first — long enough for a
+// click on Settings to land on a strip that was not listening yet.
+// Both panels are already loaded once at boot below; the tabs only decide
+// what is on screen, so there is nothing to re-fetch on a switch.
+initSubtabs("settings", { defaultTab: "ai" });
+initReadiness({ revealElement });
+initSubtabs("profile", {
+  defaultTab: "about",
+  // The matching facts and the goals were fetched once at boot and never
+  // again, so reopening the tab showed whatever was true when the app
+  // started — including values a scan had changed since.
+  onChange: (tab) => {
+    if (tab === "constraints") loadMatchingFacts().catch(() => {});
+    renderReadinessStrips();
+  },
+});
 {
   const usageRangeSel = document.getElementById("usageRange");
   if (usageRangeSel) usageRangeSel.addEventListener("change", () => loadUsage());
@@ -1350,37 +1367,6 @@ async function bootstrap() {
   // Probes the GPU and asks Ollama: slow enough to keep off the critical path,
   // and useless until the user opens Settings anyway.
   initMatchingFacts();
-  // Both panels are already loaded once at boot below; the tabs only decide
-  // what is on screen, so there is nothing to re-fetch on a switch.
-  initSubtabs("settings", { defaultTab: "ai" });
-  initReadiness({ revealElement });
-  initChatActions({
-    getKeywords,
-    getLocations,
-    activateView,
-    showJobDetail,
-    addRoles: async (roles, keywords) => {
-      await addRolesToProfile(roles);
-      window.getKeywords?.addMultiple(keywords);
-      await _addToShortlistApi(keywords);
-    },
-    patchProfile: (body) =>
-      api("/api/profile", { method: "PATCH", body: JSON.stringify(body) }),
-    savePreference: (key, value) =>
-      api("/api/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
-    invalidateReadiness,
-    renderReadinessStrips,
-  });
-  initSubtabs("profile", {
-    defaultTab: "about",
-    // The matching facts and the goals were fetched once at boot and never
-    // again, so reopening the tab showed whatever was true when the app
-    // started — including values a scan had changed since.
-    onChange: (tab) => {
-      if (tab === "constraints") loadMatchingFacts().catch(() => {});
-      renderReadinessStrips();
-    },
-  });
   loadLocalModels();
   await loadSchedulerStatus();
   await loadChatPrompts();
@@ -1496,6 +1482,24 @@ window.getKeywords = getKeywords;
 // The locations box had no loader at all, which is why it was always empty and
 // the app filled the gap with a city of its own.
 window.getLocations = getLocations;
+
+initChatActions({
+  getKeywords,
+  getLocations,
+  activateView,
+  showJobDetail,
+  addRoles: async (roles, keywords) => {
+    await addRolesToProfile(roles);
+    window.getKeywords?.addMultiple(keywords);
+    await _addToShortlistApi(keywords);
+  },
+  patchProfile: (body) =>
+    api("/api/profile", { method: "PATCH", body: JSON.stringify(body) }),
+  savePreference: (key, value) =>
+    api("/api/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+  invalidateReadiness,
+  renderReadinessStrips,
+});
 
 async function loadRoleShortlist() {
   const roles = await _loadShortlistApi();

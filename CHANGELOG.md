@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-08-15
+
+### Changed
+- **The app stops searching for somebody else.** An empty search form did not mean "I haven't said yet": it meant "use the six terms and the city the author of this app was looking for". And the resolved values were then written down as *your* last search, which the scheduler replayed and which the work-rule inference read as evidence of where you live — so one scan with an empty form was enough to convince a stranger's installation that it belonged to an AI QA engineer in Turin. What to search for now comes from you, in order of how recently you said it: what you typed, your last scan, your shortlist, the roles read off your CV. Where, the same way. When there is nothing to go on the scan stops and asks, and a scheduled scan with nothing of yours to repeat skips instead of reaching for a built-in.
+- **The CV finally says where you live.** Nothing extracted a place before, so the app could only learn your city from a scan it had already picked the city for. It is read locally — Privacy Mode removes the address before the CV reaches any model, so the model cannot answer even when asked — and measured on a real CV, where the first version found nothing because the city sat in an unlabelled contact header. It never overwrites a value you set by hand.
+- **The words that decide what a posting is about are yours.** Two fixed lists did that job, and both described one trade. The title gate at least used its list only as a fallback; the second one ran on every scan for every profile, so a nurse's postings shared no word with it and were dropped before anyone could read them. That second gate is gone, and the first reads your terms and your CV's skills — with nothing to go on it stands down instead of guessing a trade.
+- Out of the code: the author's real CV as the model-test sample (degree mark included, in a public repository), the AI-QA example in the CV rewriting prompt, the Italy-only assumption in the salary prompt, and the Turin placeholder on the cities field.
+
+### Added
+- **The archive says which slice you are looking at, and how much it is hiding.** Five tabs with their sizes on them — to review, applied, discarded, archived, all — instead of a dropdown that said "Open". "Archived" had no entry at all before, which is how 28 auto-archived offers were in no filter. Under them, "showing X of Y".
+- **The mailbox is a place in the app, not a setting.** Deciding which offer a confirmation email belongs to was the last nine lines of a 116-line card, third of eight on a seven-screen page. It has its own tab now, with a badge counting the proposals waiting — a number the API has always returned and nothing ever read.
+- **Settings and Profile are four tabs each.** Profile follows the four questions it answers: who I am, what I'm looking for, what rules me out, the AI tools. Each tab opens with what is still missing from its own part, and every one of those is a button that takes you to the field that answers it.
+- **The coach knows which page you are on.** It answered every question from the same place before, so "why is this offer at 3?" and "which provider should I use?" got the same career-coach framing. It can now also prepare a search, save roles, fill in a profile fact or open an offer — always as a button you press. The one action it already had used to apply itself.
+- Six densities instead of two. The menu offered four and the code accepted two, so "Comfortable" and "Large" silently did nothing.
+
+### Fixed
+- **The row cap was deciding what you were allowed to see.** The list asked for 250 rows and then removed the blocked ones in Python: on a real archive "open and applicable" returned 123 rows at that cap and 174 with a bigger one. The filter is part of the query now, guarded so that a single unparseable analysis cannot take the whole list down with it, and an offer with no analysis at all — an application recovered from the mailbox — stays visible.
+- The kanban asks for the whole archive rather than a page: its columns *are* the slices, and a truncated board does not show fewer cards, it shows wrong numbers. The "Open" column read 210 of 369.
+- Two facts no CV can state — the driving licence and the protected-categories register — could be checked but not answered. They have fields now, along with the degree subject.
+- The privacy switch was hidden until a CV existed, which is exactly backwards: whether your CV is redacted before it reaches a model is the thing to decide *before* uploading one.
+- The Info tab claimed nothing leaves this computer except your prompts. It now lists every connection the app makes, and describes the app that exists rather than the one from 1.6.
+
 ## [1.8.6] — 2026-08-15
 
 ### Fixed
