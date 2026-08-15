@@ -469,6 +469,39 @@
       "hint": "I numeri veri stanno nella console del tuo provider. Scrivili qui e vincono su tutto il resto.",
       "perMin": "/min",
       "perDay": "/g"
+    },
+    "advice": {
+      "title": "Quale provider usare",
+      "subtitle": "Da ciò che l'app ha misurato sulla tua chiave e da ciò che ogni provider dichiara.",
+      "best": "Consigliato",
+      "why": "Perché",
+      "alternatives": "Vanno bene anche",
+      "getKey": "Ottieni una chiave",
+      "terms": "Le loro condizioni sui dati",
+      "none": "Ancora niente da consigliare.",
+      "measuredOn": "Misurato sugli ultimi {days} giorni",
+      "reason": {
+        "free": "piano gratuito",
+        "no_card": "senza carta di credito",
+        "configured": "chiave già configurata",
+        "allowance": "{n} richieste al giorno",
+        "eu_hosted": "ospitato in EU",
+        "stays_on_this_machine": "gira su questo computer",
+        "needs_a_model_installed_first": "prima serve installare un modello",
+        "trains_on_prompts": "si addestra sui tuoi prompt",
+        "training_depends_on_model": "l'addestramento dipende dal modello",
+        "measured_success": "{n} delle tue chiamate è andata a buon fine",
+        "measured_median_ms": "{n} ms mediani",
+        "closes_in_days": "chiude fra {n} giorni"
+      },
+      "warn": {
+        "free_tier_closed": "{provider}: il piano gratuito ha chiuso il {on}.",
+        "free_tier_closing": "{provider}: il piano gratuito chiude il {on}.",
+        "trains_on_prompts": "{provider} usa i prompt del piano gratuito — che contengono il tuo CV — per migliorare i suoi prodotti.",
+        "training_unverified": "Se {provider} si addestri sui tuoi prompt non è verificato qui. Leggi le loro condizioni prima di mandare un CV.",
+        "no_key_configured": "Nessuna chiave configurata: non si può valutare niente.",
+        "key_rejected": "{provider} sta rifiutando la chiave che hai salvato."
+      }
     }
   },
   "coach": {

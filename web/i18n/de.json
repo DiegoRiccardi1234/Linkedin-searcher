@@ -469,6 +469,39 @@
       "hint": "Die echten Zahlen stehen in der Konsole deines Anbieters. Trag sie hier ein, sie schlagen alles andere.",
       "perMin": "/Min.",
       "perDay": "/Tag"
+    },
+    "advice": {
+      "title": "Welchen Anbieter nutzen",
+      "subtitle": "Aus dem, was die App mit Ihrem Schlüssel gemessen hat, und dem, was jeder Anbieter veröffentlicht.",
+      "best": "Empfohlen",
+      "why": "Warum",
+      "alternatives": "Auch geeignet",
+      "getKey": "Schlüssel holen",
+      "terms": "Ihre Datenbedingungen",
+      "none": "Noch nichts zu empfehlen.",
+      "measuredOn": "Gemessen über die letzten {days} Tage",
+      "reason": {
+        "free": "kostenlose Stufe",
+        "no_card": "ohne Kreditkarte",
+        "configured": "Schlüssel bereits eingerichtet",
+        "allowance": "{n} Anfragen pro Tag",
+        "eu_hosted": "in der EU gehostet",
+        "stays_on_this_machine": "läuft auf diesem Rechner",
+        "needs_a_model_installed_first": "zuerst muss ein Modell installiert werden",
+        "trains_on_prompts": "trainiert mit Ihren Prompts",
+        "training_depends_on_model": "Training hängt vom Modell ab",
+        "measured_success": "{n} Ihrer Aufrufe waren erfolgreich",
+        "measured_median_ms": "{n} ms Median",
+        "closes_in_days": "schließt in {n} Tagen"
+      },
+      "warn": {
+        "free_tier_closed": "{provider}: Die kostenlose Stufe endete am {on}.",
+        "free_tier_closing": "{provider}: Die kostenlose Stufe endet am {on}.",
+        "trains_on_prompts": "{provider} nutzt Prompts der kostenlosen Stufe — die Ihren Lebenslauf enthalten — zur Produktverbesserung.",
+        "training_unverified": "Ob {provider} mit Ihren Prompts trainiert, ist hier nicht geprüft. Lesen Sie die Bedingungen, bevor Sie einen Lebenslauf senden.",
+        "no_key_configured": "Noch kein Schlüssel vorhanden, also kann nichts bewertet werden.",
+        "key_rejected": "{provider} lehnt den gespeicherten Schlüssel ab."
+      }
     }
   },
   "coach": {

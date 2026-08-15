@@ -19,6 +19,7 @@ from app.models import (
 from app.providers.model_selector import SCORING_MIN_SIZE_B, infer_size_b, rank_models
 from app.providers.openai_compat import cloudflare_base_url as cf_base_url
 from app.services import local_models, model_stats, rate_limits
+from app.services import provider_advice as provider_advice_service
 from app.services.model_probe import penalty_reason, probe_models
 from app.services.model_scoreboard import scoreboard
 
@@ -279,6 +280,23 @@ def build_router(container: AppContainer) -> APIRouter:
             rate_limits.PREF_OVERRIDES, json.dumps(data, ensure_ascii=False)
         )
         return {"ok": True, "limits": data}
+
+    @router.get("/api/providers/advice")
+    def provider_advice() -> dict[str, Any]:
+        """Which provider to use, and why — this install's evidence first.
+
+        The app could already name the best MODEL on a provider you had already
+        chosen. Choosing the provider was left to a hand-written table, so a new
+        user saw thirteen identical cards with nothing to separate them.
+        """
+        metadata = container.providers.metadata()
+        available = {
+            name: bool(entry.get("available"))
+            for name, entry in (metadata.get("providers") or {}).items()
+        }
+        return provider_advice_service.advise(
+            container.db, keys_status=container.keys_status(), available=available
+        )
 
     @router.get("/api/providers/health")
     def providers_health(days: int = 14) -> dict[str, Any]:

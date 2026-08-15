@@ -469,6 +469,39 @@
       "hint": "Your provider's console has the real numbers. Type them here and they win over everything else.",
       "perMin": "/min",
       "perDay": "/day"
+    },
+    "advice": {
+      "title": "Which provider to use",
+      "subtitle": "From what this app has measured on your own key, and what each provider publishes.",
+      "best": "Recommended",
+      "why": "Why",
+      "alternatives": "Also fine",
+      "getKey": "Get a key",
+      "terms": "Their data terms",
+      "none": "Nothing to suggest yet.",
+      "measuredOn": "Measured over the last {days} days",
+      "reason": {
+        "free": "free tier",
+        "no_card": "no credit card",
+        "configured": "key already configured",
+        "allowance": "{n} requests a day",
+        "eu_hosted": "hosted in the EU",
+        "stays_on_this_machine": "runs on this computer",
+        "needs_a_model_installed_first": "needs a model installed first",
+        "trains_on_prompts": "trains on your prompts",
+        "training_depends_on_model": "training depends on the model",
+        "measured_success": "{n} of your calls succeeded",
+        "measured_median_ms": "{n} ms median",
+        "closes_in_days": "closes in {n} days"
+      },
+      "warn": {
+        "free_tier_closed": "{provider}: the free tier closed on {on}.",
+        "free_tier_closing": "{provider}: the free tier closes on {on}.",
+        "trains_on_prompts": "{provider} uses free-tier prompts — which carry your CV — to improve its products.",
+        "training_unverified": "Whether {provider} trains on your prompts is not verified here. Read their terms before sending a CV.",
+        "no_key_configured": "No provider key yet, so nothing can be scored.",
+        "key_rejected": "{provider} is refusing the key you saved."
+      }
     }
   },
   "coach": {

@@ -43,6 +43,7 @@ import {
   populateChatProviderSelector,
   maybeOfferPersistChatOverride,
   loadProviderHealth,
+  loadProviderAdvice,
   setProviderDeps,
 } from "./modules/providers.js";
 import { initModelPicker, refreshModelPickerLabel } from "./modules/model_picker.js";
@@ -365,6 +366,7 @@ async function loadHealth() {
   updateProvidersMetadata(health.provider || {}, keys.preferred_model || "");
   renderProviderCards(keys, health.provider || {});
   loadProviderHealth();
+  loadProviderAdvice();
   showKeysStatus(status);
 }
 
@@ -377,6 +379,7 @@ async function loadKeysStatus() {
   updateProvidersMetadata(provider, keys.preferred_model || "");
   renderProviderCards(keys, provider);
   loadProviderHealth();
+  loadProviderAdvice();
   showKeysStatus(status);
 }
 

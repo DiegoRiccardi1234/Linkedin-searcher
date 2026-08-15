@@ -469,6 +469,39 @@
       "hint": "Les vrais chiffres sont dans la console de votre fournisseur. Écrivez-les ici et ils l'emportent sur le reste.",
       "perMin": "/min",
       "perDay": "/j"
+    },
+    "advice": {
+      "title": "Quel fournisseur utiliser",
+      "subtitle": "D'après ce que l'app a mesuré avec votre clé et ce que chaque fournisseur publie.",
+      "best": "Recommandé",
+      "why": "Pourquoi",
+      "alternatives": "Conviennent aussi",
+      "getKey": "Obtenir une clé",
+      "terms": "Leurs conditions sur les données",
+      "none": "Rien à recommander pour l'instant.",
+      "measuredOn": "Mesuré sur les {days} derniers jours",
+      "reason": {
+        "free": "offre gratuite",
+        "no_card": "sans carte bancaire",
+        "configured": "clé déjà configurée",
+        "allowance": "{n} requêtes par jour",
+        "eu_hosted": "hébergé dans l'UE",
+        "stays_on_this_machine": "tourne sur cet ordinateur",
+        "needs_a_model_installed_first": "il faut d'abord installer un modèle",
+        "trains_on_prompts": "s'entraîne sur vos prompts",
+        "training_depends_on_model": "l'entraînement dépend du modèle",
+        "measured_success": "{n} de vos appels ont abouti",
+        "measured_median_ms": "{n} ms médianes",
+        "closes_in_days": "ferme dans {n} jours"
+      },
+      "warn": {
+        "free_tier_closed": "{provider} : l'offre gratuite a fermé le {on}.",
+        "free_tier_closing": "{provider} : l'offre gratuite ferme le {on}.",
+        "trains_on_prompts": "{provider} utilise les prompts de l'offre gratuite — qui contiennent votre CV — pour améliorer ses produits.",
+        "training_unverified": "Rien ici ne vérifie si {provider} s'entraîne sur vos prompts. Lisez leurs conditions avant d'envoyer un CV.",
+        "no_key_configured": "Aucune clé pour l'instant : rien ne peut être évalué.",
+        "key_rejected": "{provider} refuse la clé que vous avez enregistrée."
+      }
     }
   },
   "coach": {

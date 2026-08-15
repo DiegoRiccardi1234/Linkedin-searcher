@@ -8,6 +8,86 @@
     "Patterns are matched most-specific-first with fnmatch.",
     "rpm = requests per minute, rpd = requests per day, tpm = input tokens per minute."
   ],
+  "_providers": {
+    "_note": [
+      "What the app knows about each provider BEYOND its rate limits, used to answer",
+      "'which free provider should I use?'. `trains` has three values and the third is",
+      "the honest one: 'yes' and 'no' are only written where a primary source says so,",
+      "everything else is 'unknown' and the UI links the terms instead of reassuring.",
+      "`region` is where the inference runs; `sunset` is the day a free tier closes."
+    ],
+    "google": {
+      "free": true,
+      "card": false,
+      "trains": "yes",
+      "region": "global",
+      "signup": "https://aistudio.google.com/apikey",
+      "terms": "https://ai.google.dev/gemini-api/terms",
+      "note": "Free tier prompts are used to improve Google products and human reviewers may read them."
+    },
+    "groq": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "global",
+      "signup": "https://console.groq.com/keys",
+      "terms": "https://groq.com/privacy-policy/"
+    },
+    "cerebras": {
+      "free": true,
+      "card": true,
+      "trains": "unknown",
+      "region": "global",
+      "sunset": "2026-08-17",
+      "signup": "https://cloud.cerebras.ai",
+      "terms": "https://www.cerebras.ai/privacy"
+    },
+    "openrouter": {
+      "free": true,
+      "card": false,
+      "trains": "depends",
+      "region": "global",
+      "signup": "https://openrouter.ai/keys",
+      "terms": "https://openrouter.ai/docs/features/privacy-and-logging",
+      "note": "Each upstream provider has its own policy; some train on free-model prompts. OpenRouter account settings can refuse to route to those."
+    },
+    "cloudflare": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "global",
+      "signup": "https://dash.cloudflare.com/profile/api-tokens",
+      "terms": "https://www.cloudflare.com/privacypolicy/"
+    },
+    "ovh": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "eu",
+      "signup": "https://endpoints.ai.cloud.ovh.net/",
+      "terms": "https://www.ovhcloud.com/en/personal-data-protection/"
+    },
+    "mistral": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "eu",
+      "signup": "https://console.mistral.ai/api-keys",
+      "terms": "https://mistral.ai/terms"
+    },
+    "custom": {
+      "free": true,
+      "card": false,
+      "trains": "no",
+      "region": "local",
+      "note": "A model on your own machine: the prompt never leaves it."
+    },
+    "openai": { "free": false, "card": true, "trains": "no", "region": "global" },
+    "anthropic": { "free": false, "card": true, "trains": "no", "region": "global" },
+    "deepseek": { "free": false, "card": true, "trains": "unknown", "region": "global" },
+    "xai": { "free": false, "card": true, "trains": "unknown", "region": "global" },
+    "glm": { "free": false, "card": true, "trains": "unknown", "region": "global" }
+  },
   "google": {
     "*flash-lite*": {
       "rpm": 15,

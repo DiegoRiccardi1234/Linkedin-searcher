@@ -3197,6 +3197,20 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 }
 .provider-health-row > span:last-child { color: var(--text-muted); text-align: right; }
 
+/* Which provider to use: measured first, published second */
+.provider-advice {
+  margin-bottom: var(--space-3); padding: var(--space-2);
+  border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.advice-row {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  flex-wrap: wrap; padding: 3px 0; font-size: var(--fs-sm);
+}
+.advice-label { font-weight: 600; opacity: 0.7; min-width: 7rem; }
+.advice-row > span.micro { color: var(--text-muted); }
+.advice-links { margin-left: auto; }
+.advice-warnings { margin: var(--space-2) 0 0; padding-left: 1.1rem; color: var(--text-muted); }
+
 /* Provider cards: what a provider costs, and where to get a key */
 .provider-free-badge {
   background: rgba(0, 135, 90, 0.14); color: var(--success);
