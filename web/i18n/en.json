@@ -1048,5 +1048,34 @@
       "fetchOne": "Get the job title",
       "notFound": "No recognisable job title in this message."
     }
+  },
+  "readiness": {
+    "blocking": "Needed before searching",
+    "optional": "Improves the results",
+    "allSet": "Nothing missing here.",
+    "fix": "Fill in",
+    "askAi": "Ask the AI",
+    "scanBlockedTitle": "Tell me what to look for first",
+    "scanBlockedBody": "A search needs two things of yours: {items}. Otherwise the app would be searching for somebody else.",
+    "sourceCv": "from your CV",
+    "sourceManual": "you told me",
+    "sourceLastScan": "from your last search",
+    "sourceShortlist": "from your shortlist",
+    "sourceProfile": "from your profile",
+    "sourceWatchlist": "from the companies you follow",
+    "item": {
+      "search_terms": "What to search for",
+      "location": "Where to search",
+      "cv": "Your CV",
+      "goal": "Search goal",
+      "ral_min": "Minimum salary",
+      "years_experience": "Years of experience",
+      "education_level": "Education level",
+      "grade": "Degree mark",
+      "degree_fields": "Degree subject",
+      "driving_licence": "Driving licence",
+      "protected_category": "Protected categories register",
+      "work_rule": "Where you can work"
+    }
   }
 }

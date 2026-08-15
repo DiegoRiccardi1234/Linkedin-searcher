@@ -1048,5 +1048,34 @@
       "fetchOne": "Stellenbezeichnung holen",
       "notFound": "Keine erkennbare Stellenbezeichnung in dieser Nachricht."
     }
+  },
+  "readiness": {
+    "blocking": "Zum Suchen nötig",
+    "optional": "Verbessert die Ergebnisse",
+    "allSet": "Hier fehlt nichts.",
+    "fix": "Ausfüllen",
+    "askAi": "KI fragen",
+    "scanBlockedTitle": "Sag mir zuerst, wonach ich suchen soll",
+    "scanBlockedBody": "Eine Suche braucht zwei Angaben von dir: {items}. Sonst würde die App die Arbeit von jemand anderem suchen.",
+    "sourceCv": "aus deinem Lebenslauf",
+    "sourceManual": "hast du gesagt",
+    "sourceLastScan": "aus deiner letzten Suche",
+    "sourceShortlist": "aus deinen gemerkten Rollen",
+    "sourceProfile": "aus deinem Profil",
+    "sourceWatchlist": "aus den gefolgten Firmen",
+    "item": {
+      "search_terms": "Wonach suchen",
+      "location": "Wo suchen",
+      "cv": "Dein Lebenslauf",
+      "goal": "Suchziel",
+      "ral_min": "Mindestgehalt",
+      "years_experience": "Berufsjahre",
+      "education_level": "Abschluss",
+      "grade": "Abschlussnote",
+      "degree_fields": "Studienfach",
+      "driving_licence": "Führerschein",
+      "protected_category": "Schwerbehindertenstatus",
+      "work_rule": "Wo du arbeiten kannst"
+    }
   }
 }

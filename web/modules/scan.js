@@ -160,6 +160,13 @@ async function _onScanSubmit(event) {
     document.getElementById("locationsInput").value = '';
   }
 
+  if (typeof _deps.ensureProfileReady === "function") {
+    // After the pending text became tags, or someone who typed a term without
+    // pressing enter would be told they had not said what to look for.
+    const ready = await _deps.ensureProfileReady();
+    if (!ready) return;
+  }
+
   const termsText = getKeywords.getTags().join(", ");
   warnAboutVagueTerms(getKeywords.getTags());
   const siteCheckboxes = document.querySelectorAll('input[name="scanSites"]:checked');

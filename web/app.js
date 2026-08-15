@@ -63,6 +63,13 @@ import {
   setJobsBucket,
 } from "./modules/job_list.js";
 import { initSubtabs, panelOf, setSubtabBadge, showSubtab } from "./modules/subtabs.js";
+import {
+  ensureProfileReady,
+  fetchReadiness,
+  initReadiness,
+  invalidateReadiness,
+  renderReadinessStrips,
+} from "./modules/readiness.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
@@ -840,6 +847,7 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
     activateView(view);
     if (view === "profile") {
       loadProfileView().catch(() => {});
+      renderReadinessStrips();
     }
     if (view === "jobs") {
       loadJobs().catch(() => {});
@@ -853,6 +861,21 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
 });
 
 bindProfileEvents();
+
+// The keyword box read the shortlist while the CV wrote `preferred_roles`, so
+// after uploading a CV it stayed empty — and an empty box used to mean "search
+// for whatever this app was written for". Both boxes are now filled from the
+// same chain the scan would follow, visibly and editable.
+async function prefillSearchForm() {
+  const report = await fetchReadiness();
+  if (!report) return;
+  if (window.getKeywords && !window.getKeywords.getTags().length) {
+    window.getKeywords.addMultiple(report.suggested_terms || []);
+  }
+  if (window.getLocations && !window.getLocations.getTags().length) {
+    window.getLocations.addMultiple(report.suggested_locations || []);
+  }
+}
 
 const _primaryProviderEl = document.getElementById("primaryProvider");
 if (_primaryProviderEl) {
@@ -1299,7 +1322,21 @@ async function bootstrap() {
     toggleCompare,
   });
   initCompare();
-  initScan({ getKeywords, getLocations, ensureProviderConfigured });
+  initScan({
+    getKeywords,
+    getLocations,
+    ensureProviderConfigured,
+    // Two gates now: a key to score with, and something of the user's to
+    // search for. The second one used to be covered by a built-in default.
+    ensureProfileReady: () =>
+      ensureProfileReady({
+        showToast,
+        revealElement,
+        terms: getKeywords.getTags(),
+        locations: getLocations.getTags(),
+        isRemote: document.getElementById("remoteToggle")?.checked || false,
+      }),
+  });
   setupSharedLayout();
   activateView("dashboard");
   await loadHealth();
@@ -1319,6 +1356,7 @@ async function bootstrap() {
   // Both panels are already loaded once at boot below; the tabs only decide
   // what is on screen, so there is nothing to re-fetch on a switch.
   initSubtabs("settings", { defaultTab: "ai" });
+  initReadiness({ revealElement });
   initSubtabs("profile", {
     defaultTab: "about",
     // The matching facts and the goals were fetched once at boot and never
@@ -1326,6 +1364,7 @@ async function bootstrap() {
     // started — including values a scan had changed since.
     onChange: (tab) => {
       if (tab === "constraints") loadMatchingFacts().catch(() => {});
+      renderReadinessStrips();
     },
   });
   loadLocalModels();
@@ -1440,12 +1479,18 @@ function setupTagInput(containerId, inputId, onRemove) {
 const getKeywords = setupTagInput('keywordsContainer', 'keywordsInput', (term) => { _removeFromShortlistApi(term); });
 const getLocations = setupTagInput('locationsContainer', 'locationsInput');
 window.getKeywords = getKeywords;
+// The locations box had no loader at all, which is why it was always empty and
+// the app filled the gap with a city of its own.
+window.getLocations = getLocations;
 
 async function loadRoleShortlist() {
   const roles = await _loadShortlistApi();
   if (roles.length && getKeywords && typeof getKeywords.addMultiple === "function") {
     getKeywords.addMultiple(roles);
   }
+  // Whatever the shortlist did not cover — the roles read off the CV, the last
+  // search actually run — comes from the same chain the scan follows.
+  await prefillSearchForm();
 }
 loadRoleShortlist();
 

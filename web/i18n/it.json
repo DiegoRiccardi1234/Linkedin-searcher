@@ -1048,5 +1048,34 @@
       "fetchOne": "Recupera il ruolo",
       "notFound": "Nessun titolo riconoscibile in questo messaggio."
     }
+  },
+  "readiness": {
+    "blocking": "Serve per cercare",
+    "optional": "Migliora i risultati",
+    "allSet": "Qui non manca niente.",
+    "fix": "Completa",
+    "askAi": "Chiedi all'IA",
+    "scanBlockedTitle": "Prima dimmi cosa cercare",
+    "scanBlockedBody": "Per cercare servono due cose tue: {items}. Altrimenti l'app cercherebbe il lavoro di qualcun altro.",
+    "sourceCv": "dal tuo CV",
+    "sourceManual": "l'hai detto tu",
+    "sourceLastScan": "dalla tua ultima ricerca",
+    "sourceShortlist": "dai ruoli che hai salvato",
+    "sourceProfile": "dal tuo profilo",
+    "sourceWatchlist": "dalle aziende che segui",
+    "item": {
+      "search_terms": "Cosa cercare",
+      "location": "Dove cercare",
+      "cv": "Il tuo CV",
+      "goal": "Obiettivo di ricerca",
+      "ral_min": "RAL minima",
+      "years_experience": "Anni di esperienza",
+      "education_level": "Titolo di studio",
+      "grade": "Voto di laurea",
+      "degree_fields": "Materia della laurea",
+      "driving_licence": "Patente B",
+      "protected_category": "Iscrizione alle categorie protette",
+      "work_rule": "Dove puoi lavorare"
+    }
   }
 }

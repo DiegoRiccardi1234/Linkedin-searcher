@@ -751,6 +751,44 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
    because they now live in four different panels. */
 .view.no-profile [data-needs-profile] { display: none; }
 
+/* What the app still needs to know, at the top of the tab where it can be
+   answered. A gap named without a way to fill it is just a complaint. */
+.readiness-strip { margin-bottom: var(--space-3); }
+.readiness-strip:empty { display: none; }
+.readiness-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.readiness-label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.readiness-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: default;
+}
+button.readiness-chip { cursor: pointer; }
+button.readiness-chip:hover { border-color: var(--accent); color: var(--text); }
+.readiness-chip.is-blocking {
+  border-color: var(--danger, #d33);
+  color: var(--danger, #d33);
+}
+.readiness-chip.is-warning { border-style: dashed; }
+.readiness-chip.is-ok { opacity: 0.75; }
+.readiness-done { font-size: var(--fs-sm); color: var(--text-secondary); }
+
 .jobs-count-line {
   display: flex;
   align-items: center;

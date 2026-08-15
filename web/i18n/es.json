@@ -1048,5 +1048,34 @@
       "fetchOne": "Recuperar el puesto",
       "notFound": "Ningún título reconocible en este mensaje."
     }
+  },
+  "readiness": {
+    "blocking": "Necesario para buscar",
+    "optional": "Mejora los resultados",
+    "allSet": "Aquí no falta nada.",
+    "fix": "Completar",
+    "askAi": "Pregunta a la IA",
+    "scanBlockedTitle": "Dime primero qué buscar",
+    "scanBlockedBody": "Para buscar hacen falta dos cosas tuyas: {items}. Si no, la app buscaría el trabajo de otra persona.",
+    "sourceCv": "de tu CV",
+    "sourceManual": "lo dijiste tú",
+    "sourceLastScan": "de tu última búsqueda",
+    "sourceShortlist": "de tus roles guardados",
+    "sourceProfile": "de tu perfil",
+    "sourceWatchlist": "de las empresas que sigues",
+    "item": {
+      "search_terms": "Qué buscar",
+      "location": "Dónde buscar",
+      "cv": "Tu CV",
+      "goal": "Objetivo de búsqueda",
+      "ral_min": "Salario mínimo",
+      "years_experience": "Años de experiencia",
+      "education_level": "Nivel de estudios",
+      "grade": "Nota de la carrera",
+      "degree_fields": "Materia de la carrera",
+      "driving_licence": "Carné de conducir",
+      "protected_category": "Registro de discapacidad",
+      "work_rule": "Dónde puedes trabajar"
+    }
   }
 }

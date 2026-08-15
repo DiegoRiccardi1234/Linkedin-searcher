@@ -1048,5 +1048,34 @@
       "fetchOne": "Récupérer l'intitulé",
       "notFound": "Aucun intitulé reconnaissable dans ce message."
     }
+  },
+  "readiness": {
+    "blocking": "Nécessaire pour chercher",
+    "optional": "Améliore les résultats",
+    "allSet": "Rien ne manque ici.",
+    "fix": "Compléter",
+    "askAi": "Demander à l'IA",
+    "scanBlockedTitle": "Dites-moi d'abord quoi chercher",
+    "scanBlockedBody": "Une recherche demande deux choses de vous : {items}. Sinon l'app chercherait le travail de quelqu'un d'autre.",
+    "sourceCv": "de votre CV",
+    "sourceManual": "vous l'avez dit",
+    "sourceLastScan": "de votre dernière recherche",
+    "sourceShortlist": "de vos rôles enregistrés",
+    "sourceProfile": "de votre profil",
+    "sourceWatchlist": "des entreprises suivies",
+    "item": {
+      "search_terms": "Quoi chercher",
+      "location": "Où chercher",
+      "cv": "Votre CV",
+      "goal": "Objectif de recherche",
+      "ral_min": "Salaire minimum",
+      "years_experience": "Années d'expérience",
+      "education_level": "Niveau d'études",
+      "grade": "Mention du diplôme",
+      "degree_fields": "Matière du diplôme",
+      "driving_licence": "Permis de conduire",
+      "protected_category": "Statut de travailleur handicapé",
+      "work_rule": "Où vous pouvez travailler"
+    }
   }
 }
