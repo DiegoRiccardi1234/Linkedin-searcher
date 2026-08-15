@@ -26,7 +26,7 @@ from app.models import (
     RoleShortlistRequest,
 )
 from app.services import candidate_facts as cf
-from app.services import market_snapshot
+from app.services import market_snapshot, readiness
 from app.services import roles_shortlist as roles_shortlist_svc
 from app.services.generation import CV_POLICY, generate_with_profile
 from app.services.onboarding import onboarding_context
@@ -463,6 +463,13 @@ def build_router(container: AppContainer) -> APIRouter:
             container.db.set_preference(
                 cf.FACT_DRIVING_LICENCE, "1" if payload.driving_licence else "0"
             )
+        if payload.protected_category is not None:
+            container.db.set_preference(
+                cf.FACT_PROTECTED_CATEGORY, "1" if payload.protected_category else "0"
+            )
+        if payload.degree_fields is not None:
+            fields = [f.strip().lower() for f in payload.degree_fields if f and f.strip()]
+            container.db.set_preference(cf.FACT_DEGREE_FIELDS, ",".join(fields))
         if payload.base_cities is not None:
             cities = [c.strip() for c in payload.base_cities if c and c.strip()]
             container.db.set_preference(cf.FACT_BASE_CITIES, ",".join(cities))
@@ -501,9 +508,22 @@ def build_router(container: AppContainer) -> APIRouter:
                 if on
             ],
             "rule_summary": cf.describe_work_rule(rule),
+            "protected_category": facts.protected_category,
             "sources": facts.sources,
             "missing": facts.missing(),
         }
+
+    @router.get("/api/profile/readiness")
+    def profile_readiness() -> dict[str, Any]:
+        """What is still missing before a scan means anything for THIS user.
+
+        Kept apart from ``matching-facts``, which answers a narrower question
+        (the facts that decide whether an offer is takeable). Readiness also
+        covers what to search for and where — neither of which is a fact about
+        the candidate — and it is what the scan gate and the profile panels
+        both read, so the two can never disagree about what is missing.
+        """
+        return readiness.profile_readiness(container.db)
 
     @router.patch("/api/profile")
     def update_profile(payload: ProfileUpdate) -> dict[str, Any]:

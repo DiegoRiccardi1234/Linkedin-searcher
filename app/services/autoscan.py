@@ -186,6 +186,13 @@ class AutoScanScheduler:
                 if not self._container.has_provider_configured():
                     return {"status": "skipped", "reason": "no_provider"}
                 payload = self._build_payload()
+                # A scheduled scan replays what the user ran by hand. If they
+                # never ran one, there is nothing to replay — and the fallback
+                # that used to cover this case is exactly the one that made
+                # every install search for the same six terms in Turin.
+                if not payload.search_terms:
+                    log.info("autoscan skipped: no search of your own to repeat yet")
+                    return {"status": "skipped", "reason": "no_search_intent"}
                 for _event in self._run_scan(
                     db=self._container.db,
                     settings=self._container.settings,

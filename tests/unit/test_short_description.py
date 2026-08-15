@@ -110,7 +110,7 @@ def _run(df: pd.DataFrame, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> l
     try:
         return list(
             ss.run_scan(
-                db, settings, _CountingPM(), ScanRequest(search_terms=["x"], sites=["linkedin"])
+                db, settings, _CountingPM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")
             )
         )
     finally:

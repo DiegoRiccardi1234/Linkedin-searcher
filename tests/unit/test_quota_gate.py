@@ -94,7 +94,7 @@ def test_run_scan_stops_before_scraping(tmp_path: Path, monkeypatch: pytest.Monk
     try:
         db.set_preference(quota.LIMIT_PREFERENCE, "10")
         _log_calls(db, 10)
-        events = list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"])))
+        events = list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], location="Milano")))
         assert scraped == []  # not even the scrape ran
         assert events[0]["error"].startswith("daily_limit_reached")
         assert events[0]["quota"]["used"] == 10

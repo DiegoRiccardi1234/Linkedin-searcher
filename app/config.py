@@ -5,19 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-# Two domain tokens each, never a bare role word. Measured on a real scan:
-# "AI Specialist" alone returned 27 of 47 postings and nearly all the noise —
-# job boards match "Specialist" against payroll, sales and partnership roles —
-# while "AI QA" returned 15 with one strong hit and "LLM Evaluation" 5 with two.
-# A narrow term fishes less and better, and it costs nothing to fix here.
-DEFAULT_SEARCH_TERMS = [
-    "AI QA",
-    "LLM Evaluation",
-    "AI Automation",
-    "Prompt Engineering",
-    "Data Annotation",
-    "QA Engineer",
-]
+# There is deliberately no built-in list of search terms and no default city.
+# Both used to exist, taken from the person who wrote this app, and an empty
+# search form silently resolved to them — then stored them as the user's own
+# last search, which the scheduler replayed and the work-rule inference read as
+# evidence of where they lived. What to search for now comes from the user
+# (app/services/search_intent.py) and, when there is nothing to go on, the scan
+# refuses and the app asks. `settings.json` can still set both for a deployment
+# that wants them.
 
 LOCAL_SECRETS_FILE = "local_secrets.json"
 SUPPORTED_PROVIDERS = [
@@ -61,12 +56,9 @@ class AppSettings:
     hours_old: int
     max_annunci: int
     delay_tra_ricerche: float
-    location_default: str
-    location_remote_default: str
     # Default Indeed/Glassdoor country (a jobspy Country name/alias, e.g. "italy",
     # "usa"). Overridable per-scan by the country selector.
     country_default: str
-    default_search_terms: list[str]
     cerebras_api_key: str | None
     groq_api_key: str | None
     openai_api_key: str | None
@@ -312,10 +304,6 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     if primary_provider in SUPPORTED_PROVIDERS:
         sanitized_order = [primary_provider] + [p for p in sanitized_order if p != primary_provider]
 
-    terms = cfg.get("default_search_terms", DEFAULT_SEARCH_TERMS)
-    if not isinstance(terms, list) or not terms:
-        terms = DEFAULT_SEARCH_TERMS
-
     model_policy = cfg.get("model_selection_policy", {})
     if not isinstance(model_policy, dict):
         model_policy = {}
@@ -365,10 +353,9 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         hours_old=_as_int(cfg, "hours_old", 336),
         max_annunci=_as_int(cfg, "max_annunci", 20),
         delay_tra_ricerche=_as_float(cfg, "delay_tra_ricerche", 4.0),
-        location_default=str(cfg.get("location_default", "Torino, Italy")),
-        location_remote_default=str(cfg.get("location_remote_default", "Italy")),
-        country_default=str(cfg.get("country_default", "italy")),
-        default_search_terms=[str(x) for x in terms],
+        country_default=str(
+            cfg.get("country_default", "italy")
+        ),  # jobspy needs one; the selector overrides it
         cerebras_api_key=cerebras_api_key,
         groq_api_key=groq_api_key,
         openai_api_key=openai_api_key,

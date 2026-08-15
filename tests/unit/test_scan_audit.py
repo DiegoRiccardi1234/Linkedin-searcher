@@ -77,7 +77,7 @@ def test_audit_rescores_the_offers_it_flags(tmp_path: Path, monkeypatch: pytest.
 
     db = Database(tmp_path / "s.db")
     try:
-        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"])))
+        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")))
         assert len(calls) > 5, "the audit flagged clones but never asked again"
         summaries = [
             db.get_job_with_analysis(j["id"])["analysis"].get("riassunto")
@@ -112,7 +112,7 @@ def test_audit_leaves_a_healthy_scan_alone(tmp_path: Path, monkeypatch: pytest.M
 
     db = Database(tmp_path / "h.db")
     try:
-        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"])))
+        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")))
         assert len(calls) == 5
     finally:
         db.close()

@@ -133,6 +133,7 @@ from app.services.scan.vocab import (
     title_off_topic,
     title_vocabulary,
 )
+from app.services.search_intent import ScanRefused, resolve_locations, resolve_search_terms
 
 # This module stays the front door of the scan pipeline: the internals now live
 # under ``app.services.scan``, but callers and tests keep importing them from
@@ -1011,7 +1012,19 @@ def run_scan(
     # "tirocinio" never sees the postings titled "stage" or "internship", which
     # is most of them. Each alternative is a separate search, because the boards
     # rank on all the words in a query together.
-    terms = expand_terms(list(payload.search_terms or settings.default_search_terms))
+    # What to search for comes from the user: what they typed, else their last
+    # scan, else their shortlist, else the roles read off their CV — and if
+    # none of that exists, the scan refuses. The old fallback was a constant in
+    # config.py, which meant a stranger's first scan searched for the terms the
+    # author of this app was looking for, and then STORED them as that
+    # stranger's own history two dozen lines below.
+    resolved_terms, terms_origin = resolve_search_terms(db, payload.search_terms)
+    # Followed employers get their own search, by name: a watchlist IS a thing
+    # to search for, so a scan that has one and no terms is legitimate.
+    watchlist = _watchlist_for_scan(db, payload)
+    if not resolved_terms and not watchlist:
+        raise ScanRefused(["search_terms"])
+    terms = expand_terms(list(resolved_terms))
     exp_levels = list(payload.experience_levels or [])
     job_types = list(payload.job_types or [])
     work_types = list(payload.work_types or [])
@@ -1045,15 +1058,21 @@ def run_scan(
 
     is_remote_effective = payload.is_remote or ("remote" in work_types)
 
-    # Multi-location: scrape each location. Fall back to the single location (or
-    # the settings default) for backward compat / saved searches. Capped to keep
-    # a scan bounded (terms x locations x ~20 jobs each).
-    default_location = (
-        settings.location_remote_default if is_remote_effective else settings.location_default
+    # Multi-location: scrape each location. Same rule as the terms — the user's
+    # own answer, never a default city. A full-remote scan still needs somewhere
+    # to point the boards at, so it falls back to the country the user picked.
+    typed_locations = [loc.strip() for loc in (payload.locations or []) if loc and loc.strip()]
+    if not typed_locations and payload.location:
+        typed_locations = [payload.location.strip()]
+    locations_list, locations_origin = resolve_locations(
+        db, typed_locations, is_remote=is_remote_effective
     )
-    locations_list = [loc.strip() for loc in (payload.locations or []) if loc and loc.strip()]
+    if not locations_list and is_remote_effective:
+        locations_list, locations_origin = (
+            ([payload.country.strip()], "country") if payload.country else ([], locations_origin)
+        )
     if not locations_list:
-        locations_list = [payload.location.strip()] if payload.location else [default_location]
+        raise ScanRefused(["location"])
     if len(locations_list) > _MAX_SCAN_LOCATIONS:
         locations_list = locations_list[:_MAX_SCAN_LOCATIONS]
     country = (payload.country or settings.country_default or "italy").strip()
@@ -1062,18 +1081,22 @@ def run_scan(
 
     augmented_terms = [_augment_search_term(t, exp_levels, work_types) for t in terms]
 
-    # Followed employers get their own search, by name, on the primary location
-    # only: a company search is about WHO is hiring, not where, and repeating it
-    # per location would multiply the cost for the same handful of postings.
-    watchlist = _watchlist_for_scan(db, payload)
-
+    # (The watchlist was resolved before the terms: it is one of the two things
+    # that can make a scan meaningful, so the refusal above has to see it.)
     jobspy_job_type = _resolve_jobspy_job_type(job_types)
 
-    db.set_preference("last_scan_location", primary_location)
-    db.set_preference("last_scan_locations", json.dumps(locations_list, ensure_ascii=False))
-    db.set_preference("last_scan_country", country)
+    # Only what the user actually chose becomes their history. This block used
+    # to run unconditionally, so a value that had merely been resolved for them
+    # came back as evidence: the scheduler replayed it, and the work-rule
+    # inference read the stored location as proof of where they live.
+    if terms_origin == "explicit":
+        db.set_preference("last_scan_terms", json.dumps(list(resolved_terms), ensure_ascii=False))
+    if locations_origin == "explicit":
+        db.set_preference("last_scan_location", primary_location)
+        db.set_preference("last_scan_locations", json.dumps(locations_list, ensure_ascii=False))
+    if payload.country:
+        db.set_preference("last_scan_country", country)
     db.set_preference("last_scan_is_remote", "1" if is_remote_effective else "0")
-    db.set_preference("last_scan_terms", json.dumps(terms, ensure_ascii=False))
     db.set_preference(
         "last_scan_filters",
         json.dumps(

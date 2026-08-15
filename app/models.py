@@ -167,6 +167,13 @@ class ProfileUpdate(BaseModel):
     #: A category B licence, which no CV states and which decides whether a field
     #: role is reachable at all. None leaves it unsaid, and unsaid blocks nothing.
     driving_licence: bool | None = None
+    #: On the L. 68/99 register. Like the licence, no CV says so and it is the
+    #: difference between an offer reserved to that register being takeable or
+    #: not. It had a preference and a check and no way to answer.
+    protected_category: bool | None = None
+    #: Which subject the degree is in. The check reads it, the CV usually
+    #: provides it, and until now a wrong reading could not be corrected.
+    degree_fields: list[str] | None = None
 
 
 class ProfileFromTextRequest(BaseModel):

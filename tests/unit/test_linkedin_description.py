@@ -169,7 +169,7 @@ def test_run_scan_nan_description_job_is_not_blindly_scored(
     try:
         events = list(
             ss.run_scan(
-                db, settings, _NoopPM(), ScanRequest(search_terms=["x"], sites=["linkedin"])
+                db, settings, _NoopPM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")
             )
         )
     finally:
@@ -319,7 +319,7 @@ def test_relevance_gate_drops_offtopic_keeps_tech(
     db = Database(tmp_path / "s.db")
     try:
         events = list(
-            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"]))
+            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano"))
         )
     finally:
         db.close()

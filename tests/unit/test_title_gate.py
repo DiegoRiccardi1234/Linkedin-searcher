@@ -253,7 +253,7 @@ def test_scan_drops_off_topic_titles_before_spending_a_call(
     db = Database(tmp_path / "t.db")
     try:
         events = list(
-            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"]))
+            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano"))
         )
     finally:
         db.close()
