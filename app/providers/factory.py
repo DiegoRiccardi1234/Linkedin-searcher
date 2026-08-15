@@ -1,10 +1,11 @@
 import functools
 import os as _os
 import random as _random
+import re as _re
 import threading
 import time as _time
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from app.config import AppSettings
 from app.log import get_logger
@@ -50,7 +51,20 @@ _METADATA_CACHE_TTL_SECONDS = 60.0
 _KEY_INVALID_COOLDOWN_SECONDS = float(_os.environ.get("LLM_KEY_INVALID_COOLDOWN_SECONDS", "600"))
 # After a model returns a persistent 429 (rate limit), avoid auto-picking it for
 # this many seconds so selection rotates to another model.
-_MODEL_429_COOLDOWN_SECONDS = float(_os.environ.get("LLM_MODEL_429_COOLDOWN_SECONDS", "300"))
+# A 429 on a free model does not mean "this model is bad", it means "this model
+# is full right now", and on a shared free pool that lasts seconds to a couple
+# of minutes. Five minutes of penalty removed it from an entire scan.
+_MODEL_429_COOLDOWN_SECONDS = float(_os.environ.get("LLM_MODEL_429_COOLDOWN_SECONDS", "60"))
+#: How many times to ask the SAME model again when it answers 429, and how long
+#: to wait in between. Free pools clear up on their own; rotating away on the
+#: first 429 spent the whole candidate list in a few seconds and left the offer
+#: unevaluated while the model that was busy became free again a moment later.
+_RATE_LIMIT_ATTEMPTS = max(1, int(_os.environ.get("LLM_RATE_LIMIT_ATTEMPTS", "3")))
+_RATE_LIMIT_WAIT_SECONDS = float(_os.environ.get("LLM_RATE_LIMIT_WAIT_SECONDS", "10"))
+#: How many times to go round the whole candidate list before giving up, when
+#: every candidate is merely busy. The second pass costs nothing unless
+#: everything was rate-limited, which is exactly when it is worth having.
+_FAILOVER_CYCLES = max(1, int(_os.environ.get("LLM_FAILOVER_CYCLES", "2")))
 # Per-reason cooldowns (seconds) for the empirical model-penalty map: after a
 # model fails a given way, auto-selection de-ranks it for this long so the next
 # request rotates to a healthier one. 429/403 are persistent (throttled / no
@@ -473,6 +487,28 @@ class ProviderManager:
             )
         return unfit
 
+    def _pace(self, provider: str, model: str) -> None:
+        """Wait if asking now would break this model's per-minute allowance."""
+        try:
+            from app.services.rate_limits import effective_limit, pace
+
+            pace(provider, model, effective_limit(getattr(self, "_db", None), provider, model))
+        except Exception as exc:  # never let bookkeeping stop a call
+            log.debug("pacing skipped for %s/%s: %s", provider, model, exc)
+
+    def _daily_exhausted(self, provider: str, model: str) -> bool:
+        """True when today's requests are spent — twenty a day is a trial, not a
+        provider, and discovering that by spending the twenty is the slow way."""
+        db = getattr(self, "_db", None)
+        if db is None:
+            return False
+        try:
+            from app.services.rate_limits import daily_exhausted
+
+            return daily_exhausted(db, provider, model)
+        except Exception:
+            return False
+
     def _ranked_models_for(
         self,
         provider: LLMProvider,
@@ -496,6 +532,24 @@ class ProviderManager:
         # mutated: _SCORING_POLICY is a module-level dict shared by every call.
         effective_policy = self._policy_for(provider.name, policy_override)
         models = self.get_models(provider.name).get("models") or []
+        # A model whose daily allowance is gone is not a candidate: some free
+        # tiers give twenty requests a DAY, which is enough to try a model and
+        # never enough to scan with one.
+        if models and not ignore_penalties:
+            exhausted = {m for m in models if self._daily_exhausted(provider.name, m)}
+            if exhausted:
+                # Removed, not de-ranked. rank_models only sinks a penalized
+                # model to the bottom, so on a provider with few models the
+                # exhausted one was still tried — and unlike a 429 cooldown, a
+                # daily allowance does not come back before midnight.
+                models = [m for m in models if m not in exhausted]
+                penalized |= exhausted
+                if not models:
+                    log.info(
+                        "%s: every model has spent its daily allowance; skipping provider.",
+                        provider.name,
+                    )
+                    return []
         if models:
 
             def _rank(pool: list[str], pen: set[str], lim: int) -> list[str]:
@@ -689,7 +743,56 @@ class ProviderManager:
             raise RuntimeError("No LLM provider available")
         last_exc: Exception | None = None
         last_empty: _RetryT | None = None
+        # Everything busy is not the same as everything broken: when every
+        # candidate answered 429, the whole list is worth one more pass after a
+        # pause. It costs nothing in any other case, because a single non-429
+        # failure stops the cycling.
+        for cycle in range(_FAILOVER_CYCLES):
+            if cycle:
+                log.info(
+                    "Every candidate was busy; waiting %.0fs and going round once more",
+                    _RATE_LIMIT_WAIT_SECONDS,
+                )
+                _time.sleep(_RATE_LIMIT_WAIT_SECONDS)
+            result = self._try_candidates(
+                candidates,
+                endpoint,
+                call,
+                state := {"last_exc": last_exc, "last_empty": last_empty},
+            )
+            # A pass that succeeded returns straight away and fills in nothing
+            # else: only a failed one has anything to report.
+            if state["ok"]:
+                return cast("_RetryT", result)
+            last_exc = cast("Exception | None", state["last_exc"])
+            last_empty = cast("_RetryT | None", state["last_empty"])
+            if not state.get("all_rate_limited"):
+                break
+        if last_empty is not None:
+            # Every candidate came back empty: keep the "empty never raises"
+            # contract — callers (chat/scan/generation) have their own fallbacks.
+            return last_empty
+        assert last_exc is not None
+        raise last_exc
+
+    def _try_candidates(
+        self,
+        candidates: list[tuple[LLMProvider, str]],
+        endpoint: str,
+        call: Callable[[LLMProvider, str], Any],
+        state: dict[str, Any],
+    ) -> Any:
+        """One pass over the candidate list. ``state`` carries what the caller
+        needs to decide whether another pass is worth it."""
+        last_exc: Exception | None = state.get("last_exc")
+        last_empty: Any = state.get("last_empty")
+        all_rate_limited = True
+        state["ok"] = False
         for idx, (provider, model) in enumerate(candidates):
+            # Not hitting the limit beats recovering from it: a free tier of
+            # fifteen calls a minute, asked ninety times a minute, spends the
+            # scan being told "no".
+            self._pace(provider.name, model)
             _t0 = _time.time()
             try:
                 result = _with_retry(
@@ -700,6 +803,8 @@ class ProviderManager:
                 elapsed_ms = int((_time.time() - _t0) * 1000)
                 last_exc = exc
                 reason = _classify_failure(exc)
+                if reason != "rate_limit":
+                    all_rate_limited = False
                 if reason:
                     self.record_model_penalty(provider.name, model, reason)
                 # A 403 on a PAID model is a statement about the account, not
@@ -708,7 +813,20 @@ class ProviderManager:
                 if reason == "forbidden" and not str(model).endswith(":free"):
                     self.mark_no_credit(provider.name)
                 self._maybe_flag_key_invalid(provider, exc)
-                self._record_call(provider, model, endpoint, False, type(exc).__name__, elapsed_ms)
+                # ``usage_log.error_type`` has two readers and both match on
+                # substrings: the scoreboard looks for the exception CLASS name,
+                # while rate_limits.observed_limit looks for the classified
+                # cause. Writing only the class name left the limit learner blind
+                # to every 429 that did not arrive as a `RateLimitError` — which
+                # is most of them. Write both, and neither goes blind.
+                self._record_call(
+                    provider,
+                    model,
+                    endpoint,
+                    False,
+                    f"{reason}:{type(exc).__name__}" if reason else type(exc).__name__,
+                    elapsed_ms,
+                )
                 if idx < len(candidates) - 1:
                     log.warning(
                         "Provider %s failed (%s); failing over to next provider.",
@@ -722,6 +840,7 @@ class ProviderManager:
                 # successful-but-useless reply. De-rank AND try the next
                 # candidate; returning it would poison callers (e.g. a scored
                 # job persisted as {} is never re-scored).
+                all_rate_limited = False
                 self.record_model_penalty(provider.name, model, "empty")
                 self._record_call(provider, model, endpoint, True, "empty_result", elapsed_ms)
                 last_empty = result
@@ -732,13 +851,12 @@ class ProviderManager:
                     )
                 continue
             self._record_call(provider, model, endpoint, True, None, elapsed_ms)
+            state["ok"] = True
             return result
-        if last_empty is not None:
-            # Every candidate came back empty: keep the "empty never raises"
-            # contract — callers (chat/scan/generation) have their own fallbacks.
-            return last_empty
-        assert last_exc is not None
-        raise last_exc
+        state["last_exc"] = last_exc
+        state["last_empty"] = last_empty
+        state["all_rate_limited"] = all_rate_limited and last_exc is not None
+        return None
 
     def pin_kwargs(
         self, model_id: str | None, policy_override: dict[str, Any] | None = None
@@ -831,6 +949,27 @@ def _is_rate_limited(exc: Exception) -> bool:
         return True
     text = str(exc).lower()
     return "429" in text or "rate limit" in text or "too many requests" in text
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    """How long the server asked us to wait, when it says so.
+
+    OpenRouter's 429 carries ``retry_after_seconds`` in the payload and most
+    HTTP clients keep the message; using it beats a fixed pause, which is
+    either rude or slower than necessary.
+    """
+    for attr in ("retry_after", "retry_after_seconds"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int | float) and value > 0:
+            return min(float(value), 60.0)
+    # "retry_after: 7", "retry-after=7", "retry_after_seconds": 7 — the wording
+    # differs by provider and the number is what matters.
+    match = _re.search(
+        r"retry[_ -]?after(?:[_ -]?seconds)?[\"'\s:=]+(\d+(?:\.\d+)?)", str(exc), _re.IGNORECASE
+    )
+    if match:
+        return min(float(match.group(1)), 60.0)
+    return None
 
 
 def _is_forbidden(exc: Exception) -> bool:
@@ -959,25 +1098,46 @@ def _with_retry(fn: Callable[[], _RetryT], provider_label: str) -> _RetryT:
     if provider_label in _LOCAL_PROVIDERS:
         timeout = max(timeout, _LOCAL_TIMEOUT_SECONDS)
     last_exc: Exception | None = None
-    for attempt in range(1, max_attempts + 1):
+    # Waiting out a busy model is not the same as retrying a failing one, so it
+    # has its own budget: an attempt spent on a 429 does not use up the ones
+    # reserved for transient 5xx.
+    rate_limit_attempt = 1
+    attempt = 0
+    while True:
+        attempt += 1
+        if attempt > max_attempts + _RATE_LIMIT_ATTEMPTS:
+            break
         try:
             return _call_with_timeout(fn, timeout)
         except Exception as exc:
             last_exc = exc
-            # Fail fast on 429 AND on a wall-clock timeout: don't hammer the same
-            # model — let _run_with_failover rotate to the next model/provider
-            # immediately. A timeout costs the FULL timeout window per attempt
-            # (measured: 3 x 60s = 183s burned on one dead model, 14 times in a
-            # single scan), and a model that hung once almost always hangs again.
-            # (5xx / connection resets still retry with backoff.)
-            if (
-                attempt >= max_attempts
-                or not _is_retryable(exc)
-                or _is_rate_limited(exc)
-                or isinstance(exc, TimeoutError)
-            ):
+            # A 429 is not a broken model, it is a full one: ask again after a
+            # pause, up to _RATE_LIMIT_ATTEMPTS, before letting the caller
+            # rotate. Rotating on the first 429 burned the whole candidate list
+            # in seconds and left the offer unevaluated, while the model that
+            # was busy answered fine a moment later.
+            if _is_rate_limited(exc):
+                if rate_limit_attempt >= _RATE_LIMIT_ATTEMPTS:
+                    raise
+                wait = _retry_after_seconds(exc) or _RATE_LIMIT_WAIT_SECONDS
+                log.info(
+                    "Provider %s is rate-limited (attempt %d/%d); waiting %.0fs before asking again",
+                    provider_label,
+                    rate_limit_attempt,
+                    _RATE_LIMIT_ATTEMPTS,
+                    wait,
+                )
+                rate_limit_attempt += 1
+                _time.sleep(wait)
+                continue
+            # Still fail fast on a wall-clock timeout: it costs the FULL timeout
+            # window per attempt (measured: 3 x 60s = 183s burned on one dead
+            # model, 14 times in a single scan), and a model that hung once
+            # almost always hangs again. (5xx / connection resets keep their
+            # exponential backoff below.)
+            if attempt >= max_attempts or not _is_retryable(exc) or isinstance(exc, TimeoutError):
                 raise
-            delay = base * (2 ** (attempt - 1))
+            delay = base * (2 ** (attempt - rate_limit_attempt))
             jitter = delay * 0.3 * (2 * _random.random() - 1)
             wait = max(0.1, delay + jitter)
             log.warning(

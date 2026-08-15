@@ -6,7 +6,7 @@ import sqlite3
 import threading
 import unicodedata
 from collections.abc import Callable, Collection, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
@@ -1437,6 +1437,45 @@ class Database:
         )
         row = self.conn.execute(f"SELECT {selects} FROM jobs {where}", params).fetchone()
         return {name: int(row[name] or 0) for name in JOB_BUCKETS}
+
+    def recent_usage(self, provider: str, model: str, days: int = 7) -> list[dict[str, Any]]:
+        """Calls to one model, with the timestamp as an epoch float.
+
+        Written for the rate limiter: a 429 and the calls that preceded it are
+        the only honest source for what a free tier actually allows this key.
+        """
+        floor = (datetime.now(UTC) - timedelta(days=max(1, days))).isoformat(timespec="seconds")
+        try:
+            rows = self.conn.execute(
+                "SELECT ts, success, error_type FROM usage_log "
+                "WHERE provider = ? AND model = ? AND ts >= ?",
+                (provider, model, floor),
+            ).fetchall()
+        except sqlite3.DatabaseError:
+            return []
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                stamp = datetime.fromisoformat(str(row["ts"])).timestamp()
+            except (TypeError, ValueError):
+                continue
+            out.append(
+                {"ts": stamp, "success": bool(row["success"]), "error_type": row["error_type"]}
+            )
+        return out
+
+    def usage_count_today(self, provider: str, model: str) -> int:
+        """Successful calls to this model since midnight UTC (the daily cap)."""
+        floor = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        try:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM usage_log WHERE provider = ? AND model = ? "
+                "AND ts >= ? AND success = 1",
+                (provider, model, floor),
+            ).fetchone()
+        except sqlite3.DatabaseError:
+            return 0
+        return int(row[0] or 0)
 
     def get_top_jobs(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.list_jobs(status="open", limit=limit)

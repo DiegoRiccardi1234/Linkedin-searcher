@@ -2,7 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-data/
+# Only the runtime archive at the repo root — NOT app/data/, which ships with the app.
+/data/
 *.db
 *.sqlite
 *.sqlite3

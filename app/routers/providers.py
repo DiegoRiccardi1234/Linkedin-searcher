@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -9,9 +10,14 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.config import SUPPORTED_PROVIDERS, save_local_provider_keys
-from app.models import LocalPullRequest, LocalUseRequest, ProviderKeysRequest
+from app.models import (
+    LocalPullRequest,
+    LocalUseRequest,
+    ProviderKeysRequest,
+    ProviderLimitRequest,
+)
 from app.providers.model_selector import SCORING_MIN_SIZE_B, infer_size_b, rank_models
-from app.services import local_models, model_stats
+from app.services import local_models, model_stats, rate_limits
 from app.services.model_probe import penalty_reason, probe_models
 from app.services.model_scoreboard import scoreboard
 
@@ -203,6 +209,63 @@ def build_router(container: AppContainer) -> APIRouter:
         with contextlib.suppress(Exception):  # persistence is best-effort
             container.db.set_preference(f"model_probe_{name}", json.dumps(payload))
         return {"ok": True, "provider": name, **payload}
+
+    @router.get("/api/providers/limits")
+    def provider_limits() -> dict[str, Any]:
+        """What each model is allowed, and where that number comes from.
+
+        Three columns, because they answer different questions: what the app
+        ships knowing, what it has measured on THIS key, and what the user
+        typed after looking at their own console. The limits of a free tier
+        belong to a project, not to a provider — shipping one person's numbers
+        as everyone's is the mistake this release is about.
+        """
+        out: list[dict[str, Any]] = []
+        for name, provider in container.providers.providers.items():
+            if not provider.is_available():
+                continue
+            models = container.providers.get_models(name).get("models") or []
+            for model in models[:40]:
+                default, observed, override, effective = rate_limits.resolve(
+                    container.db, name, model
+                )
+                if not (default or observed or override):
+                    continue
+                out.append(
+                    {
+                        "provider": name,
+                        "model": model,
+                        "default": asdict(default) if default else None,
+                        "observed": asdict(observed) if observed else None,
+                        "override": asdict(override) if override else None,
+                        "used_today": container.db.usage_count_today(provider=name, model=model),
+                        "exhausted": rate_limits.daily_exhausted(
+                            container.db, name, model, limit=effective
+                        ),
+                    }
+                )
+        return {"limits": out}
+
+    @router.post("/api/providers/limits")
+    def save_provider_limit(payload: ProviderLimitRequest) -> dict[str, Any]:
+        """Store the user's own numbers for one model (empty values clear them)."""
+        raw = container.db.get_preference(rate_limits.PREF_OVERRIDES, "") or "{}"
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        entry = {k: v for k, v in (("rpm", payload.rpm), ("rpd", payload.rpd)) if v}
+        provider_entry = data.setdefault(payload.provider, {})
+        if entry:
+            provider_entry[payload.model] = entry
+        else:
+            provider_entry.pop(payload.model, None)
+        container.db.set_preference(
+            rate_limits.PREF_OVERRIDES, json.dumps(data, ensure_ascii=False)
+        )
+        return {"ok": True, "limits": data}
 
     @router.get("/api/providers/health")
     def providers_health(days: int = 14) -> dict[str, Any]:

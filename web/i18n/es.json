@@ -451,6 +451,24 @@
       "search": "Búsqueda",
       "appearance": "Apariencia",
       "system": "Sistema"
+    },
+    "limits": {
+      "title": "Límites de frecuencia",
+      "subtitle": "A qué ritmo puede preguntar la app. Parte de lo que sabemos, se corrige con lo que tu clave permite de verdad, y tú puedes imponerte a ambos.",
+      "model": "Modelo",
+      "default": "De serie",
+      "observed": "Medido",
+      "yours": "Tuyo",
+      "today": "Usadas hoy",
+      "rpm": "sol./min",
+      "rpd": "sol./día",
+      "save": "Guardar",
+      "saved": "Límite guardado",
+      "empty": "Nada que mostrar: la app aún no ha hecho llamadas y no conoce límites para estos modelos.",
+      "exhausted": "Cuota de hoy agotada: la app se salta este modelo hasta mañana.",
+      "hint": "Los números reales están en la consola de tu proveedor. Escríbelos aquí y mandan sobre todo lo demás.",
+      "perMin": "/min",
+      "perDay": "/día"
     }
   },
   "coach": {

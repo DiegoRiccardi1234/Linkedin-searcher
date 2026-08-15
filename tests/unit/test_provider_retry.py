@@ -98,15 +98,24 @@ def test_retry_respects_max_attempts(monkeypatch) -> None:
     assert calls["n"] == 2
 
 
-def test_retry_fails_fast_on_429(monkeypatch) -> None:
-    # 429 is fail-fast: don't hammer a rate-limited model — one attempt, then
-    # _run_with_failover rotates to the next model/provider.
+def test_a_busy_model_is_asked_again_before_rotating(monkeypatch) -> None:
+    """A 429 is a full model, not a broken one.
+
+    This used to fail fast, on the reasoning that hammering a rate-limited
+    model is rude. On a shared free pool it produced the opposite of what was
+    wanted: the whole candidate list was spent in a couple of seconds and the
+    offer came out unevaluated, while the model that was busy answered fine a
+    few seconds later.
+    """
     monkeypatch.setenv("LLM_MAX_RETRIES", "5")
     monkeypatch.setenv("LLM_RETRY_BASE_SECONDS", "0")
 
     from app.providers import factory as _mod
 
-    monkeypatch.setattr(_mod._time, "sleep", lambda _: None)
+    waited: list[float] = []
+    monkeypatch.setattr(_mod._time, "sleep", waited.append)
+    monkeypatch.setattr(_mod, "_RATE_LIMIT_ATTEMPTS", 3)
+    monkeypatch.setattr(_mod, "_RATE_LIMIT_WAIT_SECONDS", 10.0)
 
     calls = {"n": 0}
 
@@ -117,4 +126,41 @@ def test_retry_fails_fast_on_429(monkeypatch) -> None:
     with pytest.raises(Exception):
         _with_retry(always_429, provider_label="test")
 
+    # Three goes at the same model, ten seconds apart, and only then give up on
+    # it so the caller can rotate.
+    assert calls["n"] == 3
+    assert waited == [10.0, 10.0]
+
+
+def test_the_server_decides_how_long_to_wait_when_it_says_so(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_RETRY_BASE_SECONDS", "0")
+    from app.providers import factory as _mod
+
+    waited: list[float] = []
+    monkeypatch.setattr(_mod._time, "sleep", waited.append)
+    monkeypatch.setattr(_mod, "_RATE_LIMIT_ATTEMPTS", 2)
+
+    def busy():
+        raise _HttpError("rate-limited upstream, retry_after_seconds: 4", status_code=429)
+
+    with pytest.raises(Exception):
+        _with_retry(busy, provider_label="test")
+    assert waited == [4.0]
+
+
+def test_a_timeout_still_fails_fast(monkeypatch) -> None:
+    """Unchanged, and for the original reason: a hung model hangs again, and
+    each attempt costs the whole timeout window."""
+    monkeypatch.setenv("LLM_MAX_RETRIES", "5")
+    from app.providers import factory as _mod
+
+    monkeypatch.setattr(_mod._time, "sleep", lambda _: None)
+    calls = {"n": 0}
+
+    def always_timeout():
+        calls["n"] += 1
+        raise TimeoutError("took too long")
+
+    with pytest.raises(Exception):
+        _with_retry(always_timeout, provider_label="test")
     assert calls["n"] == 1

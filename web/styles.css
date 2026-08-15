@@ -3289,3 +3289,9 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 .chat-action-buttons { display: flex; gap: var(--space-2); }
 .chat-action-buttons button { padding: 4px 12px; font-size: var(--fs-sm); }
 .chat-action-done { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+
+/* The rate-limit table: three columns of numbers plus a place to type your own. */
+.limits-table { overflow-x: auto; margin: var(--space-2) 0; }
+.limits-table table { width: 100%; }
+.limits-edit { display: flex; gap: 6px; align-items: center; }
+.limits-edit input { width: 5.5rem; }

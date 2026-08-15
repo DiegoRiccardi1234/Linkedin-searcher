@@ -439,3 +439,98 @@ def test_local_endpoint_is_exempt_from_the_scoring_floor(tmp_path: Any) -> None:
     remote = _CatalogProvider("openrouter", ["gemma-4-12b", "qwen2.5:14b"])
     mgr_remote = _mgr(tmp_path, {"openrouter": remote}, ["openrouter"], "openrouter")
     assert mgr_remote._ranked_models_for(remote, limit=2, policy_override=_SCORING_POLICY) == []
+
+
+class _BusyOnce(_StubProvider):
+    """429 on the first lap, an answer on the second."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name, answer="ok")
+        self.laps = 0
+
+    def complete_json(self, prompt: str, model: str | None = None, max_tokens: int = 700):
+        self.laps += 1
+        if self.laps <= 1:
+            raise _Http429()
+        return {"answer": "ok"}
+
+
+class _Http429(Exception):
+    def __init__(self) -> None:
+        super().__init__("too many requests")
+        self.status_code = 429
+
+
+def test_all_busy_gets_a_second_lap_before_giving_up(tmp_path: Any, monkeypatch) -> None:
+    """When every candidate is merely busy, the list is worth one more pass.
+
+    From using the free tier: a model answering 429 is full, not broken, so it
+    is worth asking again in a moment. Rotating away on the first 429 spent the
+    whole candidate list in seconds and left the offer unevaluated, while the
+    busy model answered fine right after.
+    """
+    from app.providers import factory as _mod
+
+    monkeypatch.setattr(_mod, "_RATE_LIMIT_ATTEMPTS", 1)  # keep the pass short
+    monkeypatch.setattr(_mod, "_FAILOVER_CYCLES", 2)
+
+    provider = _BusyOnce("openrouter")
+    mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
+    assert mgr.complete_json(prompt="x") == {"answer": "ok"}
+    assert provider.laps == 2
+
+
+def test_a_real_failure_stops_the_cycling(tmp_path: Any, monkeypatch) -> None:
+    """A second lap is for a busy pool, not for a broken model."""
+    from app.providers import factory as _mod
+
+    monkeypatch.setattr(_mod, "_FAILOVER_CYCLES", 3)
+
+    broken = _StubProvider("openrouter", exc=ValueError("Nessun JSON trovato"))
+    mgr = _mgr(tmp_path, {"openrouter": broken}, ["openrouter"], "openrouter")
+    with pytest.raises(Exception):
+        mgr.complete_json(prompt="x")
+    assert broken.calls == 1
+
+
+def test_a_model_out_of_its_daily_allowance_is_dropped_not_demoted(
+    tmp_path: Any, monkeypatch
+) -> None:
+    """A spent daily quota is not a cooldown: it does not come back before
+    midnight. Penalising only de-ranks (rank_models sinks the model to the
+    bottom), so on a provider with two models the exhausted one was still tried.
+    """
+    provider = _StubProvider("google", answer="ok")
+    mgr = _mgr(tmp_path, {"google": provider}, ["google"], "google")
+    monkeypatch.setattr(
+        mgr, "get_models", lambda name, **kw: {"models": ["gemma-3-27b-it", "gemma-2-9b-it"]}
+    )
+    monkeypatch.setattr(
+        mgr, "_daily_exhausted", lambda name, model: model == "gemma-3-27b-it"
+    )
+
+    ranked = mgr._ranked_models_for(provider, limit=5)
+    assert "gemma-3-27b-it" not in ranked
+    assert "gemma-2-9b-it" in ranked
+
+
+def test_a_provider_whose_whole_catalog_is_spent_is_skipped(tmp_path: Any, monkeypatch) -> None:
+    provider = _StubProvider("google", answer="ok")
+    mgr = _mgr(tmp_path, {"google": provider}, ["google"], "google")
+    monkeypatch.setattr(
+        mgr, "get_models", lambda name, **kw: {"models": ["gemma-3-27b-it", "gemma-2-9b-it"]}
+    )
+    monkeypatch.setattr(mgr, "_daily_exhausted", lambda name, model: True)
+
+    assert mgr._ranked_models_for(provider, limit=5) == []
+
+
+def test_the_anti_brick_path_ignores_the_daily_allowance(tmp_path: Any, monkeypatch) -> None:
+    """``ignore_penalties`` exists so the app is never left with nothing to try:
+    a possibly-spent model beats no model at all."""
+    provider = _StubProvider("google", answer="ok")
+    mgr = _mgr(tmp_path, {"google": provider}, ["google"], "google")
+    monkeypatch.setattr(mgr, "get_models", lambda name, **kw: {"models": ["gemma-3-27b-it"]})
+    monkeypatch.setattr(mgr, "_daily_exhausted", lambda name, model: True)
+
+    assert mgr._ranked_models_for(provider, limit=5, ignore_penalties=True) == ["gemma-3-27b-it"]

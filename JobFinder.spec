@@ -38,6 +38,9 @@ datas: list[tuple[str, str]] = [
     ("web", "web"),
     ("app/prompts", "app/prompts"),
     ("app/migrations", "app/migrations"),
+    # Shipped provider rate limits. Without this the file exists in the repo and
+    # vanishes in the frozen bundle, with every test still green.
+    ("app/data", "app/data"),
 ]
 try:
     datas += collect_data_files("jobspy", include_py_files=False)

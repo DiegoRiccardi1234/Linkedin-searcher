@@ -63,6 +63,7 @@ import {
   setJobsBucket,
 } from "./modules/job_list.js";
 import { initSubtabs, panelOf, setSubtabBadge, showSubtab } from "./modules/subtabs.js";
+import { initRateLimits, loadRateLimits } from "./modules/limits.js";
 import { initChatActions, renderChatAction } from "./modules/chat_actions.js";
 import {
   ensureProfileReady,
@@ -859,8 +860,18 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
       // is worth a request when someone actually opens the tab.
       loadMailboxStatus().catch(() => {});
     }
+    if (view === "settings") {
+      // Same reasoning as the mailbox queue, with a sharper edge: the limits
+      // endpoint walks a week of usage per model, so it is worth exactly one
+      // request — when somebody opens the tab that shows it.
+      loadRateLimits().catch(() => {});
+    }
   });
 });
+
+// A delegated listener, bound once. It must live outside bootstrap(): bootstrap
+// awaits a dozen requests, and a click landing in that window would hit nothing.
+initRateLimits();
 
 bindProfileEvents();
 

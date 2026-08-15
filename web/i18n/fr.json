@@ -451,6 +451,24 @@
       "search": "Recherche",
       "appearance": "Apparence",
       "system": "Système"
+    },
+    "limits": {
+      "title": "Limites de fréquence",
+      "subtitle": "À quel rythme l'app peut demander. Elle part de ce que nous savons, se corrige avec ce que votre clé autorise vraiment, et vous pouvez passer devant les deux.",
+      "model": "Modèle",
+      "default": "D'origine",
+      "observed": "Mesuré",
+      "yours": "Le vôtre",
+      "today": "Utilisées aujourd'hui",
+      "rpm": "req./min",
+      "rpd": "req./jour",
+      "save": "Enregistrer",
+      "saved": "Limite enregistrée",
+      "empty": "Rien à afficher : l'app n'a pas encore fait d'appels et ne connaît aucune limite pour ces modèles.",
+      "exhausted": "Quota du jour épuisé — l'app saute ce modèle jusqu'à demain.",
+      "hint": "Les vrais chiffres sont dans la console de votre fournisseur. Écrivez-les ici et ils l'emportent sur le reste.",
+      "perMin": "/min",
+      "perDay": "/j"
     }
   },
   "coach": {

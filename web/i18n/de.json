@@ -451,6 +451,24 @@
       "search": "Suche",
       "appearance": "Darstellung",
       "system": "System"
+    },
+    "limits": {
+      "title": "Frequenzlimits",
+      "subtitle": "Wie schnell die App fragen darf. Sie startet mit dem, was wir wissen, korrigiert sich an dem, was dein Schlüssel wirklich erlaubt, und du kannst beides überstimmen.",
+      "model": "Modell",
+      "default": "Ab Werk",
+      "observed": "Gemessen",
+      "yours": "Deins",
+      "today": "Heute genutzt",
+      "rpm": "Anfr./Min",
+      "rpd": "Anfr./Tag",
+      "save": "Speichern",
+      "saved": "Limit gespeichert",
+      "empty": "Nichts zu zeigen: Die App hat noch keine Aufrufe gemacht und kennt für diese Modelle keine Limits.",
+      "exhausted": "Heutiges Kontingent aufgebraucht — die App überspringt dieses Modell bis morgen.",
+      "hint": "Die echten Zahlen stehen in der Konsole deines Anbieters. Trag sie hier ein, sie schlagen alles andere.",
+      "perMin": "/Min.",
+      "perDay": "/Tag"
     }
   },
   "coach": {

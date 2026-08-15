@@ -181,6 +181,19 @@ class ProfileFromTextRequest(BaseModel):
     source_name: str | None = None
 
 
+class ProviderLimitRequest(BaseModel):
+    """The user's own rate limits for one model, read off their console.
+
+    Zero or missing clears the override and hands the model back to the shipped
+    default and to what the app measures.
+    """
+
+    provider: str
+    model: str
+    rpm: int | None = Field(default=None, ge=0, le=100000)
+    rpd: int | None = Field(default=None, ge=0, le=10000000)
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"

@@ -451,6 +451,24 @@
       "search": "Search",
       "appearance": "Appearance",
       "system": "System"
+    },
+    "limits": {
+      "title": "Rate limits",
+      "subtitle": "How fast the app is allowed to ask. It starts from what we know, corrects itself from what your key actually allows, and you can overrule both.",
+      "model": "Model",
+      "default": "Shipped",
+      "observed": "Measured",
+      "yours": "Yours",
+      "today": "Used today",
+      "rpm": "req/min",
+      "rpd": "req/day",
+      "save": "Save",
+      "saved": "Limit saved",
+      "empty": "Nothing to show yet: the app has made no calls and knows no limits for these models.",
+      "exhausted": "Today's allowance is spent — the app is skipping this model until tomorrow.",
+      "hint": "Your provider's console has the real numbers. Type them here and they win over everything else.",
+      "perMin": "/min",
+      "perDay": "/day"
     }
   },
   "coach": {
