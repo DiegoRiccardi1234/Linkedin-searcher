@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.8.5] — 2026-08-15
+
+### Fixed
+- **The routine mailbox check was eating the recovery.** "Find applications" reaches back up to a year, and it inherited the sweep's rule that a message once examined is never fetched again. But the two ask different questions: the sweep asks "does this confirm an offer already in the archive", writes `no_match` when it does not, and walks on — while the recovery asks "does this record an application at all", which none of those messages had ever been asked. On a real mailbox 673 messages had been written off that way, and a 365-day recovery could not see one of them: it read 1.043 messages where 1.717 were waiting. Only a decision — applied, imported, dismissed — closes a message to the recovery now.
+- **A decision taken on an already-filed message was thrown away.** Both writes were `INSERT OR IGNORE` on one row per message, so "dismissed" landing on a row the sweep had written simply vanished, and the proposal came back on the next sweep — the exact failure the review queue was built to end.
+- **"None of these" is now an answer.** A proposal could only be attached to one of the offers the archive holds from that employer, or dismissed. That the archive knows the employer does not make one of its postings the one you applied for: of 53 such proposals on a real queue, the title read from the message matched an archive offer 15 times, and the other 38 were roles the archive had never collected — six unrelated Teoresi postings offered for an application to "AI Engineer". The only available answers were a false record or no record. Each proposal can now be recorded as an application of its own, and the "get the job title" button — which is what makes the choice decidable — is offered on those rows too, not only on imports.
+- **Half a year of experience read as no experience at all.** The CV extractor reports a first job as `0.5` years and the profile parsed it with `int(str(...))`, so it became "unknown" — and an unknown year count switches the whole experience check off. A rewritten CV silently stopped flagging every posting that asks for three years. Fractions floor now: six months is zero whole years, not a mystery.
+- **"Missing skills" offered constraints as homework.** The panel says learning these unlocks more matches, and its top five rows were things nobody can learn: "requires 3+ years of experience (your profile states 0)" at 99 occurrences, the two-year version at 40, the master's degree at 27, two unreachable cities at 16 and 15 — with Power BI, the first genuinely learnable thing on the list, at 7. The blockers are written into the same list on purpose, so each offer's own page can say why it is capped; the aggregate now leaves them out.
+
 ## [1.8.4] — 2026-08-10
 
 ### Added

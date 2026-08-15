@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
@@ -444,8 +444,18 @@ class Database:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def filter_unseen_mail(self, account: str, keys: Sequence[str]) -> list[str]:
-        """The message keys not examined yet, in the order they were given."""
+    def filter_unseen_mail(
+        self, account: str, keys: Sequence[str], *, verdicts: Collection[str] | None = None
+    ) -> list[str]:
+        """The message keys not examined yet, in the order they were given.
+
+        ``verdicts`` narrows what counts as examined, and exists because
+        ``mail_seen`` holds two different kinds of row. Most are the sweep's own
+        bookkeeping — "this message confirms none of the offers I am waiting
+        for" — and the sweep is right to never ask itself that twice. The rest
+        record a decision somebody made: applied, imported, dismissed. Only the
+        second kind may silence a sweep that is asking a *different* question.
+        """
         if not keys:
             return []
         seen: set[str] = set()
@@ -454,10 +464,13 @@ class Database:
             window = list(keys[start : start + chunk])
             placeholders = ",".join("?" for _ in window)
             rows = self.conn.execute(
-                f"SELECT mail_key FROM mail_seen WHERE account = ? AND mail_key IN ({placeholders})",
+                "SELECT mail_key, verdict FROM mail_seen "
+                f"WHERE account = ? AND mail_key IN ({placeholders})",
                 (account, *window),
             ).fetchall()
-            seen.update(str(row[0]) for row in rows)
+            seen.update(
+                str(row[0]) for row in rows if verdicts is None or str(row[1] or "") in verdicts
+            )
         return [key for key in keys if key not in seen]
 
     @_synchronized
@@ -471,10 +484,18 @@ class Database:
         received_at: str = "",
         job_id: int | None = None,
         matched_rule: str = "",
+        overwrite: bool = False,
     ) -> None:
-        """Remember the verdict for a message. Never the message itself."""
+        """Remember the verdict for a message. Never the message itself.
+
+        ``overwrite`` is for the verdicts that settle a message — applied,
+        imported, dismissed. Those may land on a row the routine sweep already
+        wrote, and ``INSERT OR IGNORE`` then threw the decision away and left
+        the bookkeeping in place: the message read as "not examined by a human"
+        forever, so the recovery kept re-proposing what had just been dismissed.
+        """
         self.conn.execute(
-            "INSERT OR IGNORE INTO mail_seen"
+            f"INSERT OR {'REPLACE' if overwrite else 'IGNORE'} INTO mail_seen"
             "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, seen_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
@@ -608,8 +629,12 @@ class Database:
             tuple(review_ids),
         ).fetchall()
         for row in rows:
+            # REPLACE, not IGNORE: the message may already carry the sweep's own
+            # no_match, and a human's answer has to win over it — otherwise the
+            # decision is dropped and the proposal comes back on the next sweep,
+            # which is exactly the failure this table was added to end.
             self.conn.execute(
-                "INSERT OR IGNORE INTO mail_seen"
+                "INSERT OR REPLACE INTO mail_seen"
                 "(account, mail_key, message_id, received_at, verdict, job_id, matched_rule, "
                 "seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (

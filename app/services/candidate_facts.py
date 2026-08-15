@@ -143,8 +143,16 @@ class CandidateFacts:
 
 
 def _as_int(raw: Any) -> int | None:
+    """A whole number of years, from whatever the CV extractor produced.
+
+    It parsed through ``int(str(...))``, so ``0.5`` — six months, which is what
+    a first job looks like — raised and became "unknown". The difference
+    matters: an unknown year count disables the experience check entirely, so a
+    CV that says half a year silently stopped flagging the offers asking for
+    three. Fractions floor, because half a year of experience is not one.
+    """
     try:
-        value = int(str(raw).strip())
+        value = int(float(str(raw).strip()))
     except (TypeError, ValueError):
         return None
     return value if value >= 0 else None
