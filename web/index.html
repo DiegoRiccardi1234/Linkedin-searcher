@@ -345,6 +345,16 @@
             <button id="viewKanbanBtn" type="button" class="tab-pill"><span class="material-symbols-outlined">view_kanban</span> <span data-i18n="jobs.kanban">Kanban</span></button>
           </div>
         </div>
+        <!-- The archive's five slices. This was a dropdown, which meant the
+             state you were looking at was invisible until you opened it, and
+             the count that tells you a cap is in play had nowhere to live. -->
+        <div class="bucket-tabs" id="jobBuckets" role="tablist">
+          <button type="button" class="bucket-tab is-active" role="tab" aria-selected="true" data-bucket="to_review" data-i18n-title="jobs.bucketHint" title="What is left to decide"><span data-i18n="jobs.bucket.toReview">To review</span><span class="bucket-count" data-bucket-count="to_review"></span></button>
+          <button type="button" class="bucket-tab" role="tab" aria-selected="false" data-bucket="applied"><span data-i18n="jobs.bucket.applied">Applied</span><span class="bucket-count" data-bucket-count="applied"></span></button>
+          <button type="button" class="bucket-tab" role="tab" aria-selected="false" data-bucket="rejected"><span data-i18n="jobs.bucket.rejected">Discarded</span><span class="bucket-count" data-bucket-count="rejected"></span></button>
+          <button type="button" class="bucket-tab" role="tab" aria-selected="false" data-bucket="archived"><span data-i18n="jobs.bucket.archived">Archived</span><span class="bucket-count" data-bucket-count="archived"></span></button>
+          <button type="button" class="bucket-tab" role="tab" aria-selected="false" data-bucket="all"><span data-i18n="jobs.bucket.all">All</span><span class="bucket-count" data-bucket-count="all"></span></button>
+        </div>
         <div class="filters-row">
           <input id="searchText" type="text" data-i18n-placeholder="jobs.searchPlaceholder" placeholder="Search title or company..." />
           <input id="minScore" type="number" min="0" max="10" data-i18n-placeholder="jobs.minScore" placeholder="Min score" />
@@ -353,13 +363,7 @@
           <label class="filter-check"><input id="onlyNew" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">fiber_new</span> <span data-i18n="jobs.new">New</span></label>
           <label class="filter-check"><input id="remoteOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">home_work</span> <span data-i18n="jobs.remote">Remote</span></label>
           <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" checked /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
-          <select id="statusFilter">
-            <option value="" data-i18n="jobs.allStatuses">All statuses</option>
-            <option value="open" data-i18n="jobs.open">Open</option>
-            <option value="applied" data-i18n="jobs.applied">Applied</option>
-            <option value="interviewing" data-i18n="jobs.interviewing">Interviewing</option>
-            <option value="rejected" data-i18n="jobs.rejected">Rejected</option>
-          </select>
+          <label class="filter-check"><input id="minScore4" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">grade</span> <span data-i18n="jobs.minScore4">Score 4+</span></label>
           <button id="refreshJobsBtn" type="button" class="ghost-btn" aria-label="Refresh jobs"><span class="material-symbols-outlined">refresh</span></button>
           <button id="exportCsvBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">download</span> <span data-i18n="jobs.csv">CSV</span></button>
           <!-- The applications, not the archive: status, which CV went with
@@ -375,6 +379,9 @@
           <button id="addManualJobBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">add</span> <span data-i18n="manualJob.addShort">Add job</span></button>
           <button id="deleteAllJobsBtn" type="button" class="ghost-btn danger" title="Delete all jobs" data-i18n-title="jobs.deleteAllTitle"><span class="material-symbols-outlined">delete_sweep</span> <span data-i18n="jobs.deleteAll">Delete all</span></button>
         </div>
+        <!-- "showing X of Y" exists because the row cap used to hide offers in
+             silence: 174 matched, 123 were rendered, and nothing said so. -->
+        <p class="jobs-count-line"><span id="jobsShownOf"></span> <button id="jobsShowAllBtn" type="button" class="link-btn hidden" data-i18n="jobs.showAll">Show all</button></p>
 
         <div id="tableView" class="table-wrap is-active">
           <table>

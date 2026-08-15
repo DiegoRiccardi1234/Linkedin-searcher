@@ -191,11 +191,6 @@
     "favorites": "Favorites",
     "new": "New",
     "remote": "Remote",
-    "allStatuses": "All statuses",
-    "open": "Open",
-    "applied": "Applied",
-    "interviewing": "Interviewing",
-    "rejected": "Rejected",
     "csv": "CSV",
     "score": "Score",
     "title": "Title",
@@ -287,7 +282,19 @@
     "applyPending": "Waiting for confirmation",
     "notApplied": "I did not apply",
     "csvApplications": "Applications CSV",
-    "undoMail": "Undo the mailbox marking"
+    "undoMail": "Undo the mailbox marking",
+    "bucket": {
+      "toReview": "To review",
+      "applied": "Applied",
+      "rejected": "Discarded",
+      "archived": "Archived",
+      "all": "All"
+    },
+    "bucketHint": "What is left to decide: neither applied to nor discarded.",
+    "shownOf": "showing {shown} of {total}",
+    "showAll": "Show all",
+    "emptyBucket": "Nothing in this tab.",
+    "minScore4": "Score 4+"
   },
   "kanbanCols": {
     "open": "Open",

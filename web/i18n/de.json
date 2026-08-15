@@ -191,11 +191,6 @@
     "favorites": "Favoriten",
     "new": "Neue",
     "remote": "Remote",
-    "allStatuses": "Alle Status",
-    "open": "Offen",
-    "applied": "Beworben",
-    "interviewing": "Vorstellungsgespräch",
-    "rejected": "Abgelehnt",
     "csv": "CSV",
     "score": "Score",
     "title": "Titel",
@@ -287,7 +282,19 @@
     "applyPending": "Warte auf Bestätigung",
     "notApplied": "Ich habe mich nicht beworben",
     "csvApplications": "Bewerbungen als CSV",
-    "undoMail": "Postfach-Markierung rückgängig machen"
+    "undoMail": "Postfach-Markierung rückgängig machen",
+    "bucket": {
+      "toReview": "Zu prüfen",
+      "applied": "Beworben",
+      "rejected": "Verworfen",
+      "archived": "Archiviert",
+      "all": "Alle"
+    },
+    "bucketHint": "Was noch zu entscheiden ist: weder beworben noch verworfen.",
+    "shownOf": "{shown} von {total} angezeigt",
+    "showAll": "Alle anzeigen",
+    "emptyBucket": "Nichts in diesem Tab.",
+    "minScore4": "Note 4+"
   },
   "kanbanCols": {
     "open": "Offen",

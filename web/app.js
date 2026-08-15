@@ -55,7 +55,13 @@ import {
 import { initSavedSearches, loadSavedSearches } from "./modules/saved_searches.js";
 import { initLocalModels, loadLocalModels } from "./modules/local_models.js";
 import { initWatchlist, loadWatchlist } from "./modules/watchlist.js";
-import { initJobList, initJobSorting, loadJobs } from "./modules/job_list.js";
+import {
+  initJobBuckets,
+  initJobList,
+  initJobSorting,
+  loadJobs,
+  setJobsBucket,
+} from "./modules/job_list.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
@@ -792,8 +798,7 @@ if (_refreshRecommendationsBtn) _refreshRecommendationsBtn.addEventListener("cli
 
 const _focusOpenBtn = document.getElementById("focusOpenBtn");
 if (_focusOpenBtn) _focusOpenBtn.addEventListener("click", async () => {
-  const status = document.getElementById("statusFilter");
-  status.value = "open";
+  setJobsBucket("to_review");
   activateView("jobs");
   await loadJobs();
 });
@@ -999,10 +1004,10 @@ document.getElementById("onlyFavorites").addEventListener("change", loadJobs);
 document.getElementById("searchText").addEventListener("change", loadJobs);
 document.getElementById("minScore").addEventListener("change", loadJobs);
 document.getElementById("maxAgeDays").addEventListener("change", loadJobs);
-document.getElementById("statusFilter").addEventListener("change", loadJobs);
 document.getElementById("remoteOnly").addEventListener("change", loadJobs);
 document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
 initJobSorting();
+initJobBuckets();
 {
   const usageRangeSel = document.getElementById("usageRange");
   if (usageRangeSel) usageRangeSel.addEventListener("change", () => loadUsage());
@@ -1299,11 +1304,20 @@ if (closeDetailBtn) {
 }
 
 
+// The kanban's columns ARE the buckets, so the tab strip has nothing to say
+// there and the board always asks for the whole archive.
+function _syncBucketStrip(kanban) {
+  document.getElementById("jobBuckets")?.classList.toggle("hidden", kanban);
+  document.querySelector(".jobs-count-line")?.classList.toggle("hidden", kanban);
+}
+
 document.getElementById("viewTableBtn")?.addEventListener("click", e => {
     document.getElementById("tableView").classList.add("is-active");
     document.getElementById("kanbanView").classList.remove("is-active");
   e.currentTarget.classList.add("is-active");
     document.getElementById("viewKanbanBtn").classList.remove("is-active");
+  _syncBucketStrip(false);
+  loadJobs();
 });
 
 document.getElementById("viewKanbanBtn")?.addEventListener("click", e => {
@@ -1311,6 +1325,7 @@ document.getElementById("viewKanbanBtn")?.addEventListener("click", e => {
     document.getElementById("tableView").classList.remove("is-active");
   e.currentTarget.classList.add("is-active");
     document.getElementById("viewTableBtn").classList.remove("is-active");
+  _syncBucketStrip(true);
   loadJobs();
 });
 

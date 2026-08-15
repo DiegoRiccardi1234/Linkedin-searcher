@@ -656,6 +656,67 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
   z-index: 1;
 }
 
+/* The archive's slices. A row of tabs rather than a dropdown so the state you
+   are looking at, and how much of the archive it holds, are both readable
+   without opening anything. */
+.bucket-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.bucket-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.bucket-tab:hover { border-color: var(--accent); color: var(--text); }
+.bucket-tab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bucket-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--text-secondary);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.12));
+  border-radius: 999px;
+  padding: 0 6px;
+  min-width: 1.4em;
+  text-align: center;
+}
+.bucket-tab.is-active .bucket-count { color: var(--accent); background: transparent; }
+.bucket-count:empty { display: none; }
+
+.jobs-count-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(var(--space-3) * -1 + 2px) 0 var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ============== jobs table ============== */
 #tableView, #kanbanView { display: none; }
 #tableView.is-active, #kanbanView.is-active { display: block; }

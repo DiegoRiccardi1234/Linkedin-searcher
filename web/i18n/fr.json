@@ -191,11 +191,6 @@
     "favorites": "Favoris",
     "new": "Nouveaux",
     "remote": "Télétravail",
-    "allStatuses": "Tous les statuts",
-    "open": "Ouvert",
-    "applied": "Postulé",
-    "interviewing": "Entretien",
-    "rejected": "Refusé",
     "csv": "CSV",
     "score": "Score",
     "title": "Titre",
@@ -287,7 +282,19 @@
     "applyPending": "En attente de confirmation",
     "notApplied": "Je n'ai pas postulé",
     "csvApplications": "CSV candidatures",
-    "undoMail": "Annuler le marquage par la boîte mail"
+    "undoMail": "Annuler le marquage par la boîte mail",
+    "bucket": {
+      "toReview": "À évaluer",
+      "applied": "Candidatures",
+      "rejected": "Écartées",
+      "archived": "Archivées",
+      "all": "Toutes"
+    },
+    "bucketHint": "Ce qu'il reste à décider : ni envoyées ni écartées.",
+    "shownOf": "affichées {shown} sur {total}",
+    "showAll": "Tout afficher",
+    "emptyBucket": "Rien dans cet onglet.",
+    "minScore4": "Note 4+"
   },
   "kanbanCols": {
     "open": "Ouvert",

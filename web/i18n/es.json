@@ -191,11 +191,6 @@
     "favorites": "Favoritos",
     "new": "Nuevos",
     "remote": "Remoto",
-    "allStatuses": "Todos los estados",
-    "open": "Abierto",
-    "applied": "Postulado",
-    "interviewing": "Entrevista",
-    "rejected": "Rechazado",
     "csv": "CSV",
     "score": "Puntuación",
     "title": "Título",
@@ -287,7 +282,19 @@
     "applyPending": "Esperando confirmación",
     "notApplied": "No me he postulado",
     "csvApplications": "CSV candidaturas",
-    "undoMail": "Deshacer la marca del correo"
+    "undoMail": "Deshacer la marca del correo",
+    "bucket": {
+      "toReview": "Por valorar",
+      "applied": "Enviadas",
+      "rejected": "Descartadas",
+      "archived": "Archivadas",
+      "all": "Todas"
+    },
+    "bucketHint": "Lo que queda por decidir: ni enviadas ni descartadas.",
+    "shownOf": "mostradas {shown} de {total}",
+    "showAll": "Mostrar todas",
+    "emptyBucket": "Nada en esta pestaña.",
+    "minScore4": "Nota 4+"
   },
   "kanbanCols": {
     "open": "Abierto",
