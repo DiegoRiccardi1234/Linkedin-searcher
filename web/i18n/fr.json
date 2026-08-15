@@ -1077,5 +1077,15 @@
       "protected_category": "Statut de travailleur handicapé",
       "work_rule": "Où vous pouvez travailler"
     }
+  },
+  "chatAction": {
+    "apply": "Appliquer",
+    "dismiss": "Pas maintenant",
+    "done": "C'est fait.",
+    "failed": "Impossible d'appliquer",
+    "fillScan": "Je prépare une recherche de {terms} à {places} ?",
+    "addRoles": "J'enregistre ces métiers à chercher : {roles} ?",
+    "setField": "Je mets {field} à {value} ?",
+    "openJob": "J'ouvre cette offre ?"
   }
 }

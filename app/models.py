@@ -186,6 +186,9 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
     provider: str | None = None
     model: str | None = None
+    #: Which page the user is looking at. The coach used to answer every
+    #: question from the same place regardless of what was on screen.
+    view: str | None = None
 
 
 class ChatResponse(BaseModel):

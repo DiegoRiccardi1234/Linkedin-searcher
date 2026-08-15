@@ -40,6 +40,7 @@ def build_router(container: AppContainer) -> APIRouter:
             session_id=payload.session_id,
             provider=provider,
             model=model,
+            view=payload.view,
         )
         return ChatResponse(**result)
 
@@ -103,10 +104,10 @@ def build_router(container: AppContainer) -> APIRouter:
         return {"ok": True}
 
     @router.get("/api/chat/prompts")
-    def chat_prompts(lang: str | None = None) -> dict[str, Any]:
+    def chat_prompts(lang: str | None = None, view: str | None = None) -> dict[str, Any]:
         from app.services.chat.context import suggest_chat_prompts
 
         resolved_lang = (lang or container.db.get_preference("ui_language", "en") or "en").lower()
-        return {"prompts": suggest_chat_prompts(container.db, lang=resolved_lang)}
+        return {"prompts": suggest_chat_prompts(container.db, lang=resolved_lang, view=view)}
 
     return router

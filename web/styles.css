@@ -3243,3 +3243,17 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 }
 .mail-review-row .micro { grid-column: 2; opacity: 0.75; }
 .mail-review-job { font-weight: 600; }
+
+/* The coach's proposals. Rendered as a card with a button, because the model
+   suggesting something and the app doing it are two different events. */
+.chat-action-card {
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.chat-action-text { margin: 0 0 var(--space-2); font-size: var(--fs-sm); }
+.chat-action-buttons { display: flex; gap: var(--space-2); }
+.chat-action-buttons button { padding: 4px 12px; font-size: var(--fs-sm); }
+.chat-action-done { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }

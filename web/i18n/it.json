@@ -1077,5 +1077,15 @@
       "protected_category": "Iscrizione alle categorie protette",
       "work_rule": "Dove puoi lavorare"
     }
+  },
+  "chatAction": {
+    "apply": "Applica",
+    "dismiss": "Non ora",
+    "done": "Fatto.",
+    "failed": "Non sono riuscito ad applicarlo",
+    "fillScan": "Preparo una ricerca di {terms} a {places}?",
+    "addRoles": "Salvo questi ruoli fra quelli da cercare: {roles}?",
+    "setField": "Imposto {field} a {value}?",
+    "openJob": "Apro questa offerta?"
   }
 }

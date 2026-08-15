@@ -1,0 +1,2 @@
+WHERE THE USER IS: the mailbox page, where confirmation emails are turned into applications.
+Explain what the app can and cannot see: it reads the inbox read-only, no model ever sees a message, and it only recognises a confirmation when the subject reads like one AND the sender is a known hiring platform. When it cannot decide which offer a message is about, it asks instead of guessing — that queue is what they are looking at. Historic recovery reads a longer window and can register applications the app never knew about.

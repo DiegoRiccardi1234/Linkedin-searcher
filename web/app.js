@@ -63,6 +63,7 @@ import {
   setJobsBucket,
 } from "./modules/job_list.js";
 import { initSubtabs, panelOf, setSubtabBadge, showSubtab } from "./modules/subtabs.js";
+import { initChatActions, renderChatAction } from "./modules/chat_actions.js";
 import {
   ensureProfileReady,
   fetchReadiness,
@@ -174,8 +175,13 @@ function activateView(viewName, { tab = null } = {}) {
   document.getElementById("navToggle")?.setAttribute("aria-expanded", "false");
   const overlay = document.getElementById("mobileOverlay");
   if (overlay) { overlay.classList.remove("active"); overlay.hidden = true; }
+  // The rail stays out of the archive's way — a nine-column table and a
+  // four-column board cannot share a 1366px row with a 300px panel — but the
+  // coach is exactly who you want to ask "which of these do I send first", so
+  // the button that opens it as a drawer stays. Only the Info page, which is
+  // documentation, has neither.
   const fab = document.getElementById("chatFab");
-  if (fab) fab.classList.toggle("hidden", railless);
+  if (fab) fab.classList.toggle("hidden", viewName === "info");
   syncStickyOffset();
 }
 
@@ -424,9 +430,15 @@ async function loadChatPrompts() {
 
   wrap.innerHTML = "";
   try {
-    const payload = await api(`/api/chat/prompts?lang=${encodeURIComponent(getCurrentLang() || "en")}`);
-    // Cap to 2 — even if the backend ever returns more, the UI stays tidy.
-    const prompts = (payload.prompts || []).slice(0, 2);
+    // The page the user is on decides what they are most likely to ask next:
+    // a question typed on the settings page is about settings, whatever their
+    // CV says. The suggestions used to be picked from the CV alone.
+    const query = new URLSearchParams({
+      lang: getCurrentLang() || "en",
+      view: getCurrentView(),
+    });
+    const payload = await api(`/api/chat/prompts?${query.toString()}`);
+    const prompts = (payload.prompts || []).slice(0, 4);
     for (const prompt of prompts) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -473,7 +485,7 @@ async function sendChatMessage(message) {
 
     const result = await api("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: text, session_id: (window.ChatSessions?.active || ChatSessions.active || "default"), provider: providerVal, model: modelVal }),
+      body: JSON.stringify({ message: text, session_id: (window.ChatSessions?.active || ChatSessions.active || "default"), provider: providerVal, model: modelVal, view: getCurrentView() }),
     });
 
     maybeOfferPersistChatOverride(providerVal, modelVal);
@@ -483,27 +495,11 @@ async function sendChatMessage(message) {
       refreshChatSessions().then(renderChatSessionDropdown).catch(() => {});
     }
 
-    if (result.action && result.action.type === "FILL_SCAN_FORM") {
-      // populate tags
-      if (!getKeywords?.addMultiple || !getLocations?.addMultiple) {
-          console.warn("Tag setups not ready");
-      } else {
-         const kwTags = getKeywords.addMultiple(result.action.keywords || []);
-         const locTags = getLocations.addMultiple(result.action.locations || []);
-         // Coach can also set the Indeed country (e.g. "cerca lavoro in Germania").
-         const countrySel = document.getElementById("scanCountry");
-         if (countrySel && result.action.country) {
-           const cv = String(result.action.country).toLowerCase();
-           if ([...countrySel.options].some((o) => o.value === cv)) {
-             countrySel.value = cv;
-             localStorage.setItem("scanCountry", cv);
-           }
-         }
-         if (kwTags || locTags || result.action.country) {
-           showToast(t("toast.formFilled"), "info");
-           activateView("job-search");
-         }
-      }
+    // The coach proposes; the user decides. This used to rewrite the search
+    // form and jump views on its own — helpful when the model was right, and
+    // startling when it was not.
+    if (result.action) {
+      renderChatAction(document.getElementById("chatBox"), result.action);
     }
   } catch (error) {
     if (pendingEl && pendingEl.parentNode) pendingEl.parentNode.removeChild(pendingEl);
@@ -852,6 +848,7 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
     if (view === "jobs") {
       loadJobs().catch(() => {});
     }
+    loadChatPrompts().catch(() => {});
     if (view === "mail") {
       // At boot only the status is fetched, for the badge; the queue itself
       // is worth a request when someone actually opens the tab.
@@ -1357,6 +1354,23 @@ async function bootstrap() {
   // what is on screen, so there is nothing to re-fetch on a switch.
   initSubtabs("settings", { defaultTab: "ai" });
   initReadiness({ revealElement });
+  initChatActions({
+    getKeywords,
+    getLocations,
+    activateView,
+    showJobDetail,
+    addRoles: async (roles, keywords) => {
+      await addRolesToProfile(roles);
+      window.getKeywords?.addMultiple(keywords);
+      await _addToShortlistApi(keywords);
+    },
+    patchProfile: (body) =>
+      api("/api/profile", { method: "PATCH", body: JSON.stringify(body) }),
+    savePreference: (key, value) =>
+      api("/api/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+    invalidateReadiness,
+    renderReadinessStrips,
+  });
   initSubtabs("profile", {
     defaultTab: "about",
     // The matching facts and the goals were fetched once at boot and never

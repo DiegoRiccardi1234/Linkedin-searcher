@@ -1077,5 +1077,15 @@
       "protected_category": "Registro de discapacidad",
       "work_rule": "Dónde puedes trabajar"
     }
+  },
+  "chatAction": {
+    "apply": "Aplicar",
+    "dismiss": "Ahora no",
+    "done": "Hecho.",
+    "failed": "No se pudo aplicar",
+    "fillScan": "¿Preparo una búsqueda de {terms} en {places}?",
+    "addRoles": "¿Guardo estos roles para buscar: {roles}?",
+    "setField": "¿Pongo {field} en {value}?",
+    "openJob": "¿Abro esta oferta?"
   }
 }

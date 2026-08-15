@@ -1077,5 +1077,15 @@
       "protected_category": "Protected categories register",
       "work_rule": "Where you can work"
     }
+  },
+  "chatAction": {
+    "apply": "Apply",
+    "dismiss": "Not now",
+    "done": "Done.",
+    "failed": "Could not apply that",
+    "fillScan": "Prepare a search for {terms} in {places}?",
+    "addRoles": "Save these roles to search for: {roles}?",
+    "setField": "Set {field} to {value}?",
+    "openJob": "Open this offer?"
   }
 }

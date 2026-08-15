@@ -145,7 +145,7 @@ def _parse_llm_response(raw: str) -> tuple[str, dict[str, Any] | None, list[dict
         # A valid envelope with an empty answer used to fall back to the whole
         # raw payload as the message body.
         answer = _recover_answer(candidate) or ""
-    action = parsed.get("action") if isinstance(parsed.get("action"), dict) else None
+    action = _clean_action(parsed.get("action"))
 
     roles_raw = parsed.get("suggested_roles")
     roles: list[dict[str, Any]] = []
@@ -163,6 +163,39 @@ def _parse_llm_response(raw: str) -> tuple[str, dict[str, Any] | None, list[dict
                 kws = []
             roles.append({"label": label, "keywords": kws or [label]})
     return str(answer), action, roles
+
+
+#: What the model is allowed to propose, and which profile fields it may
+#: propose a value for. The user still has to press the button — nothing here
+#: is applied on arrival — but an unknown action type or an unlisted field is
+#: dropped before it reaches the page, so a confused model cannot invent a
+#: control the app does not have.
+_ACTION_TYPES = {"FILL_SCAN_FORM", "ADD_ROLES", "SET_PROFILE_FIELD", "OPEN_JOB"}
+_SETTABLE_FIELDS = {
+    "base_cities",
+    "work_modes",
+    "years_experience",
+    "education_level",
+    "grade",
+    "driving_licence",
+    "protected_category",
+    "min_ral",
+    "goal",
+}
+
+
+def _clean_action(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    kind = str(raw.get("type") or "").strip().upper()
+    if kind not in _ACTION_TYPES:
+        if kind:
+            log.info("Chat proposed an unknown action %r; dropped", kind)
+        return None
+    if kind == "SET_PROFILE_FIELD" and str(raw.get("field") or "") not in _SETTABLE_FIELDS:
+        log.info("Chat proposed writing an unlisted field %r; dropped", raw.get("field"))
+        return None
+    return {**raw, "type": kind}
 
 
 #: Shown when the model's reply cannot be turned into an answer at all. Better
@@ -188,13 +221,15 @@ def handle_chat_message(
     session_id: str,
     provider: str | None = None,
     model: str | None = None,
+    view: str | None = None,
 ) -> dict[str, Any]:
     """Handle one chat turn.
 
     Flow:
     1. Persist the user message.
     2. Extract preference updates from the message and store them.
-    3. Compute the chat state (``no_cv`` / ``onboarding`` / ``ready_to_search`` / ``advising``).
+    3. Compute the chat state (``no_cv`` / ``onboarding`` / ``ready_to_search`` / ``advising``)
+       and, separately, which page the user is looking at.
     4. Build profile, preferences, and jobs context blocks.
     5. Call the active LLM provider with the state-specific system prompt.
     6. Parse the JSON envelope (``answer`` + optional ``action``). Fall back
@@ -225,7 +260,7 @@ def handle_chat_message(
 
         state = get_chat_state(db)
         ui_lang = db.get_preference("ui_language", "en")
-        sys_prompt = system_prompt(state=state, ui_language=ui_lang)
+        sys_prompt = system_prompt(state=state, ui_language=ui_lang, view=view)
 
         summary = load_session_summary(db, session_id)
         summary_block = f"\n\n=== Conversation summary so far ===\n{summary}" if summary else ""

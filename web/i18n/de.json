@@ -1077,5 +1077,15 @@
       "protected_category": "Schwerbehindertenstatus",
       "work_rule": "Wo du arbeiten kannst"
     }
+  },
+  "chatAction": {
+    "apply": "Übernehmen",
+    "dismiss": "Jetzt nicht",
+    "done": "Erledigt.",
+    "failed": "Konnte nicht übernommen werden",
+    "fillScan": "Soll ich eine Suche nach {terms} in {places} vorbereiten?",
+    "addRoles": "Diese Rollen zum Suchen merken: {roles}?",
+    "setField": "{field} auf {value} setzen?",
+    "openJob": "Dieses Angebot öffnen?"
   }
 }
