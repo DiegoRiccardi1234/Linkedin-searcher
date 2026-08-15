@@ -154,13 +154,18 @@ html, body {
 /* Compact density (Settings). Windows display scaling at 125-150% shrinks the
    CSS viewport without shrinking the design, so a 1920 screen behaves like a
    1536 or 1280 one: this gives back a step of room on demand, on any screen. */
+:root[data-density="xcompact"] { --density: 0.86; }
 :root[data-density="compact"] { --density: 0.92; }
 :root[data-density="normal"] { --density: 1; }
 :root[data-density="comfortable"] { --density: 1.08; }
 :root[data-density="large"] { --density: 1.16; }
-:root[data-density="compact"] .analytics-card { min-height: 220px; }
-:root[data-density="compact"] .table-wrap td { padding: 7px 10px; }
-:root[data-density="compact"] .table-wrap th { padding: 6px 10px; }
+:root[data-density="xlarge"] { --density: 1.26; }
+:root[data-density="compact"] .analytics-card,
+:root[data-density="xcompact"] .analytics-card { min-height: 220px; }
+:root[data-density="compact"] .table-wrap td,
+:root[data-density="xcompact"] .table-wrap td { padding: 7px 10px; }
+:root[data-density="compact"] .table-wrap th,
+:root[data-density="xcompact"] .table-wrap th { padding: 6px 10px; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
@@ -697,6 +702,54 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
 }
 .bucket-tab.is-active .bucket-count { color: var(--accent); background: transparent; }
 .bucket-count:empty { display: none; }
+
+/* Sub-tabs inside a view (Settings, Profile). Panels are hidden by class, not
+   by the hidden attribute, so getElementById and applyTranslations keep
+   working on a panel nobody is looking at. */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4, 20px);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-2);
+}
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.subtab:hover { background: var(--surface); color: var(--text); }
+.subtab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.subtab .material-symbols-outlined { font-size: 1.1rem; }
+.subtab-badge {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs, 0.75rem);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  min-width: 1.4em;
+  text-align: center;
+}
+.subtab-panel { display: none; }
+.subtab-panel.is-active { display: block; }
+/* Cards that only mean something once a CV exists. Marked rather than wrapped,
+   because they now live in four different panels. */
+.view.no-profile [data-needs-profile] { display: none; }
 
 .jobs-count-line {
   display: flex;

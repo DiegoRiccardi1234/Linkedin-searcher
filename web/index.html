@@ -689,7 +689,21 @@
         <p class="micro" data-i18n="profile.subtitle">What the AI understood from your CV. Edit any field, switch between uploaded CVs.</p>
       </header>
 
-      <div class="profile-actions">
+      <!-- Four questions, four tabs: who I am, what I am looking for, what
+           rules me out, and the AI tools. Twelve cards in one column meant
+           the constraints that hide half the archive sat below the fold. -->
+      <div class="subtabs" data-subtabs="profile" role="tablist">
+        <button type="button" class="subtab is-active" role="tab" id="profile-tab-about" aria-controls="profile-panel-about" aria-selected="true" tabindex="0" data-subtab="about"><span class="material-symbols-outlined">badge</span> <span data-i18n="profile.tabs.about">about</span><span class="subtab-badge hidden">0</span></button>
+        <button type="button" class="subtab" role="tab" id="profile-tab-target" aria-controls="profile-panel-target" aria-selected="false" tabindex="-1" data-subtab="target"><span class="material-symbols-outlined">flag</span> <span data-i18n="profile.tabs.target">target</span><span class="subtab-badge hidden">0</span></button>
+        <button type="button" class="subtab" role="tab" id="profile-tab-constraints" aria-controls="profile-panel-constraints" aria-selected="false" tabindex="-1" data-subtab="constraints"><span class="material-symbols-outlined">rule</span> <span data-i18n="profile.tabs.constraints">constraints</span><span class="subtab-badge hidden">0</span></button>
+        <button type="button" class="subtab" role="tab" id="profile-tab-tools" aria-controls="profile-panel-tools" aria-selected="false" tabindex="-1" data-subtab="tools"><span class="material-symbols-outlined">auto_awesome</span> <span data-i18n="profile.tabs.tools">tools</span><span class="subtab-badge hidden">0</span></button>
+      </div>
+      <div id="profileEmpty" class="profile-empty hidden">
+        <p data-i18n="profile.empty">Upload your CV in the box above to populate your profile.</p>
+      </div>
+      <div data-subtabs-panels="profile">
+        <section class="subtab-panel is-active" role="tabpanel" data-subtab-panel="about" id="profile-panel-about" aria-labelledby="profile-tab-about">
+          <div class="profile-grid">
         <article class="profile-action-card">
           <h3><span class="material-symbols-outlined">description</span> <span data-i18n="profile.cvUpload">CV Upload</span></h3>
           <form id="cvForm" class="column">
@@ -720,6 +734,50 @@
           <pre id="linkedinStatus" class="output hidden"></pre>
         </article>
 
+        <article data-needs-profile class="profile-block profile-history">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.history">CV history</h3>
+          </header>
+          <div id="profileHistory" class="profile-history-list"></div>
+        </article>
+
+        <article data-needs-profile class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.experience">Experience</h3>
+          </header>
+          <div id="profileExperience" class="profile-experience"></div>
+        </article>
+
+        <!-- The four facts that decide whether an offer is applicable at all.
+             They were extracted from the CV and shown read-only while nothing
+             in the scoring path read them; now they gate offers, so a parser
+             mistake has to be correctable without rewriting the whole CV. -->
+
+        <article data-needs-profile class="profile-block profile-cv">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.originalCv">CV (markdown)</h3>
+            <span id="profileMeta" class="micro"></span>
+            <button type="button" class="ghost-btn micro" id="cvEditBtn" data-i18n="profile.editCv">Edit</button>
+          </header>
+          <div id="profileMarkdown" class="markdown-render"></div>
+          <div id="cvEditWrap" class="cv-edit-wrap hidden">
+            <label class="micro" data-i18n="profile.editName">Display name</label>
+            <input type="text" id="cvEditName" class="profile-add-input" />
+            <label class="micro" data-i18n="profile.editCvText">CV text (feeds AI scoring)</label>
+            <textarea id="cvEditArea" class="cv-edit-area" rows="18"></textarea>
+            <div class="cv-edit-actions">
+              <button type="button" class="secondary" id="cvEditSaveBtn" data-i18n="profile.save">Save</button>
+              <button type="button" class="ghost-btn" id="cvEditCancelBtn" data-i18n="profile.cancel">Cancel</button>
+            </div>
+          </div>
+        </article>
+
+      
+          </div>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="target" id="profile-panel-target" aria-labelledby="profile-tab-target">
+          <div class="profile-grid">
+
         <article class="profile-action-card">
           <h3><span class="material-symbols-outlined">flag</span> <span data-i18n="profile.onboarding.title">Search goals</span></h3>
           <p class="micro" data-i18n="profile.onboarding.subtitle">Used to tailor scoring and CV advice to what you're looking for.</p>
@@ -737,6 +795,75 @@
             <button type="submit" class="secondary" data-i18n="profile.onboarding.save">Save goals</button>
           </form>
         </article>
+
+        <article data-needs-profile class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.preferredRoles">Preferred roles</h3>
+          </header>
+          <div id="profileRoles" class="chip-list" data-field="preferred_roles"></div>
+          <div class="profile-edit-row" data-field="preferred_roles">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addRole" placeholder="Add role" />
+            <button type="button" class="secondary profile-add-btn" data-field="preferred_roles" data-i18n="profile.add">Add</button>
+          </div>
+        </article>
+
+        <article data-needs-profile class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.skills">Top skills</h3>
+          </header>
+          <div id="profileSkills" class="chip-list" data-field="skills"></div>
+          <div class="profile-edit-row" data-field="skills">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addSkill" placeholder="Add skill" />
+            <button type="button" class="secondary profile-add-btn" data-field="skills" data-i18n="profile.add">Add</button>
+          </div>
+        </article>
+
+        <article data-needs-profile class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.languages">Languages</h3>
+          </header>
+          <div id="profileLanguages" class="chip-list" data-field="languages"></div>
+          <div class="profile-edit-row" data-field="languages">
+            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addLanguage" placeholder="Add language" />
+            <button type="button" class="secondary profile-add-btn" data-field="languages" data-i18n="profile.add">Add</button>
+          </div>
+        </article>
+          </div>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="constraints" id="profile-panel-constraints" aria-labelledby="profile-tab-constraints">
+          <div class="profile-grid">
+        <article data-needs-profile class="profile-block">
+          <header class="profile-block-head">
+            <h3 data-i18n="profile.matching.title">Matching data</h3>
+            <button type="button" class="ghost-btn micro" id="factsEditBtn" data-i18n="profile.edit">Edit</button>
+          </header>
+          <p class="micro" data-i18n="profile.matching.hint">Used to hide offers you cannot apply to. If something is missing or wrong, fix it here.</p>
+          <div id="matchingFactsView" class="profile-experience"></div>
+          <div id="matchingFactsEdit" class="cv-edit-wrap hidden">
+            <label class="micro" data-i18n="profile.matching.years">Years of professional experience</label>
+            <input type="number" min="0" max="50" id="factYears" class="profile-add-input" />
+            <label class="micro" data-i18n="profile.matching.education">Highest degree</label>
+            <select id="factEducation" class="settings-select"></select>
+            <label class="micro" data-i18n="profile.matching.grade">Degree grade (out of 110)</label>
+            <input type="number" min="60" max="110" id="factGrade" class="profile-add-input" />
+            <label class="micro" data-i18n="profile.matching.cities">Cities you can commute to (comma separated)</label>
+            <input type="text" id="factCities" class="profile-add-input" placeholder="Torino" />
+            <label class="micro" data-i18n="profile.matching.modes">Work modes you accept</label>
+            <div class="filter-pills" id="factModes">
+              <label class="filter-check"><input type="checkbox" value="onsite" /> <span data-i18n="profile.matching.onsite">On-site</span></label>
+              <label class="filter-check"><input type="checkbox" value="hybrid" /> <span data-i18n="profile.matching.hybrid">Hybrid</span></label>
+              <label class="filter-check"><input type="checkbox" value="remote" /> <span data-i18n="profile.matching.remote">Full remote</span></label>
+            </div>
+            <div class="cv-edit-actions">
+              <button type="button" class="secondary" id="factsSaveBtn" data-i18n="profile.save">Save</button>
+              <button type="button" class="ghost-btn" id="factsCancelBtn" data-i18n="profile.cancel">Cancel</button>
+            </div>
+          </div>
+        </article>
+          </div>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="tools" id="profile-panel-tools" aria-labelledby="profile-tab-tools">
+          <div class="profile-grid">
 
         <article class="profile-action-card profile-features">
           <h3><span class="material-symbols-outlined">toggle_on</span> <span data-i18n="profile.features.title">CV tools &amp; privacy</span></h3>
@@ -769,14 +896,8 @@
             </div>
           </div>
         </article>
-      </div>
-
-      <div id="profileEmpty" class="profile-empty hidden">
-        <p data-i18n="profile.empty">Upload your CV in the box above to populate your profile.</p>
-      </div>
-
-      <div id="profileContent" class="profile-grid hidden">
-        <article class="profile-block profile-cv-tools">
+      
+        <article data-needs-profile class="profile-block profile-cv-tools">
           <header class="profile-block-head cv-tools-head">
             <h3><span class="material-symbols-outlined">auto_awesome</span> <span data-i18n="profile.cvTools.title">AI CV tools</span></h3>
             <div class="cv-tools-actions">
@@ -795,107 +916,10 @@
             <div id="cvToolsOutput" class="markdown-render"></div>
           </div>
         </article>
-
-        <article class="profile-block profile-history">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.history">CV history</h3>
-          </header>
-          <div id="profileHistory" class="profile-history-list"></div>
-        </article>
-
-        <article class="profile-block">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.preferredRoles">Preferred roles</h3>
-          </header>
-          <div id="profileRoles" class="chip-list" data-field="preferred_roles"></div>
-          <div class="profile-edit-row" data-field="preferred_roles">
-            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addRole" placeholder="Add role" />
-            <button type="button" class="secondary profile-add-btn" data-field="preferred_roles" data-i18n="profile.add">Add</button>
           </div>
-        </article>
-
-        <article class="profile-block">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.skills">Top skills</h3>
-          </header>
-          <div id="profileSkills" class="chip-list" data-field="skills"></div>
-          <div class="profile-edit-row" data-field="skills">
-            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addSkill" placeholder="Add skill" />
-            <button type="button" class="secondary profile-add-btn" data-field="skills" data-i18n="profile.add">Add</button>
-          </div>
-        </article>
-
-        <article class="profile-block">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.languages">Languages</h3>
-          </header>
-          <div id="profileLanguages" class="chip-list" data-field="languages"></div>
-          <div class="profile-edit-row" data-field="languages">
-            <input type="text" class="profile-add-input" data-i18n-placeholder="profile.addLanguage" placeholder="Add language" />
-            <button type="button" class="secondary profile-add-btn" data-field="languages" data-i18n="profile.add">Add</button>
-          </div>
-        </article>
-
-        <article class="profile-block">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.experience">Experience</h3>
-          </header>
-          <div id="profileExperience" class="profile-experience"></div>
-        </article>
-
-        <!-- The four facts that decide whether an offer is applicable at all.
-             They were extracted from the CV and shown read-only while nothing
-             in the scoring path read them; now they gate offers, so a parser
-             mistake has to be correctable without rewriting the whole CV. -->
-        <article class="profile-block">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.matching.title">Matching data</h3>
-            <button type="button" class="ghost-btn micro" id="factsEditBtn" data-i18n="profile.edit">Edit</button>
-          </header>
-          <p class="micro" data-i18n="profile.matching.hint">Used to hide offers you cannot apply to. If something is missing or wrong, fix it here.</p>
-          <div id="matchingFactsView" class="profile-experience"></div>
-          <div id="matchingFactsEdit" class="cv-edit-wrap hidden">
-            <label class="micro" data-i18n="profile.matching.years">Years of professional experience</label>
-            <input type="number" min="0" max="50" id="factYears" class="profile-add-input" />
-            <label class="micro" data-i18n="profile.matching.education">Highest degree</label>
-            <select id="factEducation" class="settings-select"></select>
-            <label class="micro" data-i18n="profile.matching.grade">Degree grade (out of 110)</label>
-            <input type="number" min="60" max="110" id="factGrade" class="profile-add-input" />
-            <label class="micro" data-i18n="profile.matching.cities">Cities you can commute to (comma separated)</label>
-            <input type="text" id="factCities" class="profile-add-input" placeholder="Torino" />
-            <label class="micro" data-i18n="profile.matching.modes">Work modes you accept</label>
-            <div class="filter-pills" id="factModes">
-              <label class="filter-check"><input type="checkbox" value="onsite" /> <span data-i18n="profile.matching.onsite">On-site</span></label>
-              <label class="filter-check"><input type="checkbox" value="hybrid" /> <span data-i18n="profile.matching.hybrid">Hybrid</span></label>
-              <label class="filter-check"><input type="checkbox" value="remote" /> <span data-i18n="profile.matching.remote">Full remote</span></label>
-            </div>
-            <div class="cv-edit-actions">
-              <button type="button" class="secondary" id="factsSaveBtn" data-i18n="profile.save">Save</button>
-              <button type="button" class="ghost-btn" id="factsCancelBtn" data-i18n="profile.cancel">Cancel</button>
-            </div>
-          </div>
-        </article>
-
-        <article class="profile-block profile-cv">
-          <header class="profile-block-head">
-            <h3 data-i18n="profile.originalCv">CV (markdown)</h3>
-            <span id="profileMeta" class="micro"></span>
-            <button type="button" class="ghost-btn micro" id="cvEditBtn" data-i18n="profile.editCv">Edit</button>
-          </header>
-          <div id="profileMarkdown" class="markdown-render"></div>
-          <div id="cvEditWrap" class="cv-edit-wrap hidden">
-            <label class="micro" data-i18n="profile.editName">Display name</label>
-            <input type="text" id="cvEditName" class="profile-add-input" />
-            <label class="micro" data-i18n="profile.editCvText">CV text (feeds AI scoring)</label>
-            <textarea id="cvEditArea" class="cv-edit-area" rows="18"></textarea>
-            <div class="cv-edit-actions">
-              <button type="button" class="secondary" id="cvEditSaveBtn" data-i18n="profile.save">Save</button>
-              <button type="button" class="ghost-btn" id="cvEditCancelBtn" data-i18n="profile.cancel">Cancel</button>
-            </div>
-          </div>
-        </article>
-
+        </section>
       </div>
+    
     </section>
 
     <!-- Settings View -->
@@ -905,22 +929,17 @@
         <p data-i18n="settings.subtitle">Manage your CV, search scans &amp; API keys — no terminal needed.</p>
       </header>
 
-      <div class="settings-grid">
-        <article class="card-block card-block--wide system-card">
-          <h3><span class="material-symbols-outlined">tune</span> <span data-i18n="settings.system.title">System</span></h3>
-          <div class="system-row">
-            <span class="micro" data-i18n="settings.system.currentVersion">Current version</span>
-            <code id="systemCurrentVersion">—</code>
-          </div>
-          <div class="system-row">
-            <span class="micro" data-i18n="settings.system.lastCheck">Last check</span>
-            <span id="systemLastCheck" class="system-status">—</span>
-          </div>
-          <div class="system-actions">
-            <button type="button" id="systemCheckUpdate" class="secondary" data-i18n="settings.system.checkNow">Check for updates</button>
-            <button type="button" id="systemOpenLogs" class="ghost-btn" data-i18n="settings.system.openLogs">Open logs folder</button>
-          </div>
-        </article>
+      <!-- Eight full-width cards in one column were seven screens of scrolling:
+           the page had no shape, so nothing in it was findable. -->
+      <div class="subtabs" data-subtabs="settings" role="tablist">
+        <button type="button" class="subtab is-active" role="tab" id="settings-tab-ai" aria-controls="settings-panel-ai" aria-selected="true" tabindex="0" data-subtab="ai"><span class="material-symbols-outlined">smart_toy</span> <span data-i18n="settings.tabs.ai">ai</span></button>
+        <button type="button" class="subtab" role="tab" id="settings-tab-search" aria-controls="settings-panel-search" aria-selected="false" tabindex="-1" data-subtab="search"><span class="material-symbols-outlined">travel_explore</span> <span data-i18n="settings.tabs.search">search</span></button>
+        <button type="button" class="subtab" role="tab" id="settings-tab-appearance" aria-controls="settings-panel-appearance" aria-selected="false" tabindex="-1" data-subtab="appearance"><span class="material-symbols-outlined">format_size</span> <span data-i18n="settings.tabs.appearance">appearance</span></button>
+        <button type="button" class="subtab" role="tab" id="settings-tab-system" aria-controls="settings-panel-system" aria-selected="false" tabindex="-1" data-subtab="system"><span class="material-symbols-outlined">tune</span> <span data-i18n="settings.tabs.system">system</span></button>
+      </div>
+      <div data-subtabs-panels="settings">
+        <section class="subtab-panel is-active" role="tabpanel" data-subtab-panel="ai" id="settings-panel-ai" aria-labelledby="settings-tab-ai">
+          <div class="settings-grid">
         <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">key</span> <span data-i18n="settings.providers.title">AI Providers</span></h3>
           <p class="micro" data-i18n="settings.providers.subtitle">Add an API key for each provider you want to use, then pick one as primary.</p>
@@ -959,6 +978,25 @@
              sent. Off until connected, and read-only for good: on Microsoft the
              token is scoped to Mail.Read, on IMAP the folder is opened
              read-only, and the app cannot send at all. -->
+
+        <article class="card-block card-block--wide">
+          <h3><span class="material-symbols-outlined">smart_toy</span> <span data-i18n="settings.models.title">AI models</span></h3>
+          <p class="micro" data-i18n="settings.models.subtitle">Pin a specific model per task, or leave Auto. Populated from your primary provider.</p>
+          <div class="model-override-list">
+            <label class="model-override-row">
+              <span class="micro" data-i18n="settings.models.scoring">Job search (scoring)</span>
+              <select id="scoringModelSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
+            </label>
+            <label class="model-override-row">
+              <span class="micro" data-i18n="settings.models.chat">Coach chat</span>
+              <select id="chatModelOverrideSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
+            </label>
+            <label class="model-override-row">
+              <span class="micro" data-i18n="settings.models.cv">CV tools</span>
+              <select id="cvModelSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
+            </label>
+          </div>
+        </article>
         <article class="card-block card-block--wide" id="localModelsCard">
           <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>
           <p class="micro" data-i18n="local.subtitle">A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.</p>
@@ -979,25 +1017,10 @@
           <p id="localProgress" class="micro local-progress" hidden></p>
           <button type="button" id="localRefresh" class="ghost-btn small"><span class="material-symbols-outlined">refresh</span> <span data-i18n="local.refresh">Check again</span></button>
         </article>
-
-        <article class="card-block card-block--wide">
-          <h3><span class="material-symbols-outlined">smart_toy</span> <span data-i18n="settings.models.title">AI models</span></h3>
-          <p class="micro" data-i18n="settings.models.subtitle">Pin a specific model per task, or leave Auto. Populated from your primary provider.</p>
-          <div class="model-override-list">
-            <label class="model-override-row">
-              <span class="micro" data-i18n="settings.models.scoring">Job search (scoring)</span>
-              <select id="scoringModelSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
-            </label>
-            <label class="model-override-row">
-              <span class="micro" data-i18n="settings.models.chat">Coach chat</span>
-              <select id="chatModelOverrideSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
-            </label>
-            <label class="model-override-row">
-              <span class="micro" data-i18n="settings.models.cv">CV tools</span>
-              <select id="cvModelSelect" class="model-override-select"><option value="" data-i18n="settings.models.auto">Auto (recommended)</option></select>
-            </label>
           </div>
-        </article>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="search" id="settings-panel-search" aria-labelledby="settings-tab-search">
+          <div class="settings-grid">
 
         <article class="card-block card-block--wide features-card">
           <h3><span class="material-symbols-outlined">schedule</span> <span data-i18n="settings.features.title">Automation</span></h3>
@@ -1016,20 +1039,6 @@
         </article>
 
         <article class="card-block card-block--wide">
-          <h3><span class="material-symbols-outlined">format_size</span> <span data-i18n="settings.appearance.title">Appearance</span></h3>
-          <p class="micro" data-i18n="settings.appearance.subtitle">On a small laptop, or with Windows display scaling at 125%, the compact setting gives back a step of room.</p>
-          <label class="settings-field">
-            <span class="micro" data-i18n="settings.appearance.density">Density</span>
-            <select id="densitySelect" class="settings-select">
-              <option value="compact" data-i18n="settings.appearance.densityCompact">Compact</option>
-              <option value="normal" data-i18n="settings.appearance.densityNormal">Normal</option>
-              <option value="comfortable" data-i18n="settings.appearance.densityComfortable">Comfortable</option>
-              <option value="large" data-i18n="settings.appearance.densityLarge">Large</option>
-            </select>
-          </label>
-        </article>
-
-        <article class="card-block card-block--wide">
           <h3><span class="material-symbols-outlined">content_copy</span> <span data-i18n="settings.dedup.title">Duplicate jobs</span></h3>
           <p class="micro" data-i18n="settings.dedup.subtitle">How the same role found on different sources (LinkedIn, Indeed) is grouped into one card.</p>
           <label class="settings-field">
@@ -1042,7 +1051,50 @@
           </label>
         </article>
 
+      
+          </div>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="appearance" id="settings-panel-appearance" aria-labelledby="settings-tab-appearance">
+          <div class="settings-grid">
+
+        <article class="card-block card-block--wide">
+          <h3><span class="material-symbols-outlined">format_size</span> <span data-i18n="settings.appearance.title">Appearance</span></h3>
+          <p class="micro" data-i18n="settings.appearance.subtitle">On a small laptop, or with Windows display scaling at 125%, the compact setting gives back a step of room.</p>
+          <label class="settings-field">
+            <span class="micro" data-i18n="settings.appearance.density">Density</span>
+            <select id="densitySelect" class="settings-select">
+              <option value="xcompact" data-i18n="settings.appearance.densityXCompact">Very compact</option>
+              <option value="compact" data-i18n="settings.appearance.densityCompact">Compact</option>
+              <option value="normal" data-i18n="settings.appearance.densityNormal">Normal</option>
+              <option value="comfortable" data-i18n="settings.appearance.densityComfortable">Comfortable</option>
+              <option value="large" data-i18n="settings.appearance.densityLarge">Large</option>
+              <option value="xlarge" data-i18n="settings.appearance.densityXLarge">Very large</option>
+            </select>
+          </label>
+        </article>
+          </div>
+        </section>
+        <section class="subtab-panel" role="tabpanel" data-subtab-panel="system" id="settings-panel-system" aria-labelledby="settings-tab-system">
+          <div class="settings-grid">
+        <article class="card-block card-block--wide system-card">
+          <h3><span class="material-symbols-outlined">tune</span> <span data-i18n="settings.system.title">System</span></h3>
+          <div class="system-row">
+            <span class="micro" data-i18n="settings.system.currentVersion">Current version</span>
+            <code id="systemCurrentVersion">—</code>
+          </div>
+          <div class="system-row">
+            <span class="micro" data-i18n="settings.system.lastCheck">Last check</span>
+            <span id="systemLastCheck" class="system-status">—</span>
+          </div>
+          <div class="system-actions">
+            <button type="button" id="systemCheckUpdate" class="secondary" data-i18n="settings.system.checkNow">Check for updates</button>
+            <button type="button" id="systemOpenLogs" class="ghost-btn" data-i18n="settings.system.openLogs">Open logs folder</button>
+          </div>
+        </article>
+          </div>
+        </section>
       </div>
+    
     </section>
 
     <!-- Right Rail -->

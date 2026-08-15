@@ -191,6 +191,10 @@ export function revealElement(target, opts = {}) {
   return true;
 }
 
+// Exposed like ChatSessions is: the whole point of this function is that it
+// works from anywhere, and "anywhere" includes a test driving the page.
+window.revealElement = revealElement;
+
 function roleLabel(role) {
   if (role === "assistant") return "Coach";
   if (role === "user") return "You";
@@ -1312,6 +1316,18 @@ async function bootstrap() {
   // Probes the GPU and asks Ollama: slow enough to keep off the critical path,
   // and useless until the user opens Settings anyway.
   initMatchingFacts();
+  // Both panels are already loaded once at boot below; the tabs only decide
+  // what is on screen, so there is nothing to re-fetch on a switch.
+  initSubtabs("settings", { defaultTab: "ai" });
+  initSubtabs("profile", {
+    defaultTab: "about",
+    // The matching facts and the goals were fetched once at boot and never
+    // again, so reopening the tab showed whatever was true when the app
+    // started — including values a scan had changed since.
+    onChange: (tab) => {
+      if (tab === "constraints") loadMatchingFacts().catch(() => {});
+    },
+  });
   loadLocalModels();
   await loadSchedulerStatus();
   await loadChatPrompts();

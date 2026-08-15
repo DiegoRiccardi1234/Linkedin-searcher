@@ -120,6 +120,12 @@
       "fromYou": "introducido por ti",
       "missing": "falta",
       "saved": "Datos actualizados"
+    },
+    "tabs": {
+      "about": "Quién soy",
+      "target": "Qué busco",
+      "constraints": "Restricciones",
+      "tools": "Herramientas IA"
     }
   },
   "jobSearch": {
@@ -428,13 +434,21 @@
       "densityCompact": "Compacta",
       "densitySaved": "Densidad actualizada",
       "densityComfortable": "Cómoda",
-      "densityLarge": "Grande"
+      "densityLarge": "Grande",
+      "densityXCompact": "Muy compacta",
+      "densityXLarge": "Muy grande"
     },
     "usage": {
       "limitLabel": "Límite de peticiones al día (0 = sin límite)",
       "limitSaved": "Límite diario actualizado."
     },
-    "keysDiagnostics": "Diagnóstico de claves"
+    "keysDiagnostics": "Diagnóstico de claves",
+    "tabs": {
+      "ai": "IA",
+      "search": "Búsqueda",
+      "appearance": "Apariencia",
+      "system": "Sistema"
+    }
   },
   "coach": {
     "title": "Career Coach",

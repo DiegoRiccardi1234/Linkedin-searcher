@@ -9,7 +9,11 @@
 import { showToast } from "./helpers.js";
 import { t } from "./i18n.js";
 
-const DENSITIES = new Set(["normal", "compact"]);
+// The select offered four steps and this set accepted two, so "Comfortable"
+// and "Large" quietly did nothing — the CSS multipliers for them had been
+// sitting in styles.css the whole time. Six steps now, and a value that is not
+// one of them still falls back to normal rather than painting nothing.
+const DENSITIES = new Set(["xcompact", "compact", "normal", "comfortable", "large", "xlarge"]);
 
 // The topbar and the two banners are all `position: sticky; top: 0`, so they
 // stack visually and anything sticking below them (the chat rail) has to start
