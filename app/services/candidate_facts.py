@@ -37,11 +37,17 @@ FACT_PREFIX = "profile_fact_"
 FACT_YEARS = f"{FACT_PREFIX}years_experience"
 FACT_EDUCATION = f"{FACT_PREFIX}education_level"
 FACT_GRADE = f"{FACT_PREFIX}grade"
+#: Comma-separated family names ("informatica,ingegneria"), for the CV whose
+#: education section a parser read wrong — or the graduate whose second degree
+#: is in something else entirely.
+FACT_DEGREE_FIELDS = f"{FACT_PREFIX}degree_fields"
 FACT_BASE_CITIES = f"{FACT_PREFIX}base_cities"
 FACT_WORK_MODES = f"{FACT_PREFIX}work_modes"
 #: "1"/"0" — whether the user is on the protected-categories register (L. 68/99).
 #: Absent means unknown, and unknown blocks nothing, like every other fact here.
 FACT_PROTECTED_CATEGORY = f"{FACT_PREFIX}protected_category"
+#: "1"/"0" — whether the user holds a category B driving licence.
+FACT_DRIVING_LICENCE = f"{FACT_PREFIX}driving_licence"
 
 _GRADE_RE = re.compile(r"(\d{2,3})\s*/\s*110")
 
@@ -134,6 +140,12 @@ class CandidateFacts:
     grade: int | None = None
     #: On the protected-categories register (L. 68/99). None = not stated.
     protected_category: bool | None = None
+    #: Whether the user holds a category B licence. None = never said, and never
+    #: said blocks nothing.
+    driving_licence: bool | None = None
+    #: Degree families the CV shows, e.g. ``{"informatica"}``. A separate fact
+    #: from ``education_level``: one answers "how high", this one "in what".
+    degree_fields: frozenset[str] = frozenset()
     work_rule: WorkRule = field(default_factory=WorkRule)
     #: fact name -> "cv" | "manuale" | "mancante", for the profile panel.
     sources: dict[str, str] = field(default_factory=dict)
@@ -274,12 +286,31 @@ def candidate_facts(db: Database) -> CandidateFacts:
     else:
         protected, sources["protected_category"] = None, "mancante"
 
+    manual_fields = (db.get_preference(FACT_DEGREE_FIELDS, "") or "").strip()
+    if manual_fields:
+        fields = frozenset(f.strip().lower() for f in manual_fields.split(",") if f.strip())
+        sources["degree_fields"] = "manuale"
+    else:
+        fields = frozenset(candidate_degree_fields(markdown, summary))
+        sources["degree_fields"] = "cv" if fields else "mancante"
+
+    raw_licence = (db.get_preference(FACT_DRIVING_LICENCE, "") or "").strip().lower()
+    licence: bool | None
+    if raw_licence in ("1", "si", "sì", "yes", "true"):
+        licence, sources["driving_licence"] = True, "manuale"
+    elif raw_licence in ("0", "no", "false"):
+        licence, sources["driving_licence"] = False, "manuale"
+    else:
+        licence, sources["driving_licence"] = None, "mancante"
+
     rule = _work_rule_for(db, sources)
     return CandidateFacts(
         years_experience=years,
         education_level=education,
         grade=grade,
         protected_category=protected,
+        driving_licence=licence,
+        degree_fields=fields,
         work_rule=rule,
         sources=sources,
     )
@@ -351,6 +382,232 @@ def education_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str 
     if EDUCATION_LEVELS.index(have) >= EDUCATION_LEVELS.index(level):
         return level, None
     return level, f"Richiede una laurea {level.lower()} (il profilo ha: {have.lower()})"
+
+
+# ── the SUBJECT of the degree, which is a different question from its level ──
+#
+# ``education_status`` compares a bachelor's against a master's and says nothing
+# about what the degree is IN. A computer-science graduate was therefore reading
+# "hai una laurea in Economia" as satisfied, and PwC's junior auditor sat at 8/10
+# in a shortlist built for an IT job hunt. Measured on 423 real descriptions, 245
+# of them name a subject: this is the single most stated requirement in the
+# archive and the only one nothing read.
+#
+# Families are named the way the ads name them, and the candidate's own degree is
+# matched into the same table — nothing here is written for one person.
+_FIELD_FAMILIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "informatica",
+        (
+            "informatic",
+            "computer",
+            "software",
+            "ict",
+            "cyber",
+            "telecomunicazion",
+            "information technology",
+            "information system",
+            "sistemi informativ",
+            # Bare "Data" is a subject in its own right in English ads
+            # ("Bachelor's degree in Data, Supply Chain Management, ..."), and
+            # every accidental match can only make this check quieter, never
+            # more aggressive — which is the safe direction for it to err in.
+            "data",
+            "analytics",
+            "intelligenza artificiale",
+            "artificial intelligence",
+            # "Ingegneria dell'informazione" is the Italian umbrella that
+            # contains computer engineering; without it Adgenera's "ingegneria
+            # industriale o dell'informazione" read as a foreign subject.
+            "informazione",
+        ),
+    ),
+    ("ingegneria", ("ingegneria", "engineering", "ingegner")),
+    (
+        "economia",
+        (
+            "economi",
+            "business",
+            "management",
+            "marketing",
+            "finanz",
+            "finance",
+            "accounting",
+            "amministrazione",
+            "contabil",
+            "commercial",
+        ),
+    ),
+    ("giuridica", ("giurisprudenz", "giuridic", "legal", "law")),
+    ("matematica", ("matematic", "fisic", "statistic", "mathemat", "physic")),
+    (
+        "scienze della vita",
+        ("biolog", "biomedic", "medicin", "farmac", "life science", "chimic", "chemistr", "health"),
+    ),
+    (
+        "umanistica",
+        ("lettere", "filosof", "psicolog", "comunicazione", "lingue", "traduzion", "sociolog"),
+    ),
+)
+
+#: Phrases that name no subject in particular and therefore exclude nobody. An
+#: ad saying "laurea in ambito tecnico-scientifico" accepts a computer-science
+#: graduate without spelling it out, and 24 of the 41 live postings phrase it
+#: exactly like this.
+_FIELD_UMBRELLAS = (
+    "stem",
+    "tecnico-scientific",
+    "tecnico scientific",
+    "tecnico/scientific",
+    "scientifiche",
+    "scientific discipline",
+    "technical field",
+    "technical discipline",
+    "related technical",
+    "ambito tecnico",
+    "indirizzo tecnico",
+    "materie tecnico",
+    "discipline tecniche",
+    "quantitative",
+)
+
+#: A subject named as a wish is not a gate — the same rule ``education_status``
+#: already applies to the level.
+_FIELD_PREFERENCE_RE = re.compile(
+    r"preferib|preferen|gradit|desirable|preferably|nice to have|costituisce titolo|plus",
+    re.IGNORECASE,
+)
+
+#: "Laurea in X, Y o Z" — the subject list runs to the end of the clause.
+_FIELD_REQUIREMENT_RE = re.compile(
+    r"(?:laurea|laureand[oai]|laureat[oai]|titolo di studio|degree|bachelor|master)"
+    r"[^.;:\n]{0,60}?\bin\b\s*([^.;\n]{3,140})",
+    re.IGNORECASE,
+)
+
+
+#: "IT" is a degree subject in half the English-language ads ("Business,
+#: Engineering, IT, or Data Analytics") and two letters everywhere else, so it is
+#: matched as a WORD and case-SENSITIVELY — the same rule the title gate learned
+#: for short acronyms, where lowercase "ai" is an Italian preposition.
+_IT_ACRONYM_RE = re.compile(r"\bIT\b")
+
+
+def _families_named_in(text: str) -> set[str]:
+    low = _norm(text)
+    found = {name for name, terms in _FIELD_FAMILIES if any(t in low for t in terms)}
+    if _IT_ACRONYM_RE.search(str(text or "")):
+        found.add("informatica")
+    return found
+
+
+def candidate_degree_fields(markdown: str, summary: dict[str, Any] | None) -> set[str]:
+    """Which degree families the CV shows, e.g. ``{"informatica"}``.
+
+    Read from the education lines rather than the whole CV: a developer's skill
+    list mentions half the table, and "PostgreSQL" must not make someone a
+    graduate in economics.
+    """
+    sources: list[str] = []
+    if isinstance(summary, dict):
+        for key in ("education", "education_level", "degree", "field_of_study"):
+            value = summary.get(key)
+            if isinstance(value, str):
+                sources.append(value)
+            elif isinstance(value, list):
+                sources.extend(str(v) for v in value)
+    for line in str(markdown or "").splitlines():
+        if re.search(r"laurea|degree|bachelor|master|diploma", line, re.IGNORECASE):
+            sources.append(line)
+    return _families_named_in(" ".join(sources))
+
+
+def degree_field_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
+    """``(subject the posting asks for, reason or None)``.
+
+    Silent unless the posting names a subject AND none of the subjects it names
+    belongs to a family the candidate holds. Deliberately reads EVERY degree
+    sentence in the ad before deciding: postings routinely list an acceptable
+    subject in one line and a preferred one in another, and refusing on the
+    second while the first accepts you is the false positive that matters here.
+    """
+    mine = facts.degree_fields
+    if not mine:
+        return "Non specificato", None  # unknown subject blocks nothing
+    first_named = ""
+    for match in _FIELD_REQUIREMENT_RE.finditer(str(descrizione or "")):
+        clause = match.group(1).strip()
+        if _FIELD_PREFERENCE_RE.search(match.group(0)):
+            continue
+        low = _norm(clause)
+        if any(u in low for u in _FIELD_UMBRELLAS):
+            return clause[:60], None
+        named = _families_named_in(clause)
+        if not named:
+            continue  # "laurea in corso", "degree in progress": no subject stated
+        if named & mine:
+            return clause[:60], None
+        first_named = first_named or clause
+    if not first_named:
+        return "Non specificato", None
+    subject = re.sub(r"\s+", " ", first_named).strip(" ,*")[:70]
+    have = ", ".join(sorted(mine))
+    return subject, f"Chiede una laurea in {subject} (il profilo e' in {have})"
+
+
+# ── a driving licence, which is a barrier and not a skill ────────────────────
+#
+# The comment above ``BLOCKING_FLAGS`` has always listed "no driving licence"
+# among the non-arguable constraints, and no check ever read one: the barrier was
+# assumed to be covered by the unreachable-office rule, which it is not. A field
+# role in your own city still needs the car. Cost of the gap, measured: Siemens'
+# Implementation Consultant PLM — "Valid driving license and willingness to
+# travel within Italy" — was recommended as a Tier-1 offer and applied to.
+#
+# Rare enough to be worth reading precisely: 11 of 423 real descriptions mention
+# a licence at all, so this is nothing like the L. 68/99 boilerplate trap.
+_LICENCE_MENTION_RE = re.compile(
+    r"patente(?:\s+di\s+guida)?(?:\s+(?:cat\.?|categoria)\s*)?\s*b?\b"
+    r"|automunit|driving licen[cs]e|driver'?s licen[cs]e",
+    re.IGNORECASE,
+)
+#: "Nice to have: inglese e patente B" is a wish. Verbatim from EY's ad, and the
+#: only one of the eleven that phrases it that way — which is exactly why the
+#: guard is needed rather than assumed.
+_LICENCE_PREFERENCE_RE = re.compile(
+    r"nice to have|preferib|gradit|costituisce titolo|plus|desirable|preferential",
+    re.IGNORECASE,
+)
+
+
+def driving_licence_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
+    """``(label, blocking reason or None)`` for a posting that needs a car.
+
+    Blocks only when the user has explicitly said they do not hold one — an
+    unstated fact hides nothing, exactly like every other check here.
+
+    Fires on 7 of 423 real descriptions, all genuine requirements, and correctly
+    spares EY's "Nice to have: ... patente B". Known limit, left in deliberately:
+    the veto window keeps its left side wide (a heading governs the list under
+    it), so a posting that writes "MICROSOFT OFFICE - preferibile / Patenti:
+    Patente B - obbligatorio" has the neighbouring bullet's "preferibile" inside
+    the window and is missed. One posting in the archive, already blocked for
+    other reasons — and a miss leaves the status quo, while the opposite error
+    hides a job someone could take.
+    """
+    if facts.driving_licence is not False:
+        return "Non specificato", None
+    from app.services.scan.heuristics import _clause_window
+
+    text = str(descrizione or "")
+    for match in _LICENCE_MENTION_RE.finditer(text):
+        # A veto window, so the tail is clamped at the clause boundary: the next
+        # bullet is the next requirement, about something else.
+        window = _clause_window(text, match.start(), match.end(), 90)
+        if _LICENCE_PREFERENCE_RE.search(window):
+            continue
+        return "Patente richiesta", "L'annuncio richiede la patente B (il profilo non la ha)"
+    return "Non specificato", None
 
 
 def location_status(sede: str, modalita: str, facts: CandidateFacts) -> tuple[str, str | None]:
@@ -440,6 +697,8 @@ def blocking_reasons(
     if facts is None:
         return []
     from app.services.scan.hard_requirements import (
+        FLAG_DEGREE_FIELD,
+        FLAG_DRIVING_LICENCE,
         FLAG_EDUCATION,
         FLAG_EXPERIENCE,
         FLAG_LOCATION,
@@ -450,7 +709,9 @@ def blocking_reasons(
     for code, (_label, reason) in (
         (FLAG_EXPERIENCE, experience_status(descrizione, facts)),
         (FLAG_EDUCATION, education_status(descrizione, facts)),
+        (FLAG_DEGREE_FIELD, degree_field_status(descrizione, facts)),
         (FLAG_LOCATION, location_status(sede, modalita, facts)),
+        (FLAG_DRIVING_LICENCE, driving_licence_status(descrizione, facts)),
         (FLAG_PROTECTED_CATEGORY, protected_category_status(descrizione, facts)),
     ):
         if reason:

@@ -160,10 +160,18 @@ def _declared_constraint_breaks(
 
 
 # ── declared salary vs the candidate's floor ─────────────────────────────────
-# jobspy returns no salary at all (N/D on 78/78 rows measured), and the model's
-# own ``ral_stimata`` is "Non stimabile" half the time, so this is a FLAG, never
-# a score cap: capping would punish the rare posting honest enough to publish a
-# figure while leaving every silent one untouched.
+# jobspy returns no salary at all (N/D on 78/78 rows measured) and the model's
+# own ``ral_stimata`` is "Non stimabile" half the time, so this used to be a flag
+# and nothing else: capping looked like punishing the rare posting honest enough
+# to publish a figure while every silent one went free.
+#
+# What that produced, on the real archive: a TIM internship declaring up to 9.600
+# EUR against a declared floor of 20.000 kept the model's 8/10 and led the "best
+# for you" panel. A stated figure under a stated floor is a fact, not an
+# inference — so it now carries a WEIGHTED flag: the offer keeps its place in the
+# list with the badge on it and simply stops outranking the ones that pay enough.
+# Postings that declare nothing are still untouched, which is the asymmetry the
+# original note was worried about and it remains true.
 
 _RAL_AMOUNT_RE = re.compile(r"(\d{1,3}(?:[.\s]\d{3})+|\d{4,6}|\d{2,3}\s*k)", re.IGNORECASE)
 
@@ -364,19 +372,28 @@ FLAG_NOT_EVALUATED = "non_valutato"  # no model judged this: there is no score
 FLAG_AGGREGATOR = "annuncio_aggregatore"  # a job board reposting someone else's ad
 FLAG_EXPERIENCE = "esperienza_richiesta"  # asks for more years than the CV shows
 FLAG_EDUCATION = "titolo_superiore"  # demands a degree above the candidate's
+FLAG_DEGREE_FIELD = "campo_studio"  # demands a degree in a subject the CV is not in
 FLAG_LOCATION = "sede_non_raggiungibile"  # on-site/hybrid outside the accepted cities
 FLAG_PROTECTED_CATEGORY = "categorie_protette"  # reserved to the L. 68/99 register
+FLAG_DRIVING_LICENCE = "patente_richiesta"  # needs a car the candidate said they lack
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
 #: "you cannot apply" — the offer may well be the best one in the archive.
 #: Neither are the WEIGHTED ones below: those you can apply to and sometimes get.
+#: ``FLAG_DRIVING_LICENCE`` belongs here for the reason the note below already
+#: gave — "no driving licence" was listed among the non-arguable constraints for
+#: months while nothing checked one, on the assumption the unreachable-office
+#: rule covered it. It does not: a field role in your own city still needs the
+#: car. It cost a Tier-1 recommendation and an application, to Siemens' "Valid
+#: driving license and willingness to travel within Italy".
 BLOCKING_FLAGS = frozenset(
     {
         FLAG_GEO_BLOCKED,
         FLAG_GRADE_BLOCKED,
         FLAG_LOCATION,
         FLAG_PROTECTED_CATEGORY,
+        FLAG_DRIVING_LICENCE,
     }
 )
 
@@ -388,7 +405,17 @@ BLOCKING_FLAGS = frozenset(
 #: They lower a CEILING instead: still visible, still badged, never recommended.
 #: The other four are not arguable — no driving licence, no visa, a grade
 #: threshold an ATS filters on, a register you are not enrolled in.
-WEIGHTED_FLAGS = frozenset({FLAG_EXPERIENCE, FLAG_EDUCATION})
+#:
+#: ``FLAG_DEGREE_FIELD`` joined them once the archive was read properly: 245 of
+#: 423 real descriptions name the SUBJECT of the degree they want, which makes it
+#: the most-stated requirement in the whole archive and the only one nothing
+#: checked — a computer-science CV sat at 8/10 under "hai una laurea in Economia".
+#: ``FLAG_SALARY_BELOW`` joined them for the opposite reason: it was flagged and
+#: nothing else, so a TIM internship declaring 9.600 EUR against a 20.000 floor
+#: kept an 8/10 and led the "best for you" panel. Both are arguable — people do
+#: get hired across a subject line, and an internship can still be worth taking —
+#: so neither hides the offer; they just stop it outranking one that fits.
+WEIGHTED_FLAGS = frozenset({FLAG_EXPERIENCE, FLAG_EDUCATION, FLAG_DEGREE_FIELD, FLAG_SALARY_BELOW})
 
 
 def is_unevaluated(analysis: Mapping[str, Any]) -> bool:
@@ -470,7 +497,10 @@ _WEIGHTED_CEILING = 6
 _CONSTRAINT_WEAKNESS = {
     FLAG_EXPERIENCE: "Chiede più anni di esperienza di quelli dichiarati nel profilo.",
     FLAG_EDUCATION: "Chiede un titolo di studio superiore a quello del profilo.",
+    FLAG_DEGREE_FIELD: "Chiede una laurea in una materia diversa da quella del profilo.",
+    FLAG_SALARY_BELOW: "Retribuzione dichiarata sotto la RAL minima del profilo.",
     FLAG_LOCATION: "Sede e modalità fuori da quelle accettate.",
+    FLAG_DRIVING_LICENCE: "Richiede la patente B, che il profilo dichiara di non avere.",
 }
 
 
@@ -506,21 +536,37 @@ def _apply_declared_constraints(
 
     The two kinds part ways here. A constraint in :data:`BLOCKING_FLAGS` is not
     arguable — no licence, no visa, a grade an ATS filters on — and keeps the cap
-    at 3 plus "Salta". A constraint in :data:`WEIGHTED_FLAGS` lowers a ceiling
-    that starts at 6 and drops by one for each further unmet requirement, so the
-    offer stays in the list, badged and never recommended.
+    at 3 plus "Salta". A constraint in :data:`WEIGHTED_FLAGS` lowers a ceiling,
+    but that is applied once at the end by :func:`_apply_weighted_ceiling`: the
+    salary check runs after this function and produces a weighted flag too, and
+    counting them in two places let the second one land on a ceiling the first
+    had already used up.
     """
-    weighted = 0
     for code, reason in _declared_constraint_breaks(descrizione, sede, modalita, facts):
         _add_flag(analysis, code, reason)
         _add_missing(analysis, reason)
-        weakness = _CONSTRAINT_WEAKNESS.get(code, reason)
-        if code in WEIGHTED_FLAGS:
-            weighted += 1
-            ceiling = max(_DECLARED_CONSTRAINT_CAP, _WEIGHTED_CEILING - (weighted - 1))
-            _lower_ceiling(analysis, ceiling, weakness)
-        else:
-            _cap_score(analysis, _DECLARED_CONSTRAINT_CAP, weakness)
+        if code not in WEIGHTED_FLAGS:
+            _cap_score(analysis, _DECLARED_CONSTRAINT_CAP, _CONSTRAINT_WEAKNESS.get(code, reason))
+
+
+def _apply_weighted_ceiling(analysis: dict[str, Any]) -> None:
+    """One ceiling for every arguable requirement this offer breaks.
+
+    Counted from the flags actually recorded rather than as each check runs, so
+    the checks stay independent and can be added in any order. Six for the first
+    unmet requirement, one lower for each further one, never under the hard-block
+    cap — which means something else and must stay distinguishable.
+    """
+    flags = analysis.get("blocchi")
+    present = [c for c in (flags if isinstance(flags, list) else []) if c in WEIGHTED_FLAGS]
+    if not present:
+        return
+    ceiling = max(_DECLARED_CONSTRAINT_CAP, _WEIGHTED_CEILING - (len(present) - 1))
+    details = analysis.get("blocchi_dettaglio")
+    details = details if isinstance(details, dict) else {}
+    for code in present:
+        weakness = _CONSTRAINT_WEAKNESS.get(code) or str(details.get(code) or "")
+        _lower_ceiling(analysis, ceiling, weakness)
 
 
 def _apply_geo_eligibility(analysis: dict[str, Any], sede: str, descrizione: str) -> None:
@@ -694,6 +740,9 @@ def enforce_hard_requirements(
     _apply_geo_eligibility(out, sede, descrizione)
     _apply_declared_constraints(out, descrizione, sede, modalita, facts)
     _apply_salary_expectation(out, _ral_min_from_context(extra_context))
+    # After both, because each can produce a weighted flag and the ceiling is a
+    # function of how many there are in total.
+    _apply_weighted_ceiling(out)
     engagement = _detect_engagement(azienda, f"{descrizione} {out.get('contratto', '')}")
     if engagement:
         out["tipo_ingaggio"] = engagement

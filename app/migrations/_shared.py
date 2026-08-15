@@ -52,11 +52,12 @@ def reapply_weighted_constraints(
         _DECLARED_CONSTRAINT_CAP,
         _WEIGHTED_CEILING,
         BLOCKING_FLAGS,
+        FLAG_SALARY_BELOW,
         WEIGHTED_FLAGS,
     )
 
     facts = facts_from_connection(conn)
-    if facts.years_experience is None and facts.education_level is None:
+    if facts.years_experience is None and facts.education_level is None and not facts.degree_fields:
         return  # nothing known about the candidate: nothing to re-judge
 
     rows = conn.execute(
@@ -78,6 +79,18 @@ def reapply_weighted_constraints(
         text = f"{titolo or ''} {descrizione or ''}"
         breaks = blocking_reasons(text, str(sede or ""), str(modalita or ""), facts)
         current_weighted = [(c, r) for c, r in breaks if c in WEIGHTED_FLAGS]
+        # The salary flag is not re-derivable from the description: it was
+        # computed from the figure the ad declared against the floor the user had
+        # set, and the ad's own text does not carry the comparison. The stored
+        # flag IS that fact, so it is carried forward and counted like the rest —
+        # otherwise the offer keeps a flag whose ceiling nobody applies, which is
+        # exactly the state that left a 9.600 EUR internship at 8/10.
+        if FLAG_SALARY_BELOW in stored:
+            detail = ""
+            stored_details = data.get("blocchi_dettaglio")
+            if isinstance(stored_details, dict):
+                detail = str(stored_details.get(FLAG_SALARY_BELOW) or "")
+            current_weighted.append((FLAG_SALARY_BELOW, detail))
         hard_now = {c for c, _ in breaks if c in BLOCKING_FLAGS}
         hard_stored = set(stored) & BLOCKING_FLAGS
 
@@ -168,6 +181,7 @@ def facts_from_connection(conn: sqlite3.Connection) -> Any:
     from app.services.candidate_facts import (
         CandidateFacts,
         WorkRule,
+        candidate_degree_fields,
         candidate_education_level,
         parse_work_rule,
     )
@@ -195,12 +209,17 @@ def facts_from_connection(conn: sqlite3.Connection) -> Any:
     years = _int(prefs.get("profile_fact_years_experience"))
     if years is None:
         years = _int(summary.get("years_experience"))
-    raw_protected = (prefs.get("profile_fact_protected_category") or "").strip().lower()
-    protected: bool | None = None
-    if raw_protected in ("1", "si", "sì", "yes", "true"):
-        protected = True
-    elif raw_protected in ("0", "no", "false"):
-        protected = False
+
+    def _tri(raw: Any) -> bool | None:
+        value = (raw or "").strip().lower()
+        if value in ("1", "si", "sì", "yes", "true"):
+            return True
+        if value in ("0", "no", "false"):
+            return False
+        return None
+
+    protected = _tri(prefs.get("profile_fact_protected_category"))
+    licence = _tri(prefs.get("profile_fact_driving_licence"))
     education = (prefs.get("profile_fact_education_level") or "").strip() or (
         candidate_education_level(markdown, summary)
     )
@@ -218,9 +237,17 @@ def facts_from_connection(conn: sqlite3.Connection) -> Any:
             allow_hybrid=rule.allow_hybrid,
             allow_remote=rule.allow_remote,
         )
+    manual_fields = (prefs.get("profile_fact_degree_fields") or "").strip()
+    fields = (
+        frozenset(f.strip().lower() for f in manual_fields.split(",") if f.strip())
+        if manual_fields
+        else frozenset(candidate_degree_fields(markdown, summary))
+    )
     return CandidateFacts(
         years_experience=years,
         education_level=education,
         protected_category=protected,
+        driving_licence=licence,
+        degree_fields=fields,
         work_rule=rule,
     )

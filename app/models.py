@@ -164,6 +164,9 @@ class ProfileUpdate(BaseModel):
     grade: int | None = None
     base_cities: list[str] | None = None
     work_modes: list[str] | None = None
+    #: A category B licence, which no CV states and which decides whether a field
+    #: role is reachable at all. None leaves it unsaid, and unsaid blocks nothing.
+    driving_licence: bool | None = None
 
 
 class ProfileFromTextRequest(BaseModel):
