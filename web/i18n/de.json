@@ -304,7 +304,8 @@
     "emptyBucket": "Nichts in diesem Tab.",
     "minScore4": "Note 4+",
     "fromMail": "Aus der Mail",
-    "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen"
+    "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen",
+    "scoredBy": "Bewertet von {model}"
   },
   "kanbanCols": {
     "open": "Offen",

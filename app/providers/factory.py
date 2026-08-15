@@ -36,6 +36,7 @@ from app.providers.openai_compat import (
 )
 from app.providers.openai_provider import OpenAIProvider
 from app.providers.openrouter_provider import OpenRouterProvider
+from app.scoring_schema import ANSWERED_BY_KEY
 from app.services import local_models, model_stats
 
 _RetryT = TypeVar("_RetryT")
@@ -858,6 +859,13 @@ class ProviderManager:
                 continue
             self._record_call(provider, model, endpoint, True, None, elapsed_ms)
             state["ok"] = True
+            # Who actually answered. A year of failover means the archive holds
+            # verdicts from a dozen different models, all rendered as the same
+            # number out of ten, with no way to tell whether a low score was the
+            # offer or the scorer. Stamped here because this is the only place
+            # that knows, and per-call so four scoring threads cannot mix it up.
+            if isinstance(result, dict):
+                result.setdefault(ANSWERED_BY_KEY, f"{provider.name}/{model}")
             return result
         state["last_exc"] = last_exc
         state["last_empty"] = last_empty

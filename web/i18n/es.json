@@ -304,7 +304,8 @@
     "emptyBucket": "Nada en esta pestaña.",
     "minScore4": "Nota 4+",
     "fromMail": "Del correo",
-    "fromMailHint": "Solo las candidaturas reconstruidas desde tu buzón"
+    "fromMailHint": "Solo las candidaturas reconstruidas desde tu buzón",
+    "scoredBy": "Evaluada por {model}"
   },
   "kanbanCols": {
     "open": "Abierto",

@@ -304,7 +304,8 @@
     "emptyBucket": "Rien dans cet onglet.",
     "minScore4": "Note 4+",
     "fromMail": "Depuis le courrier",
-    "fromMailHint": "Seulement les candidatures reconstruites depuis votre boîte mail"
+    "fromMailHint": "Seulement les candidatures reconstruites depuis votre boîte mail",
+    "scoredBy": "Évaluée par {model}"
   },
   "kanbanCols": {
     "open": "Ouvert",

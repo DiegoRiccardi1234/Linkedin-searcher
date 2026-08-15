@@ -304,7 +304,8 @@
     "emptyBucket": "Niente in questa scheda.",
     "minScore4": "Voto 4+",
     "fromMail": "Dalla posta",
-    "fromMailHint": "Solo le candidature ricostruite dalla tua casella"
+    "fromMailHint": "Solo le candidature ricostruite dalla tua casella",
+    "scoredBy": "Valutata da {model}"
   },
   "kanbanCols": {
     "open": "Aperto",

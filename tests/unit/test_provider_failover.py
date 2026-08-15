@@ -105,7 +105,11 @@ def test_complete_json_fails_over(tmp_path: Any) -> None:
         tmp_path, {"cerebras": bad, "openrouter": good}, ["cerebras", "openrouter"], "cerebras"
     )
 
-    assert mgr.complete_json(prompt="x") == {"answer": "ok"}
+    result = mgr.complete_json(prompt="x")
+    assert result["answer"] == "ok"
+    # Stamped with whoever the chain landed on: two verdicts are only
+    # comparable when you know which model wrote each of them.
+    assert result["answered_by"].endswith("/model-x")
 
 
 def test_chat_flags_key_invalid_on_401_then_fails_over(tmp_path: Any) -> None:
@@ -254,7 +258,11 @@ def test_empty_json_fails_over_to_next_provider(tmp_path: Any) -> None:
         tmp_path, {"cerebras": empty, "openrouter": good}, ["cerebras", "openrouter"], "cerebras"
     )
 
-    assert mgr.complete_json(prompt="x") == {"answer": "ok"}
+    result = mgr.complete_json(prompt="x")
+    assert result["answer"] == "ok"
+    # Stamped with whoever the chain landed on: two verdicts are only
+    # comparable when you know which model wrote each of them.
+    assert result["answered_by"].endswith("/model-x")
     assert empty.calls == 1 and good.calls == 1
     assert "cerebras::model-x" in mgr._model_penalty
 
@@ -476,7 +484,11 @@ def test_all_busy_gets_a_second_lap_before_giving_up(tmp_path: Any, monkeypatch)
 
     provider = _BusyOnce("openrouter")
     mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
-    assert mgr.complete_json(prompt="x") == {"answer": "ok"}
+    result = mgr.complete_json(prompt="x")
+    assert result["answer"] == "ok"
+    # Stamped with whoever the chain landed on: two verdicts are only
+    # comparable when you know which model wrote each of them.
+    assert result["answered_by"].endswith("/model-x")
     assert provider.laps == 2
 
 
@@ -534,3 +546,32 @@ def test_the_anti_brick_path_ignores_the_daily_allowance(tmp_path: Any, monkeypa
     monkeypatch.setattr(mgr, "_daily_exhausted", lambda name, model: True)
 
     assert mgr._ranked_models_for(provider, limit=5, ignore_penalties=True) == ["gemma-3-27b-it"]
+
+
+def test_the_stamp_names_the_provider_that_actually_answered(tmp_path: Any) -> None:
+    """Not the one that was asked first. The point of the column is to explain a
+    score after the fact, and after a failover those are different providers."""
+    bad = _StubProvider("cerebras", exc=Exception("503 service unavailable"))
+    good = _StubProvider("openrouter", answer="ok")
+    mgr = _mgr(
+        tmp_path, {"cerebras": bad, "openrouter": good}, ["cerebras", "openrouter"], "cerebras"
+    )
+    assert mgr.complete_json(prompt="x")["answered_by"] == "openrouter/model-x"
+
+
+def test_the_stamp_never_overwrites_a_model_that_named_itself(tmp_path: Any) -> None:
+    """A batch reply that already carries the key keeps it: setdefault, not set."""
+    provider = _StubProvider("openrouter", answer="ok")
+    provider.complete_json = lambda prompt, model=None, max_tokens=700: {  # type: ignore[assignment]
+        "answer": "ok",
+        "answered_by": "someone/else",
+    }
+    mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
+    assert mgr.complete_json(prompt="x")["answered_by"] == "someone/else"
+
+
+def test_chat_replies_are_left_alone(tmp_path: Any) -> None:
+    """Only dict replies are stamped: chat returns a string a user will read."""
+    provider = _StubProvider("openrouter", answer="hello")
+    mgr = _mgr(tmp_path, {"openrouter": provider}, ["openrouter"], "openrouter")
+    assert mgr.chat(messages=[{"role": "user", "content": "hi"}]) == "hello"

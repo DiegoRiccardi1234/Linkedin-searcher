@@ -304,7 +304,8 @@
     "emptyBucket": "Nothing in this tab.",
     "minScore4": "Score 4+",
     "fromMail": "From mail",
-    "fromMailHint": "Only the applications rebuilt from your inbox"
+    "fromMailHint": "Only the applications rebuilt from your inbox",
+    "scoredBy": "Scored by {model}"
   },
   "kanbanCols": {
     "open": "Open",

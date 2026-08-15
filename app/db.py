@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
-from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
+from app.scoring_schema import ANALYSIS_VERSION_KEY, ANSWERED_BY_KEY, CURRENT_ANALYSIS_VERSION
 from app.services.scan.companies import canonical_company
 
 logger = logging.getLogger(__name__)
@@ -380,11 +380,15 @@ class Database:
             version = int(raw_version) if raw_version is not None else None
         except (TypeError, ValueError):
             version = None
+        # Who answered, stamped by the provider factory. Kept in its own column
+        # rather than left inside the JSON blob because the point of it is to be
+        # filterable: "show me everything the model I no longer trust scored".
+        answered_by = str(analysis.get(ANSWERED_BY_KEY) or "") or None
         self.conn.execute(
             """
             UPDATE jobs
             SET analysis_json = ?, punteggio_ai = ?, consiglio = ?, analysis_v = ?,
-                analyzed_at = ?, updated_at = ?
+                analysis_model = ?, analyzed_at = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -392,6 +396,7 @@ class Database:
                 score,
                 consiglio,
                 version,
+                answered_by,
                 now_iso(),
                 now_iso(),
                 job_id,
