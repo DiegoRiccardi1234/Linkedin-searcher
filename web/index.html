@@ -964,6 +964,9 @@
             <option value="xai">xAI (Grok)</option>
             <option value="glm">Zhipu GLM</option>
             <option value="mistral">Mistral</option>
+            <option value="cloudflare">Cloudflare Workers AI</option>
+            <option value="ovh">OVHcloud AI Endpoints</option>
+            <option value="custom">Local / custom endpoint</option>
           </select>
           <select id="preferredModel" class="hidden" aria-hidden="true">
             <option value=""></option>
@@ -1258,8 +1261,11 @@
               <tr><td><strong>xAI (Grok)</strong></td><td><span class="info-tag paid" data-i18n="info.providers.cost.paid">Paid</span></td><td data-i18n="info.providers.xai">Grok models from xAI.</td></tr>
               <tr><td><strong>Zhipu GLM</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.glm">Zhipu GLM models.</td></tr>
               <tr><td><strong>Mistral</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.mistral">European models, good free tier.</td></tr>
+              <tr><td><strong>Cloudflare Workers AI</strong></td><td><span class="info-tag free" data-i18n="info.providers.cost.free">Free</span></td><td data-i18n="info.providers.cloudflare">10,000 Neurons a day for free — about fifty scored offers on a 70B model. One token, no card.</td></tr>
+              <tr><td><strong>OVHcloud AI Endpoints</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.ovh">Models hosted in the EU — the only one here that keeps your CV in Europe. Free shared tier is slow (2 requests a minute); with a key you pay per token.</td></tr>
+              <tr><td><strong>Google AI Studio</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.google">Fast and free to start. On the free tier Google uses your prompts — which include your CV — to improve its products, and human reviewers may read them.</td></tr>
               <tr><td><strong>Local / custom</strong></td><td><span class="info-tag free" data-i18n="info.providers.cost.free">Free</span></td><td data-i18n="info.providers.custom">Any OpenAI-compatible endpoint.</td></tr>
-              <tr><td><strong>Anthropic / OpenAI / Google</strong></td><td><span class="info-tag paid" data-i18n="info.providers.cost.paid">Paid</span></td><td data-i18n="info.providers.paid">Paid, top-tier quality.</td></tr>
+              <tr><td><strong>Anthropic / OpenAI</strong></td><td><span class="info-tag paid" data-i18n="info.providers.cost.paid">Paid</span></td><td data-i18n="info.providers.paid">Paid, top-tier quality.</td></tr>
             </tbody>
           </table>
         </article>

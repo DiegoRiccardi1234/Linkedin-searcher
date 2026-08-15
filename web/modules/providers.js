@@ -93,6 +93,17 @@ const PROVIDER_CATALOG = [
     hint: "many :free models · ~200 req/day · one key, many models",
   },
   {
+    name: "cloudflare",
+    label: "Cloudflare Workers AI",
+    icon: "cloud",
+    placeholder: "API token",
+    free: true,
+    signup: "https://dash.cloudflare.com/profile/api-tokens",
+    // Measured 2026-08-15: 1.2s and clean JSON on the 70B, ~196 Neurons per
+    // scored offer. The token only needs the "Workers AI: Read" permission.
+    hint: "10.000 Neurons/day ≈ 50 scored offers · Workers AI Read token · no card",
+  },
+  {
     name: "mistral",
     label: "Mistral",
     icon: "air",
@@ -100,6 +111,18 @@ const PROVIDER_CATALOG = [
     free: true,
     signup: "https://console.mistral.ai/api-keys",
     hint: "free Experiment tier · rate-limited · no card",
+  },
+  {
+    name: "ovh",
+    label: "OVHcloud AI Endpoints",
+    icon: "public",
+    placeholder: "anonymous",
+    free: true,
+    signup: "https://endpoints.ai.cloud.ovh.net/",
+    // The only EU-hosted catalog here, which matters because the prompt carries
+    // a CV. Type "anonymous" to use the free shared tier: it works, but it is
+    // two requests a minute and the bigger models are usually busy.
+    hint: "hosted in the EU · type «anonymous» for the free shared tier (slow) · paid per token with a key",
   },
   {
     name: "custom",

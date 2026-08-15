@@ -26,6 +26,12 @@ SUPPORTED_PROVIDERS = [
     "xai",
     "glm",
     "mistral",
+    # Free tier on one token: 10.000 Neurons a day, about fifty scored offers
+    # on a 70B. The endpoint carries the account id, discovered from the token.
+    "cloudflare",
+    # The only catalog here served from the EU, which is what makes it worth a
+    # class of its own: the prompt carries a CV. Optional key (anonymous tier).
+    "ovh",
     # Any OpenAI-compatible endpoint the user points at: a model running on
     # their own machine (Ollama, LM Studio, vLLM, llama.cpp) or a gateway.
     # Configured by base URL; the key is optional because a local server has
@@ -72,6 +78,13 @@ class AppSettings:
     # Optional GLM/Zhipu endpoint override (env GLM_BASE_URL). Default is the
     # international host; the China console uses open.bigmodel.cn.
     glm_base_url: str | None
+    # Cloudflare Workers AI. The OpenAI-compatible endpoint embeds the account
+    # id, so the base URL is derived from the token once, when it is saved.
+    cloudflare_api_key: str | None
+    cloudflare_base_url: str | None
+    # OVHcloud AI Endpoints. The key is optional: the literal "anonymous" opts
+    # into the free shared tier, which answers only without a credentials header.
+    ovh_api_key: str | None
     # "custom" provider: the endpoint IS the configuration. Empty base URL =
     # not configured. The key is optional (local servers don't have one).
     custom_api_key: str | None
@@ -140,6 +153,9 @@ def save_local_provider_keys(
     xai_api_key: str | None = None,
     glm_api_key: str | None = None,
     mistral_api_key: str | None = None,
+    cloudflare_api_key: str | None = None,
+    cloudflare_base_url: str | None = None,
+    ovh_api_key: str | None = None,
     custom_api_key: str | None = None,
     custom_base_url: str | None = None,
     primary_provider: str | None = None,
@@ -168,6 +184,11 @@ def save_local_provider_keys(
         "xai_api_key": xai_api_key,
         "glm_api_key": glm_api_key,
         "mistral_api_key": mistral_api_key,
+        "cloudflare_api_key": cloudflare_api_key,
+        # Derived from the token, not typed: stored like a key so that clearing
+        # the key clears the endpoint with it.
+        "cloudflare_base_url": cloudflare_base_url,
+        "ovh_api_key": ovh_api_key,
         "custom_api_key": custom_api_key,
         # The endpoint is what configures the custom provider, so it is stored
         # the same way a key is (and cleared the same way).
@@ -277,6 +298,11 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     glm_api_key = local_secrets.get("glm_api_key") or os.getenv("GLM_API_KEY")
     glm_base_url = local_secrets.get("glm_base_url") or os.getenv("GLM_BASE_URL")
     mistral_api_key = local_secrets.get("mistral_api_key") or os.getenv("MISTRAL_API_KEY")
+    cloudflare_api_key = local_secrets.get("cloudflare_api_key") or os.getenv("CLOUDFLARE_API_KEY")
+    cloudflare_base_url = local_secrets.get("cloudflare_base_url") or os.getenv(
+        "CLOUDFLARE_BASE_URL"
+    )
+    ovh_api_key = local_secrets.get("ovh_api_key") or os.getenv("OVH_API_KEY")
     custom_api_key = local_secrets.get("custom_api_key") or os.getenv("CUSTOM_API_KEY")
     custom_base_url = local_secrets.get("custom_base_url") or os.getenv("CUSTOM_BASE_URL")
 
@@ -367,6 +393,9 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         glm_api_key=glm_api_key,
         mistral_api_key=mistral_api_key,
         glm_base_url=glm_base_url,
+        cloudflare_api_key=cloudflare_api_key,
+        cloudflare_base_url=cloudflare_base_url,
+        ovh_api_key=ovh_api_key,
         custom_api_key=custom_api_key,
         custom_base_url=custom_base_url,
         model_selection_policy=merged_policy,

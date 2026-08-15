@@ -802,7 +802,10 @@
         "free": "Kostenlos",
         "mixed": "Gemischt",
         "paid": "Kostenpflichtig"
-      }
+      },
+      "cloudflare": "10.000 Neurons pro Tag kostenlos — etwa fünfzig bewertete Angebote mit einem 70B-Modell. Ein Token, keine Karte.",
+      "ovh": "Modelle in der EU gehostet — als einziges hier bleibt Ihr Lebenslauf in Europa. Die kostenlose geteilte Stufe ist langsam (2 Anfragen pro Minute); mit Schlüssel zahlt man pro Token.",
+      "google": "Schnell und kostenlos zum Einstieg. In der kostenlosen Stufe nutzt Google Ihre Prompts — die Ihren Lebenslauf enthalten — zur Produktverbesserung, und menschliche Prüfer können sie lesen."
     },
     "scan": {
       "title": "Scan & Filter",

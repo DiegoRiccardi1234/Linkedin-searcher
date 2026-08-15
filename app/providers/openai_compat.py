@@ -10,6 +10,8 @@ duplicated SDK-level 429 retry spam).
 
 import json
 import re
+import urllib.parse
+import urllib.request
 from typing import Any, cast
 
 from app.log import get_logger
@@ -61,8 +63,14 @@ class OpenAICompatibleProvider(LLMProvider):
             client_kwargs["base_url"] = self.base_url
         if type(self).request_timeout:
             client_kwargs["timeout"] = type(self).request_timeout
+        client_kwargs.update(self.client_kwargs(api_key))
         self.client = OpenAI(**client_kwargs) if (api_key and OpenAI is not None) else None
         self._selected_model: str | None = None
+
+    def client_kwargs(self, api_key: str | None) -> dict[str, Any]:
+        """Extra SDK arguments for this provider. Empty for almost everyone —
+        the exception is a free tier that answers only without credentials."""
+        return {}
 
     def is_available(self) -> bool:
         return self.client is not None and not self.key_invalid
@@ -222,3 +230,112 @@ class CustomOpenAIProvider(OpenAICompatibleProvider):
 
     def is_available(self) -> bool:
         return bool(self.base_url) and self.client is not None and not self.key_invalid
+
+
+#: What a user stores as their OVH "key" to accept the anonymous tier. It is a
+#: choice, not a default: without it OVH stays unconfigured, because sending a
+#: CV to a shared endpoint nobody asked for is not the app's decision to make.
+OVH_ANONYMOUS = "anonymous"
+
+
+class OVHProvider(OpenAICompatibleProvider):
+    """OVHcloud AI Endpoints — the one catalog here served from the EU.
+
+    The key is optional. Measured 2026-08-15 on the anonymous tier: the models
+    list and a JSON completion both answer, `Mistral-Small-3.2-24B` replies in
+    1.1s with clean JSON, while `Llama-3.3-70B` returned 429 three times in a
+    row with sixty-five seconds between calls — the shared pool is busy, not the
+    caller. With a key it is 400 requests a minute, billed per token.
+    """
+
+    name = "ovh"
+    base_url = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"
+    default_model = "Meta-Llama-3_3-70B-Instruct"
+
+    def client_kwargs(self, api_key: str | None) -> dict[str, Any]:
+        if (api_key or "").strip().lower() != OVH_ANONYMOUS:
+            return {}
+        # The anonymous tier answers only when there is no credentials header at
+        # all: measured, ANY bearer token — including the string "anonymous" —
+        # comes back 403, while an empty header is served like no header.
+        return {"default_headers": {"Authorization": ""}}
+
+
+class CloudflareProvider(OpenAICompatibleProvider):
+    """Workers AI. Ten thousand Neurons a day for free, on one API token.
+
+    Measured 2026-08-15: `llama-3.3-70b-instruct-fp8-fast` answers a scoring
+    prompt in 1.2s and `gpt-oss-120b` in 2.8s, both `finish_reason: stop` with
+    valid JSON — the same gpt-oss that truncates on OpenRouter's free tier. At
+    roughly 196 Neurons per real offer, the free allowance is about fifty offers
+    a day on the 70B.
+
+    The endpoint embeds the account id, so ``base_url`` is empty until it is
+    discovered from the token (see ``cloudflare_base_url``).
+    """
+
+    name = "cloudflare"
+    base_url = ""
+    default_model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+
+    def __init__(self, api_key: str | None, base_url: str | None = None):
+        # Never build a client without the account URL: the base class would
+        # fall back to OpenAI's endpoint and point a Cloudflare token at it.
+        super().__init__(api_key if base_url else None, base_url)
+
+    def is_available(self) -> bool:
+        return bool(self.base_url) and self.client is not None and not self.key_invalid
+
+    def list_models(self) -> list[str]:
+        """The OpenAI-compatible surface has no catalog: ``GET …/ai/v1/models``
+        answers 405, "GET not supported for requested URI". Cloudflare keeps its
+        own, so ask that one — and only for models that generate text."""
+        if not self.base_url or not self.api_key:
+            return []
+        catalog = self.base_url.replace("/ai/v1", "/ai/models/search")
+        query = urllib.parse.urlencode({"task": "Text Generation", "per_page": 100})
+        request = urllib.request.Request(
+            f"{catalog}?{query}", headers={"Authorization": f"Bearer {self.api_key}"}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8", "replace"))
+        except Exception as exc:
+            if is_unauthorized(exc):
+                self.key_invalid = True
+            log.warning("Cloudflare model catalog unavailable (%s)", exc)
+            return []
+        entries = payload.get("result") if isinstance(payload, dict) else None
+        if not isinstance(entries, list):
+            return []
+        return [
+            str(entry.get("name"))
+            for entry in entries
+            if isinstance(entry, dict) and entry.get("name")
+        ]
+
+
+def cloudflare_base_url(api_key: str, timeout: float = 15.0) -> str | None:
+    """The account-scoped endpoint for this token, or ``None``.
+
+    Cloudflare's OpenAI-compatible URL carries the account id. Asking the user
+    to find and paste it is a second field and a second thing to get wrong, when
+    the token itself already answers the question in one call.
+    """
+    request = urllib.request.Request(
+        "https://api.cloudflare.com/client/v4/accounts",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+    except Exception as exc:  # network, auth, or anything else: not fatal
+        log.info("Cloudflare account lookup failed (%s)", exc)
+        return None
+    accounts = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(accounts, list) or not accounts:
+        return None
+    account_id = str((accounts[0] or {}).get("id") or "")
+    if not account_id:
+        return None
+    return f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"

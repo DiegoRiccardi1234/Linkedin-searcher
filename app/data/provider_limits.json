@@ -52,5 +52,23 @@
       "rpd": 1000,
       "source": "groq.com free tier, verified 2026-08-06"
     }
+  },
+  "cloudflare": {
+    "*70b*": {
+      "rpd": 50,
+      "note": "Not a request cap: the free allowance is 10.000 Neurons a day, and a real scored offer costs about 196 of them on a 70B (26.668 neurons per million input tokens, 204.805 per million output). Fifty is that budget expressed in offers.",
+      "source": "developers.cloudflare.com/workers-ai pricing, 2026-08-15"
+    },
+    "*": {
+      "rpd": 120,
+      "note": "Same 10.000 Neurons, spent on a smaller model. Measured per-offer cost is what matters, not the request count."
+    }
+  },
+  "ovh": {
+    "*": {
+      "rpm": 2,
+      "note": "The anonymous tier: two requests a minute per IP and per model. Measured 2026-08-15 — the bigger models answer 429 even at that rate, because the pool is shared. A key raises it to 400/min, billed per token.",
+      "source": "help.ovhcloud.com AI Endpoints getting started, 2026-08-15"
+    }
   }
 }

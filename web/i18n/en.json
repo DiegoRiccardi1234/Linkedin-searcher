@@ -802,7 +802,10 @@
         "free": "Free",
         "mixed": "Mixed",
         "paid": "Paid"
-      }
+      },
+      "cloudflare": "10,000 Neurons a day for free — about fifty scored offers on a 70B model. One token, no card.",
+      "ovh": "Models hosted in the EU — the only one here that keeps your CV in Europe. The free shared tier is slow (2 requests a minute); with a key you pay per token.",
+      "google": "Fast and free to start. On the free tier Google uses your prompts — which include your CV — to improve its products, and human reviewers may read them."
     },
     "scan": {
       "title": "Scanning & filters",

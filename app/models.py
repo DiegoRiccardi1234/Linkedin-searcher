@@ -299,6 +299,11 @@ class ProviderKeysRequest(BaseModel):
     xai_api_key: str | None = None
     glm_api_key: str | None = None
     mistral_api_key: str | None = None
+    # Cloudflare's endpoint carries the account id; the app reads it from the
+    # token when the key is saved, so the user never has to find it.
+    cloudflare_api_key: str | None = None
+    # OVH's key is optional: the literal "anonymous" opts into the free tier.
+    ovh_api_key: str | None = None
     # "custom" = any OpenAI-compatible endpoint (local model server or gateway).
     # The base URL is the configuration; the key is optional.
     custom_api_key: str | None = None

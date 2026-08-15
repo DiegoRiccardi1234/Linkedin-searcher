@@ -802,7 +802,10 @@
         "free": "Gratuit",
         "mixed": "Mixte",
         "paid": "Payant"
-      }
+      },
+      "cloudflare": "10 000 Neurons par jour gratuits : environ cinquante offres évaluées avec un modèle 70B. Un seul jeton, sans carte.",
+      "ovh": "Modèles hébergés dans l'UE : le seul ici qui garde votre CV en Europe. L'offre gratuite partagée est lente (2 requêtes par minute) ; avec une clé, c'est facturé au token.",
+      "google": "Rapide et gratuit pour commencer. Sur l'offre gratuite, Google utilise vos prompts — qui contiennent votre CV — pour améliorer ses produits, et des relecteurs humains peuvent les lire."
     },
     "scan": {
       "title": "Scan et filtres",

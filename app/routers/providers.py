@@ -17,6 +17,7 @@ from app.models import (
     ProviderLimitRequest,
 )
 from app.providers.model_selector import SCORING_MIN_SIZE_B, infer_size_b, rank_models
+from app.providers.openai_compat import cloudflare_base_url as cf_base_url
 from app.services import local_models, model_stats, rate_limits
 from app.services.model_probe import penalty_reason, probe_models
 from app.services.model_scoreboard import scoreboard
@@ -89,6 +90,15 @@ def build_router(container: AppContainer) -> APIRouter:
 
     @router.post("/api/providers/keys")
     def save_provider_keys(payload: ProviderKeysRequest) -> dict[str, Any]:
+        # Cloudflare's OpenAI-compatible endpoint embeds the account id. Reading
+        # it from the token here — once, when the user has just asked to save a
+        # key and a request is expected — spares them a second field to find and
+        # paste. A failure is not fatal: the provider simply stays unconfigured.
+        cloudflare_base_url: str | None = None
+        if payload.cloudflare_api_key:
+            cloudflare_base_url = cf_base_url(payload.cloudflare_api_key)
+        elif payload.cloudflare_api_key == "":
+            cloudflare_base_url = ""  # clearing the key clears the endpoint
         local_status = save_local_provider_keys(
             data_dir=container.settings.data_dir,
             cerebras_api_key=payload.cerebras_api_key,
@@ -101,6 +111,9 @@ def build_router(container: AppContainer) -> APIRouter:
             xai_api_key=payload.xai_api_key,
             glm_api_key=payload.glm_api_key,
             mistral_api_key=payload.mistral_api_key,
+            cloudflare_api_key=payload.cloudflare_api_key,
+            cloudflare_base_url=cloudflare_base_url,
+            ovh_api_key=payload.ovh_api_key,
             custom_api_key=payload.custom_api_key,
             custom_base_url=payload.custom_base_url,
             primary_provider=payload.primary_provider,

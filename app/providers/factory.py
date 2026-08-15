@@ -26,10 +26,12 @@ from app.providers.model_selector import (
     rank_models,
 )
 from app.providers.openai_compat import (
+    CloudflareProvider,
     CustomOpenAIProvider,
     DeepSeekProvider,
     GLMProvider,
     MistralProvider,
+    OVHProvider,
     XAIProvider,
 )
 from app.providers.openai_provider import OpenAIProvider
@@ -124,6 +126,10 @@ class ProviderManager:
             "xai": XAIProvider(api_key=settings.xai_api_key),
             "glm": GLMProvider(api_key=settings.glm_api_key, base_url=settings.glm_base_url),
             "mistral": MistralProvider(api_key=settings.mistral_api_key),
+            "cloudflare": CloudflareProvider(
+                api_key=settings.cloudflare_api_key, base_url=settings.cloudflare_base_url
+            ),
+            "ovh": OVHProvider(api_key=settings.ovh_api_key),
             "custom": CustomOpenAIProvider(
                 api_key=settings.custom_api_key, base_url=settings.custom_base_url
             ),
