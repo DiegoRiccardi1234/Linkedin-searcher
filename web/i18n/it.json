@@ -263,7 +263,9 @@
       "mailImport": "Dalla posta",
       "mailImportLong": "Candidatura ricostruita da una mail di conferma: l'annuncio non è mai passato da Job Finder, quindi non c'è titolo né descrizione da valutare",
       "experienceLong": "L'annuncio chiede più anni di esperienza di quelli del tuo profilo: non ti esclude, ma abbassa il punteggio massimo raggiungibile",
-      "educationLong": "L'annuncio chiede un titolo di studio più alto del tuo: non ti esclude, ma abbassa il punteggio massimo raggiungibile"
+      "educationLong": "L'annuncio chiede un titolo di studio più alto del tuo: non ti esclude, ma abbassa il punteggio massimo raggiungibile",
+      "degreeField": "Laurea in altra materia",
+      "degreeFieldLong": "L'annuncio chiede una laurea in una materia diversa dalla tua: non ti esclude, ma abbassa il punteggio massimo raggiungibile"
     },
     "freshness": {
       "daysAgo": "Vista {n} giorni fa",

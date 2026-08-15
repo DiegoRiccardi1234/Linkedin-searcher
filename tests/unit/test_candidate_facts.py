@@ -419,6 +419,103 @@ def candidate_facts_years(db: Database) -> int | None:
     return cf.candidate_facts(db).years_experience
 
 
+# ── the SUBJECT of the degree ────────────────────────────────────────────────
+#
+# Every sentence below is verbatim from the 423-description archive. The check
+# fires on 78 of them (18%); these pin the line it draws, in both directions.
+
+_MINE = cf.CandidateFacts(degree_fields=frozenset({"informatica"}))
+
+#: Postings whose subject list a computer-science graduate belongs to.
+_FIELD_OK = (
+    "Laurea in informatica",
+    "laurea/diploma in **discipline informatiche** alla ricerca del primo impiego",
+    "Degree or equivalent experience in Engineering or Computer Science",
+    "Laurea triennale in Ingegneria dell'informazione, Informatica o Ingegneria informatica",
+    "Laurea o diploma tecnico in Informatica, Telecomunicazioni, Elettronica o discipline affini",
+    "Laurea in ambito tecnico-scientifico (Elettrico, Elettronico o Informatico)",
+    "laureata o laureanda in Ingegneria delle Telecomunicazioni, Informatica, Cybersecurity",
+    "Laurea ad indirizzo STEM preferibilmente in Informatica o Biomedica",
+    "Laurea triennale e/o magistrale in ambito tecnico scientifico",
+    # Named in English, and the two that used to slip through: bare "Data" and
+    # the acronym, both real subjects in an English subject list.
+    "Bachelor's degree in Data, Supply Chain Management, Finance, Marketing, Economics",
+    "Bachelor's degree in Business, Engineering, IT, or Data Analytics",
+    # The Italian umbrella that contains computer engineering.
+    "Laurea in ingegneria industriale o dell'informazione",
+    # A subject named as a wish is not a gate, exactly like the degree LEVEL.
+    "Bachelor's degree, preferably with emphasis in Finance, Accounting, Engineering",
+)
+
+#: Postings that ask for a subject this CV is not in.
+_FIELD_NOT_MINE = (
+    "Ti stai per laureare o hai una laurea in Economia (Magistrale o Triennale più Master)",
+    "che hanno già conseguito una laurea magistrale in Economia",
+    "Laurea in Giurisprudenza o discipline legali",
+    "Bachelor's degree in a Life Science discipline",
+    "Laurea Specialistica in Ingegneria Gestionale e/o affini",
+    "Laurea specialistica in Economia, Marketing o un campo correlato",
+    "Laurea in Ingegneria Gestionale/Meccanica/Aerospaziale o matterie attinenti",
+    "Laureando/neolaureato in Amministrazione, Finanza Aziendale e Controllo",
+)
+
+
+def test_a_degree_in_the_wrong_subject_is_seen() -> None:
+    """The most-stated requirement in the archive, and nothing read it.
+
+    ``education_status`` compares a bachelor's against a master's and says
+    nothing about what the degree is IN, so PwC's "hai una laurea in Economia"
+    read as satisfied and its junior auditor sat at 8/10 in an IT job hunt.
+    """
+    for text in _FIELD_OK:
+        _label, reason = cf.degree_field_status(text, _MINE)
+        assert reason is None, f"must accept: {text!r}"
+    for text in _FIELD_NOT_MINE:
+        _label, reason = cf.degree_field_status(text, _MINE)
+        assert reason is not None, f"must flag: {text!r}"
+
+
+def test_one_acceptable_subject_anywhere_in_the_ad_is_enough() -> None:
+    """Ads list an acceptable subject in one line and a preferred one in another.
+
+    Refusing on the second while the first accepts you is the false positive that
+    matters: MSF asks for "a degree in Information and Technology (IT)" and then
+    "Desirable degree (or masters) in Epidemiology or Public Health".
+    """
+    ad = (
+        "Essential: degree in Information and Technology (IT). "
+        "Desirable degree in Epidemiology or Public Health."
+    )
+    assert cf.degree_field_status(ad, _MINE)[1] is None
+
+
+def test_an_unknown_subject_blocks_nothing() -> None:
+    """Same rule as every other fact here: silence beats guessing."""
+    blank = cf.CandidateFacts(degree_fields=frozenset())
+    assert cf.degree_field_status("hai una laurea in Economia", blank)[1] is None
+    # And an ad that names no subject at all says nothing about anyone.
+    assert cf.degree_field_status("Laurea triennale conseguita", _MINE)[1] is None
+
+
+def test_the_subject_is_read_from_the_education_lines_not_the_whole_cv(tmp_path) -> None:
+    """A developer's skill list mentions half the table of subjects."""
+    db = Database(tmp_path / "field.db")
+    try:
+        db.save_candidate_profile(
+            source_name="cv.pdf",
+            markdown=(
+                "Laurea Triennale in Scienze e Tecnologie Informatiche\n"
+                "Competenze: analisi di bilancio, business intelligence, diritto del lavoro\n"
+            ),
+            summary={"education": "Laurea in Informatica"},
+        )
+        facts = cf.candidate_facts(db)
+        assert facts.degree_fields == frozenset({"informatica"})
+        assert cf.degree_field_status("hai una laurea in Economia", facts)[1] is not None
+    finally:
+        db.close()
+
+
 def test_half_a_year_of_experience_is_zero_years_not_unknown(tmp_path) -> None:
     """The regression a rewritten CV shipped, silently.
 

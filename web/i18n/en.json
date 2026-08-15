@@ -263,7 +263,9 @@
       "mailImport": "From your mailbox",
       "mailImportLong": "Application rebuilt from a confirmation email: the posting never went through Job Finder, so there is no title or description to judge",
       "experienceLong": "The posting asks for more years than your profile states: it does not rule you out, it lowers the highest score this offer can reach",
-      "educationLong": "The posting asks for a higher degree than yours: it does not rule you out, it lowers the highest score this offer can reach"
+      "educationLong": "The posting asks for a higher degree than yours: it does not rule you out, it lowers the highest score this offer can reach",
+      "degreeField": "Different subject",
+      "degreeFieldLong": "The posting asks for a degree in a subject yours is not in: it does not rule you out, it lowers the highest score this offer can reach"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",

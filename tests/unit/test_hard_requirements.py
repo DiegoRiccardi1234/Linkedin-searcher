@@ -203,7 +203,16 @@ def test_parse_ral_reads_the_common_formats() -> None:
     assert ss._parse_ral("") == (None, None)
 
 
-def test_salary_below_minimum_is_flagged_not_capped() -> None:
+def test_salary_below_minimum_lowers_the_ceiling_without_hiding_the_offer() -> None:
+    """A stated figure under a stated floor is a fact, so it moves the number.
+
+    It used to flag and nothing else, on the grounds that capping would punish
+    the rare posting honest enough to publish a figure. What that produced on the
+    real archive: a TIM internship declaring up to 9.600 EUR against a declared
+    floor of 20.000 held the model's 8/10 and led the "best for you" panel. So it
+    is weighted, not blocking — the offer keeps its place and its badge, it just
+    cannot outrank one that pays enough. An internship can still be worth taking.
+    """
     out = ss.enforce_hard_requirements(
         _analysis(ral_stimata="22.000€-25.000€"),
         profile_markdown=_CV,
@@ -211,9 +220,25 @@ def test_salary_below_minimum_is_flagged_not_capped() -> None:
         sede="Milan, Italy",
         extra_context=_RAL_CTX,
     )
-    assert out["punteggio"] == 9  # a low salary is a trade-off, not a blocker
+    assert out["punteggio"] == 6, "held under the recommend band, not written off"
+    assert out["punteggio"] > 3, "and above the hard-block cap, which means something else"
+    assert ss.FLAG_SALARY_BELOW in out["blocchi"]
     assert any("sotto la tua minima" in m for m in out["skills_match"]["mancano"])
     assert out["match_axes"]["salary_match"] == 1
+    assert "Salta" not in str(out.get("consiglio") or ""), "still worth reading"
+
+
+def test_a_posting_that_declares_no_salary_is_untouched() -> None:
+    """The asymmetry the original note worried about, kept true."""
+    out = ss.enforce_hard_requirements(
+        _analysis(ral_stimata="Non stimabile"),
+        profile_markdown=_CV,
+        descrizione=_JD,
+        sede="Milan, Italy",
+        extra_context=_RAL_CTX,
+    )
+    assert out["punteggio"] == 9
+    assert ss.FLAG_SALARY_BELOW not in out["blocchi"]
 
 
 def test_salary_above_minimum_lifts_the_axis() -> None:

@@ -263,7 +263,9 @@
       "mailImport": "Del correo",
       "mailImportLong": "Candidatura reconstruida a partir de un correo de confirmación: el anuncio nunca pasó por Job Finder, así que no hay título ni descripción que evaluar",
       "experienceLong": "La oferta pide más años de experiencia de los que indica tu perfil: no te excluye, pero baja la puntuación máxima alcanzable",
-      "educationLong": "La oferta pide una titulación superior a la tuya: no te excluye, pero baja la puntuación máxima alcanzable"
+      "educationLong": "La oferta pide una titulación superior a la tuya: no te excluye, pero baja la puntuación máxima alcanzable",
+      "degreeField": "Otra titulación",
+      "degreeFieldLong": "La oferta pide una titulación en una materia distinta de la tuya: no te excluye, pero baja la puntuación máxima alcanzable"
     },
     "freshness": {
       "daysAgo": "Vista hace {n} días",
