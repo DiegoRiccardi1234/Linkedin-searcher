@@ -84,6 +84,20 @@ PREF_BODY_MODE = "mailwatch_body_mode"
 DEFAULT_INTERVAL_MINUTES = 15
 DEFAULT_PENDING_DAYS = 14
 
+#: Verdicts in ``mail_seen`` that record a DECISION rather than bookkeeping.
+#:
+#: The routine sweep files every message it walks past, and its ``no_match``
+#: means only "this confirms none of the offers I am waiting for". The recovery
+#: asks a different question — "does this record an application at all?" — which
+#: none of those rows ever answered, so it must be allowed to re-read them.
+#: Measured on a real mailbox: 673 messages had been written off by the sweep
+#: before the import existed, and a 365-day recovery could not see one of them.
+#:
+#: These five are different: each one means a human, or the confirmed match that
+#: stands in for one, has already settled the message. Re-proposing those is the
+#: bug the queue was built to end — a dismissed proposal coming back forever.
+DECIDED_VERDICTS = frozenset({"applied", "imported", "dismissed", "already_applied", "match"})
+
 #: Whether the app may download the BODY of a message, and on whose initiative.
 #:
 #: The subject of a confirmation names the employer and never the role, so the

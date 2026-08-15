@@ -115,24 +115,30 @@ export async function loadMailReview() {
       // Any open offers from that employer come along as candidates, because
       // attaching to the real posting beats a card with no title — but "record
       // it on its own" stays available and is the default when nothing matches.
-      const createOption =
-        item.kind === "import"
-          ? `
+      //
+      // Offered on ATTACH rows too. That the archive holds offers from an
+      // employer does not make one of them the offer applied for: on a real
+      // queue, 38 of 53 attach proposals turned out to be roles the archive had
+      // never collected. Without this the honest answer was missing — the row
+      // could only be attached to the wrong offer or dismissed and lost.
+      const createOption = `
         <label class="mail-review-option">
           <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
                  data-review="${item.review_id}" value="create"${options ? "" : " checked"} />
           <span data-i18n="mail.review.createEntry">Record it as a new application</span>
-        </label>`
-          : "";
+        </label>`;
       const empty =
         options || createOption
           ? ""
           : `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`;
       // "Ask" mode: the title lives in the body, and the body is only read for
-      // the one message you press this on.
+      // the one message you press this on. Offered on attach rows as well —
+      // there the title is not a nicety but the whole decision: "Teoresi" with
+      // six offers in the archive is unanswerable, "Teoresi · AI Engineer"
+      // answers itself.
       const roleBit = item.role
         ? `<span class="mail-review-role">${escapeHtml(item.role)}</span>`
-        : item.kind === "import" && _bodyMode === "ask"
+        : _bodyMode === "ask"
           ? `<button type="button" class="ghost-btn small mail-review-role-btn"
                      data-review="${item.review_id}" data-i18n="mail.body.fetchOne">Get the job title</button>`
           : "";

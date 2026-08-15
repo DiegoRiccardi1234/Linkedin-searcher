@@ -557,6 +557,70 @@ def test_the_historic_dry_run_counts_without_consuming_the_mailbox(
     assert real["checked"] == 2 and real["proposals"] == 1
 
 
+def test_the_recovery_reads_messages_the_routine_sweep_wrote_off(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The sweep's "no" must not answer a question it was never asked.
+
+    ``mail_seen`` records the sweep's verdict — "does this confirm an offer the
+    archive already holds?" — and ``filter_unseen_mail`` then never fetches that
+    message again. The recovery asks something else entirely: "does this record
+    an application at all?". Inheriting the filter meant the routine check ate
+    the recovery. On the real mailbox 673 messages had been filed as no_match
+    before the import existed, and the 365-day sweep could not see one of them.
+    """
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+
+    fake = FakeIMAP4("h", 993)
+    fake.messages[3] = (
+        b"From: LinkedIn <jobs-noreply@linkedin.com>\r\n"
+        b"Subject: " + _encode_subject("La tua candidatura è stata inviata a Reply").encode()
+        + b"\r\nDate: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <sent@linkedin.com>\r\n\r\n"
+    )
+
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+
+    # Exactly what an earlier sweep leaves behind: the message is closed, with
+    # no offer attached, because no offer from that employer was in the archive.
+    db = client.app.state.container.db  # type: ignore[attr-defined]
+    db.record_mail_seen(
+        account="me@libero.it",
+        mail_key="imap:42:3",
+        verdict="no_match",
+        message_id="<sent@linkedin.com>",
+        matched_rule="named_company_absent",
+    )
+
+    done = list(watcher.run_historic(365))[-1]
+    assert done["checked"] == 1, "a closed sweep verdict must not hide the message"
+    assert done["imports"] == 1, "and the import question gets asked"
+
+    queued = db.list_mail_review("me@libero.it")
+    assert [item["kind"] for item in queued] == ["import"]
+
+    # Run it twice: the queue is keyed by message, so nothing is proposed twice.
+    list(watcher.run_historic(365))
+    assert len(db.list_mail_review("me@libero.it")) == 1
+
+    # The other side of the same line: a DECISION does close the message. Once
+    # the proposal is dismissed the recovery stops fetching it, which is the
+    # behaviour the queue was built for and must survive this change.
+    review_id = int(db.list_mail_review("me@libero.it")[0]["id"])
+    db.close_mail_review([review_id], "dismissed")
+    done = list(watcher.run_historic(365))[-1]
+    assert done["checked"] == 0, "a dismissed message stays dismissed"
+    assert db.list_mail_review("me@libero.it") == []
+
+
 def _seed_two_reply_offers(path: Path) -> None:
     from app.db import Database
 
@@ -881,6 +945,47 @@ def test_importing_from_the_queue_creates_the_application(
     assert jobs["Kirey"]["punteggio_ai"] is None
     assert jobs["Kirey"]["fonte"] == "mail"
     assert client.get("/api/mail/review").json()["items"] == [], "and the question is closed"
+
+
+def test_an_attach_proposal_can_be_recorded_on_its_own(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """"None of these" has to be an answer, or the record is forced to lie.
+
+    That the archive holds offers from an employer does not make one of them the
+    offer applied for. Measured on a real queue: of 53 attach proposals, the
+    title read from the body matched an archive offer 15 times — the other 38
+    were roles the archive had never collected. Create was refused for this kind,
+    so the only answers on offer were attach to the wrong offer, or dismiss and
+    lose the application entirely.
+    """
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _seed_two_reply_offers(tmp_path / "data" / "searcher.db")
+    _sweep(client, "La tua candidatura è stata inviata a Reply")
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert [i["kind"] for i in items] == ["attach"]
+    assert len(items[0]["candidates"]) == 2, "and neither of them need be the right one"
+
+    out = client.post(
+        "/api/mail/review/resolve",
+        json={"attach": [], "create": [items[0]["review_id"]], "dismiss": []},
+    ).json()
+    assert out["refused"] == []
+    assert len(out["created"]) == 1
+
+    jobs = client.get("/api/jobs").json()["jobs"]
+    recorded = [j for j in jobs if j["fonte"] == "mail"]
+    assert len(recorded) == 1
+    assert recorded[0]["azienda"] == "Reply"
+    assert recorded[0]["status"] == "applied"
+    assert recorded[0]["punteggio_ai"] is None, "no description, so no score"
+    # And the two real offers are untouched: nothing was marked applied by guess.
+    assert [j["status"] for j in jobs if j["fonte"] != "mail"] == ["open", "open"]
+    assert client.get("/api/mail/review").json()["items"] == []
 
 
 def test_an_application_already_in_the_archive_is_not_imported_twice(

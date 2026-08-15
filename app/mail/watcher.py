@@ -23,7 +23,7 @@ Three behaviours here are decisions, not implementation details:
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -250,7 +250,15 @@ class MailWatcher:
         self._access_expires = self._clock() + bundle.expires_in
         return bundle.access_token
 
-    def _headers_since(self, account: MailAccount, since: datetime, limit: int) -> list[MailHeader]:
+    def _headers_since(
+        self,
+        account: MailAccount,
+        since: datetime,
+        limit: int,
+        *,
+        seen_verdicts: Collection[str] | None = None,
+    ) -> list[MailHeader]:
+        """Headers not examined yet. ``seen_verdicts`` narrows what "examined" means."""
         if account.auth == "graph":
             token = self._oauth_token(account)
             factory = self._graph_factory or GraphMailbox
@@ -267,7 +275,7 @@ class MailWatcher:
             box.select_readonly(account.folder or "INBOX")
             uids = box.search_since(since.date())
             keys = [f"imap:{box.uidvalidity}:{uid}" for uid in uids]
-            fresh = set(self._db.filter_unseen_mail(account.address, keys))
+            fresh = set(self._db.filter_unseen_mail(account.address, keys, verdicts=seen_verdicts))
             wanted = [uid for uid, key in zip(uids, keys, strict=True) if key in fresh]
             return list(box.fetch_headers(wanted[-limit:]))
 
@@ -441,6 +449,9 @@ class MailWatcher:
                 message_id=header.message_id,
                 received_at=header.date.isoformat() if header.date else "",
                 matched_rule=evidence.rule,
+                # Settles the message for good, so it must beat a no_match the
+                # sweep may have written before the import question existed.
+                overwrite=True,
             )
             return
         # In "always" the title is read here, once, while the sweep is already
@@ -515,7 +526,17 @@ class MailWatcher:
             # message says happened. Returning here left someone who connects a
             # mailbox before running a scan with no way to recover anything.
 
-            headers = self._headers_since(account, since, MAX_HISTORIC)
+            # Only a DECISION closes a message for this sweep. The routine one
+            # files everything it walks past as no_match, meaning "confirms none
+            # of the offers I am waiting for" — an answer to a question this
+            # sweep is not asking. Inheriting that filter let the routine check
+            # quietly eat the recovery: on a real mailbox 673 messages had been
+            # written off before the import existed, and a 365-day recovery
+            # could not see one of them. Re-reading costs one IMAP fetch, and
+            # both queues are keyed by message, so nothing is proposed twice.
+            headers = self._headers_since(
+                account, since, MAX_HISTORIC, seen_verdicts=mail_config.DECIDED_VERDICTS
+            )
             truncated = len(headers) >= MAX_HISTORIC
             found = 0
             imports = 0
@@ -607,7 +628,16 @@ class MailWatcher:
         created: list[int] = []
         for review_id in create or []:
             row = by_id.get(review_id)
-            if not row or row["kind"] != "import":
+            # Allowed for BOTH kinds. An "attach" proposal only means the archive
+            # holds offers from that employer — not that one of them is the one
+            # applied for. Measured on a real queue: of 53 such proposals, the
+            # title read from the body matched an archive offer 15 times; the
+            # other 38 were applications to roles the archive never collected
+            # (Teoresi's "AI Engineer" against six unrelated Teoresi postings).
+            # With create refused here, the only answers on offer were attach to
+            # the wrong offer or dismiss and lose the application — so the app
+            # forced a false record or no record at all.
+            if not row:
                 refused.append(review_id)
                 continue
             new_id = self._db.add_application_from_mail(

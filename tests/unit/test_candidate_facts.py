@@ -419,6 +419,33 @@ def candidate_facts_years(db: Database) -> int | None:
     return cf.candidate_facts(db).years_experience
 
 
+def test_half_a_year_of_experience_is_zero_years_not_unknown(tmp_path) -> None:
+    """The regression a rewritten CV shipped, silently.
+
+    The extractor reports a first job as ``0.5`` years, which parsed through
+    ``int(str(...))`` and became "unknown" — and unknown switches the whole
+    experience check off, so an archive full of "3+ anni" offers stopped being
+    flagged at all. Measured on the real profile: ``missing`` listed
+    ``years_experience`` on a CV that plainly describes six months of work.
+    """
+    db = Database(tmp_path / "half.db")
+    try:
+        db.save_candidate_profile(
+            source_name="cv.pdf",
+            markdown="Laurea Triennale. Sei mesi di ricerca linguistica.",
+            summary={"years_experience": 0.5},
+        )
+        facts = cf.candidate_facts(db)
+        assert facts.years_experience == 0, "six months is zero whole years, not a mystery"
+        assert facts.sources["years_experience"] == "cv"
+        assert "years_experience" not in facts.missing()
+        # And the check it gates works again.
+        _band, reason = cf.experience_status("richiesti almeno 3 anni di esperienza", facts)
+        assert reason is not None
+    finally:
+        db.close()
+
+
 def test_missing_facts_are_reported_not_guessed(tmp_path) -> None:
     db = Database(tmp_path / "y.db")
     try:
