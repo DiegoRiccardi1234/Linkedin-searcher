@@ -101,11 +101,17 @@ def select_job_ids(db: Database, scope: str, ids: list[int] | None = None) -> li
     # unscored by construction — so "re-score the unscored" would have sent sixty
     # empty descriptions to the model in one click. Measured on the real archive
     # before adding the guard: it excludes none of the offers that were there.
-    jobs = [j for j in db.list_jobs(limit=2000) if (j.get("descrizione") or "").strip()]
+    # The blocked offers are excluded by the query, not after it: filtering a
+    # page that was already cut is how the offer list ended up showing 123 rows
+    # out of 174.
+    blocking = BLOCKING_FLAGS if scope == "applicable" else None
+    jobs = [
+        j
+        for j in db.list_jobs(limit=2000, blocking_flags=blocking)
+        if (j.get("descrizione") or "").strip()
+    ]
     if scope == "unscored":
         return [j["id"] for j in jobs if j.get("punteggio_ai") is None]
-    if scope == "applicable":
-        return [j["id"] for j in jobs if not (set(j.get("flags") or []) & BLOCKING_FLAGS)]
     return [j["id"] for j in jobs]
 
 
