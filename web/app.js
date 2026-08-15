@@ -62,6 +62,7 @@ import {
   loadJobs,
   setJobsBucket,
 } from "./modules/job_list.js";
+import { initSubtabs, panelOf, setSubtabBadge, showSubtab } from "./modules/subtabs.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
@@ -120,12 +121,23 @@ if (quitBtn) {
 }
 
 
-function activateView(viewName) {
+// Which view is on screen. It used to live only in a CSS class, which is fine
+// for painting and useless for anything that needs to KNOW — the chat asking
+// what the user is looking at, or a deep link that has to open a sub-tab.
+let _currentView = "dashboard";
+
+export function getCurrentView() {
+  return _currentView;
+}
+
+function activateView(viewName, { tab = null } = {}) {
   // v1.3.0: navigation is no longer gated by provider configuration. The
   // warning banner + onboarding placeholder guide the user instead.
+  _currentView = viewName;
   document.querySelectorAll(".view").forEach((section) => {
     section.classList.toggle("is-active", section.id === `view-${viewName}`);
   });
+  if (tab) showSubtab(viewName, tab);
 
   document.querySelectorAll(".nav-link").forEach((btn) => {
     const target = btn.dataset.view;
@@ -158,6 +170,25 @@ function activateView(viewName) {
   const fab = document.getElementById("chatFab");
   if (fab) fab.classList.toggle("hidden", railless);
   syncStickyOffset();
+}
+
+/**
+ * Bring an element into view wherever it is hiding — wrong view, closed
+ * sub-tab, or just below the fold.
+ *
+ * Every "go to Settings and scroll to the provider cards" in this file used to
+ * be activateView() + scrollIntoView(), which stops working the moment the
+ * target sits in a sub-tab that is not open: no error, no scroll, nothing.
+ */
+export function revealElement(target, opts = {}) {
+  const el = typeof target === "string" ? document.getElementById(target) : target;
+  if (!el) return false;
+  const view = el.closest(".view");
+  if (view) activateView(view.id.replace(/^view-/, ""));
+  const panel = panelOf(el);
+  if (panel) showSubtab(panel.group, panel.id);
+  if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center", ...opts });
+  return true;
 }
 
 function roleLabel(role) {
@@ -275,9 +306,7 @@ function ensureNoKeyBanner(show, message) {
   `;
   banner.querySelector("#noApiKeyBannerLink").addEventListener("click", (e) => {
     e.preventDefault();
-    activateView("settings");
-    const keys = document.getElementById("providerCards");
-    if (keys && keys.scrollIntoView) keys.scrollIntoView({ behavior: "smooth", block: "center" });
+    revealElement("providerCards");
   });
 }
 
@@ -471,9 +500,7 @@ async function sendChatMessage(message) {
     if (isNoProvider) {
       appendChat("assistant", t("errors.noProviderToast") || "Configure an AI provider key first to use the chat.");
       try {
-        activateView("settings");
-        const cards = document.getElementById("providerCards");
-        if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
+        revealElement("providerCards");
       } catch (_) {}
     } else {
       appendChat("assistant", `${t("toast.chatError")}: ${error.message}`);
@@ -812,6 +839,11 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
     }
     if (view === "jobs") {
       loadJobs().catch(() => {});
+    }
+    if (view === "mail") {
+      // At boot only the status is fetched, for the badge; the queue itself
+      // is worth a request when someone actually opens the tab.
+      loadMailboxStatus().catch(() => {});
     }
   });
 });
@@ -1530,11 +1562,8 @@ async function showFirstTimeTutorial() {
     if (back) back.addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); render(); });
     overlay.querySelector('#wizCta').addEventListener('click', () => {
       try {
-        activateView(step.ctaTarget);
-        if (step.ctaScroll) {
-          const el = document.getElementById(step.ctaScroll);
-          if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        if (step.ctaScroll) revealElement(step.ctaScroll);
+        else activateView(step.ctaTarget);
       } catch (_) {}
     });
     overlay.querySelector('#wizNext').addEventListener('click', () => {
@@ -1837,9 +1866,7 @@ async function ensureProviderConfigured() {
   }
   showToast(t("errors.noProviderToast") || "Configure an AI provider key first", "error");
   try {
-    activateView("settings");
-    const cards = document.getElementById("providerCards");
-    if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
+    revealElement("providerCards");
   } catch (_) {}
   return false;
 }
@@ -1849,15 +1876,8 @@ function wireOnboardingPlaceholder() {
     btn.addEventListener("click", () => {
       const target = btn.getAttribute("data-onb-action");
       try {
-        if (target === "settings") {
-          activateView("settings");
-          const cards = document.getElementById("providerCards");
-          if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else if (target === "profile") {
-          activateView("profile");
-          const cv = document.getElementById("cvFile");
-          if (cv && cv.scrollIntoView) cv.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+        if (target === "settings") revealElement("providerCards");
+        else if (target === "profile") revealElement("cvFile");
       } catch (_) {}
     });
   });

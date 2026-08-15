@@ -51,6 +51,7 @@
       <button type="button" class="nav-link is-active" data-view="dashboard"><span class="material-symbols-outlined">dashboard</span> <span data-i18n="topbar.dashboard">Dashboard</span><span id="remindersNavBadge" class="nav-badge hidden">0</span></button>
       <button type="button" class="nav-link" data-view="job-search"><span class="material-symbols-outlined">travel_explore</span> <span data-i18n="topbar.jobSearch">Job Search</span></button>
       <button type="button" class="nav-link" data-view="jobs"><span class="material-symbols-outlined">work</span> <span data-i18n="topbar.jobs">Jobs</span></button>
+      <button type="button" class="nav-link" data-view="mail"><span class="material-symbols-outlined">mark_email_read</span> <span data-i18n="topbar.mail">Mail</span><span id="mailNavBadge" class="nav-badge hidden">0</span></button>
       <button type="button" class="nav-link" data-view="profile"><span class="material-symbols-outlined">person</span> <span data-i18n="topbar.profile">Profile</span></button>
       <button type="button" class="nav-link" data-view="settings"><span class="material-symbols-outlined">settings</span> <span data-i18n="topbar.settings">Settings</span></button>
       <button type="button" class="nav-link" data-view="info"><span class="material-symbols-outlined">help</span> <span data-i18n="topbar.info">Info</span></button>
@@ -558,6 +559,130 @@
     <section id="view-jobs" class="view"></section>
 
     <!-- Profile View -->
+    <!-- The mailbox was the third of eight cards inside Settings, 116
+         lines deep, with the review queue as its last nine. Deciding what
+         you applied to is not a setting. -->
+    <section id="view-mail" class="view">
+      <div class="settings-grid">
+        <article class="card-block card-block--wide" id="mailboxCard" data-state="empty">
+          <h3><span class="material-symbols-outlined">mark_email_read</span> <span data-i18n="mail.title">Mailbox</span></h3>
+          <p class="micro" data-i18n="mail.subtitle">Connect the address you apply with, and the app recognises the confirmation emails and marks those offers as applied.</p>
+          <div class="mail-row">
+            <label class="micro" for="mailAddress" data-i18n="mail.address">Email address</label>
+            <input id="mailAddress" type="email" autocomplete="off" placeholder="nome@esempio.it" />
+          </div>
+          <div class="mail-row">
+            <label class="micro" for="mailAuth" data-i18n="mail.provider.label">Sign-in</label>
+            <select id="mailAuth">
+              <option value="password" data-i18n="mail.provider.other">Other provider (app password)</option>
+              <option value="graph" data-i18n="mail.provider.microsoftGraph">Microsoft — read-only (needs your own app registration)</option>
+              <option value="imap_oauth" data-i18n="mail.provider.microsoftImap">Microsoft — IMAP (for an app id you already have)</option>
+            </select>
+          </div>
+          <div id="mailPasswordBlock" class="mail-row">
+            <label class="micro" for="mailSecret" data-i18n="mail.appPassword">App password</label>
+            <input id="mailSecret" type="password" autocomplete="off" />
+            <p class="micro" data-i18n="mail.appPasswordHelp">Generate an app password from your provider — never your main password. It is stored in clear text on this PC, like your API keys.</p>
+          </div>
+          <div id="mailGraphBlock" class="mail-row hidden">
+            <p class="micro" data-i18n="mail.graphHelp">Microsoft closed password sign-in for IMAP in 2024, so a Microsoft mailbox needs an app id. This app ships none: since June 2024 a personal Microsoft account cannot register an application, so the id has to be one you genuinely have.</p>
+            <!-- Written out because the alternative is a user hitting a 401 in
+                 the Azure portal three times before working out that the free
+                 path was closed under them. -->
+            <details class="mail-advanced">
+              <summary class="micro" data-i18n="mail.whereIdFrom">Where do I get an app id?</summary>
+              <ul class="micro">
+                <li data-i18n="mail.idSource.work">Work or school Microsoft account: register the app in your organisation's directory (Entra → App registrations), if your IT allows it. Ask for the delegated Mail.Read permission and turn on "Allow public client flows".</li>
+                <li data-i18n="mail.idSource.azure">An Azure account: same steps. The free plan costs nothing but asks for a card to verify your identity.</li>
+                <li data-i18n="mail.idSource.none">Neither of the two: a personal Outlook cannot be connected. Set up a rule that forwards confirmation emails to a mailbox that works — Gmail, Libero, any IMAP one — and connect that instead.</li>
+                <li data-i18n="mail.idSource.other">Some open-source mail clients publish their own app id, and it can be pasted here. It works, but the consent screen will show their name instead of Job Finder, and revoking access affects both.</li>
+              </ul>
+            </details>
+            <button id="mailConnectBtn" class="secondary" data-i18n="mail.connect">Connect Microsoft</button>
+            <div id="mailDeviceCode" class="mail-device hidden">
+              <p class="micro" data-i18n="mail.deviceCodeIntro">Open the page below and type this code:</p>
+              <code id="mailUserCode" class="mail-code"></code>
+              <a id="mailVerifyLink" target="_blank" rel="noopener" class="micro"></a>
+            </div>
+          </div>
+          <details class="mail-advanced">
+            <summary class="micro" data-i18n="mail.advanced">Advanced</summary>
+            <div class="mail-row">
+              <label class="micro" for="mailHost" data-i18n="mail.host">IMAP server</label>
+              <input id="mailHost" type="text" autocomplete="off" />
+            </div>
+            <div class="mail-row">
+              <label class="micro" for="mailFolder" data-i18n="mail.folder">Folder</label>
+              <input id="mailFolder" type="text" autocomplete="off" placeholder="INBOX" />
+            </div>
+            <div class="mail-row">
+              <label class="micro" for="mailClientId" data-i18n="mail.clientId">Microsoft application id</label>
+              <input id="mailClientId" type="text" autocomplete="off" />
+            </div>
+          </details>
+          <div class="mail-row mail-actions">
+            <button id="mailSaveBtn" class="secondary" data-i18n="mail.save">Save</button>
+            <button id="mailTestBtn" class="secondary" data-i18n="mail.test">Test connection</button>
+            <button id="mailDisconnectBtn" class="danger" data-i18n="mail.disconnect">Disconnect</button>
+          </div>
+          <p id="mailState" class="provider-status-text micro"></p>
+          <div class="mail-row">
+            <label class="micro"><input type="checkbox" id="mailEnabled" /> <span data-i18n="mail.auto">Check automatically while the app is open</span></label>
+            <label class="micro" for="mailInterval" data-i18n="mail.intervalMinutes">Every (minutes)</label>
+            <input id="mailInterval" type="number" min="5" max="240" step="5" value="15" />
+          </div>
+          <!-- The subject of a confirmation names the employer and never the
+               role, so a recovered application has no job title unless the body
+               is read — and not reading bodies is something this app promised.
+               Rather than quietly redefine the promise, it becomes a choice with
+               three honest positions. Default: nothing is read until you ask,
+               for the one message you asked about. -->
+          <div class="mail-row">
+            <label class="micro" for="mailBodyMode" data-i18n="mail.body.label">Job title from the message body</label>
+            <select id="mailBodyMode">
+              <option value="never" data-i18n="mail.body.never">Never read the body</option>
+              <option value="ask" data-i18n="mail.body.ask">Only when I ask, message by message</option>
+              <option value="always" data-i18n="mail.body.always">Always, for confirmations</option>
+            </select>
+          </div>
+          <p class="micro" data-i18n="mail.body.hint">Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.</p>
+          <div class="mail-row mail-actions">
+            <!-- Runs the rules and reports what they WOULD have marked. How well
+                 they do is unknown until they meet a real mailbox, and the cost
+                 of being wrong is a rewritten application history. -->
+            <button id="mailDryRunBtn" class="secondary" data-i18n="mail.dryRun">Test recognition (writes nothing)</button>
+            <button id="mailCheckBtn" class="secondary" data-i18n="mail.checkNow">Check now</button>
+          </div>
+          <!-- The window was fixed at 90 days. Someone reaching back for the
+               applications they sent before connecting the mailbox is usually
+               reaching further than that, and a year is ~3.300 messages — worth
+               measuring with the dry run before spending, because a message
+               recorded as "no match" is never looked at again. -->
+          <div class="mail-row mail-actions">
+            <label class="micro" for="mailRecoveryDays" data-i18n="mail.recovery.window">Look back</label>
+            <select id="mailRecoveryDays">
+              <option value="90">90</option>
+              <option value="180">180</option>
+              <option value="365">365</option>
+            </select>
+            <span class="micro" data-i18n="mail.recovery.days">days</span>
+            <button id="mailRecoveryDryBtn" class="secondary" data-i18n="mail.recovery.dry">Count first (writes nothing)</button>
+            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Find applications</button>
+          </div>
+          <pre id="mailOutput" class="output hidden"></pre>
+          <div id="mailReviewBox" class="mail-review hidden">
+            <h4 data-i18n="mail.review.title">Messages to confirm</h4>
+            <p class="micro" data-i18n="mail.review.intro">These look like confirmations but could not be assigned on their own. Nothing has been changed.</p>
+            <div id="mailReviewList"></div>
+            <div class="mail-actions">
+              <button id="mailReviewApplyBtn" class="secondary" data-i18n="mail.review.apply">Mark selected as applied</button>
+              <button id="mailReviewDismissBtn" class="secondary" data-i18n="mail.review.dismiss">Ignore all</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section id="view-profile" class="view">
       <header class="profile-hero">
         <h2><span data-i18n="profile.title">Your Profile</span></h2>
@@ -834,122 +959,6 @@
              sent. Off until connected, and read-only for good: on Microsoft the
              token is scoped to Mail.Read, on IMAP the folder is opened
              read-only, and the app cannot send at all. -->
-        <article class="card-block card-block--wide" id="mailboxCard" data-state="empty">
-          <h3><span class="material-symbols-outlined">mark_email_read</span> <span data-i18n="mail.title">Mailbox</span></h3>
-          <p class="micro" data-i18n="mail.subtitle">Connect the address you apply with, and the app recognises the confirmation emails and marks those offers as applied.</p>
-          <div class="mail-row">
-            <label class="micro" for="mailAddress" data-i18n="mail.address">Email address</label>
-            <input id="mailAddress" type="email" autocomplete="off" placeholder="nome@esempio.it" />
-          </div>
-          <div class="mail-row">
-            <label class="micro" for="mailAuth" data-i18n="mail.provider.label">Sign-in</label>
-            <select id="mailAuth">
-              <option value="password" data-i18n="mail.provider.other">Other provider (app password)</option>
-              <option value="graph" data-i18n="mail.provider.microsoftGraph">Microsoft — read-only (needs your own app registration)</option>
-              <option value="imap_oauth" data-i18n="mail.provider.microsoftImap">Microsoft — IMAP (for an app id you already have)</option>
-            </select>
-          </div>
-          <div id="mailPasswordBlock" class="mail-row">
-            <label class="micro" for="mailSecret" data-i18n="mail.appPassword">App password</label>
-            <input id="mailSecret" type="password" autocomplete="off" />
-            <p class="micro" data-i18n="mail.appPasswordHelp">Generate an app password from your provider — never your main password. It is stored in clear text on this PC, like your API keys.</p>
-          </div>
-          <div id="mailGraphBlock" class="mail-row hidden">
-            <p class="micro" data-i18n="mail.graphHelp">Microsoft closed password sign-in for IMAP in 2024, so a Microsoft mailbox needs an app id. This app ships none: since June 2024 a personal Microsoft account cannot register an application, so the id has to be one you genuinely have.</p>
-            <!-- Written out because the alternative is a user hitting a 401 in
-                 the Azure portal three times before working out that the free
-                 path was closed under them. -->
-            <details class="mail-advanced">
-              <summary class="micro" data-i18n="mail.whereIdFrom">Where do I get an app id?</summary>
-              <ul class="micro">
-                <li data-i18n="mail.idSource.work">Work or school Microsoft account: register the app in your organisation's directory (Entra → App registrations), if your IT allows it. Ask for the delegated Mail.Read permission and turn on "Allow public client flows".</li>
-                <li data-i18n="mail.idSource.azure">An Azure account: same steps. The free plan costs nothing but asks for a card to verify your identity.</li>
-                <li data-i18n="mail.idSource.none">Neither of the two: a personal Outlook cannot be connected. Set up a rule that forwards confirmation emails to a mailbox that works — Gmail, Libero, any IMAP one — and connect that instead.</li>
-                <li data-i18n="mail.idSource.other">Some open-source mail clients publish their own app id, and it can be pasted here. It works, but the consent screen will show their name instead of Job Finder, and revoking access affects both.</li>
-              </ul>
-            </details>
-            <button id="mailConnectBtn" class="secondary" data-i18n="mail.connect">Connect Microsoft</button>
-            <div id="mailDeviceCode" class="mail-device hidden">
-              <p class="micro" data-i18n="mail.deviceCodeIntro">Open the page below and type this code:</p>
-              <code id="mailUserCode" class="mail-code"></code>
-              <a id="mailVerifyLink" target="_blank" rel="noopener" class="micro"></a>
-            </div>
-          </div>
-          <details class="mail-advanced">
-            <summary class="micro" data-i18n="mail.advanced">Advanced</summary>
-            <div class="mail-row">
-              <label class="micro" for="mailHost" data-i18n="mail.host">IMAP server</label>
-              <input id="mailHost" type="text" autocomplete="off" />
-            </div>
-            <div class="mail-row">
-              <label class="micro" for="mailFolder" data-i18n="mail.folder">Folder</label>
-              <input id="mailFolder" type="text" autocomplete="off" placeholder="INBOX" />
-            </div>
-            <div class="mail-row">
-              <label class="micro" for="mailClientId" data-i18n="mail.clientId">Microsoft application id</label>
-              <input id="mailClientId" type="text" autocomplete="off" />
-            </div>
-          </details>
-          <div class="mail-row mail-actions">
-            <button id="mailSaveBtn" class="secondary" data-i18n="mail.save">Save</button>
-            <button id="mailTestBtn" class="secondary" data-i18n="mail.test">Test connection</button>
-            <button id="mailDisconnectBtn" class="danger" data-i18n="mail.disconnect">Disconnect</button>
-          </div>
-          <p id="mailState" class="provider-status-text micro"></p>
-          <div class="mail-row">
-            <label class="micro"><input type="checkbox" id="mailEnabled" /> <span data-i18n="mail.auto">Check automatically while the app is open</span></label>
-            <label class="micro" for="mailInterval" data-i18n="mail.intervalMinutes">Every (minutes)</label>
-            <input id="mailInterval" type="number" min="5" max="240" step="5" value="15" />
-          </div>
-          <!-- The subject of a confirmation names the employer and never the
-               role, so a recovered application has no job title unless the body
-               is read — and not reading bodies is something this app promised.
-               Rather than quietly redefine the promise, it becomes a choice with
-               three honest positions. Default: nothing is read until you ask,
-               for the one message you asked about. -->
-          <div class="mail-row">
-            <label class="micro" for="mailBodyMode" data-i18n="mail.body.label">Job title from the message body</label>
-            <select id="mailBodyMode">
-              <option value="never" data-i18n="mail.body.never">Never read the body</option>
-              <option value="ask" data-i18n="mail.body.ask">Only when I ask, message by message</option>
-              <option value="always" data-i18n="mail.body.always">Always, for confirmations</option>
-            </select>
-          </div>
-          <p class="micro" data-i18n="mail.body.hint">Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.</p>
-          <div class="mail-row mail-actions">
-            <!-- Runs the rules and reports what they WOULD have marked. How well
-                 they do is unknown until they meet a real mailbox, and the cost
-                 of being wrong is a rewritten application history. -->
-            <button id="mailDryRunBtn" class="secondary" data-i18n="mail.dryRun">Test recognition (writes nothing)</button>
-            <button id="mailCheckBtn" class="secondary" data-i18n="mail.checkNow">Check now</button>
-          </div>
-          <!-- The window was fixed at 90 days. Someone reaching back for the
-               applications they sent before connecting the mailbox is usually
-               reaching further than that, and a year is ~3.300 messages — worth
-               measuring with the dry run before spending, because a message
-               recorded as "no match" is never looked at again. -->
-          <div class="mail-row mail-actions">
-            <label class="micro" for="mailRecoveryDays" data-i18n="mail.recovery.window">Look back</label>
-            <select id="mailRecoveryDays">
-              <option value="90">90</option>
-              <option value="180">180</option>
-              <option value="365">365</option>
-            </select>
-            <span class="micro" data-i18n="mail.recovery.days">days</span>
-            <button id="mailRecoveryDryBtn" class="secondary" data-i18n="mail.recovery.dry">Count first (writes nothing)</button>
-            <button id="mailRecoveryBtn" class="secondary" data-i18n="mail.recovery.start">Find applications</button>
-          </div>
-          <pre id="mailOutput" class="output hidden"></pre>
-          <div id="mailReviewBox" class="mail-review hidden">
-            <h4 data-i18n="mail.review.title">Messages to confirm</h4>
-            <p class="micro" data-i18n="mail.review.intro">These look like confirmations but could not be assigned on their own. Nothing has been changed.</p>
-            <div id="mailReviewList"></div>
-            <div class="mail-actions">
-              <button id="mailReviewApplyBtn" class="secondary" data-i18n="mail.review.apply">Mark selected as applied</button>
-              <button id="mailReviewDismissBtn" class="secondary" data-i18n="mail.review.dismiss">Ignore all</button>
-            </div>
-          </div>
-        </article>
         <article class="card-block card-block--wide" id="localModelsCard">
           <h3><span class="material-symbols-outlined">memory</span> <span data-i18n="local.title">Run a model on this PC</span></h3>
           <p class="micro" data-i18n="local.subtitle">A model on your own GPU has no daily quota, no rate limits, and nothing leaves the machine. What matters is whether it fits in video memory.</p>

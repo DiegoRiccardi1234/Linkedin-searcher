@@ -79,7 +79,20 @@ export async function loadMailboxStatus() {
     ? ` · ${t("mail.pendingCount").replace("{n}", String(status.pending_count))}`
     : "";
   _setState(t(key) + pending, kind);
+  // The API has always answered with review_count and nobody read it, so the
+  // only way to learn there were proposals waiting was to open Settings and
+  // scroll to the bottom of the third card.
+  setMailBadge(status.review_count);
   await loadMailReview();
+}
+
+/** Proposals waiting for an answer, on the nav tab. */
+export function setMailBadge(count) {
+  const badge = $("mailNavBadge");
+  if (!badge) return;
+  const n = Number(count) || 0;
+  badge.textContent = String(n);
+  badge.classList.toggle("hidden", n === 0);
 }
 
 export async function loadMailReview() {
@@ -93,6 +106,9 @@ export async function loadMailReview() {
     return;
   }
   box.classList.toggle("hidden", items.length === 0);
+  // Resolving or dismissing a proposal reloads this list, so the badge follows
+  // the queue without a second request.
+  setMailBadge(items.length);
   // One row per message, and the choice of WHICH offer is a radio inside it.
   // Before, a proposal that could be about any of 275 offers rendered as a
   // single checkbox naming whichever one happened to sort first — a question

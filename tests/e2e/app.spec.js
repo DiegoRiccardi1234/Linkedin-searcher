@@ -4,7 +4,7 @@ const { test, expect } = require("@playwright/test");
 // behavior (shell loads, every nav tab activates its view, key API contracts
 // exist, chat input does not crash) rather than brittle visible-text matches.
 
-const VIEWS = ["dashboard", "job-search", "profile", "settings", "info"];
+const VIEWS = ["dashboard", "job-search", "jobs", "mail", "profile", "settings", "info"];
 
 test("shell loads and every nav tab activates its view", async ({ page }) => {
   const consoleErrors = [];
