@@ -306,9 +306,14 @@ test("record README demo GIF", async ({ page }) => {
   await page.waitForTimeout(400);
   idx = await captureFor(page, 600, idx);
 
-  // Smooth-scroll down to the jobs section so the viewer sees the actual matches.
+  // Reveal the matches. `.jobs-section` is authored inside #view-dashboard but
+  // moved into #view-jobs at runtime, so measuring it from the dashboard read a
+  // hidden node and scrolled to zero: this beat showed nothing at all. Go to the
+  // archive, where the section actually lives, and scroll there.
+  await page.locator(".topnav .nav-link[data-view='jobs']").click();
+  await page.waitForTimeout(800);
   const jobsTarget = await page.evaluate(() => {
-    const sec = document.querySelector(".jobs-section");
+    const sec = document.querySelector("#view-jobs .jobs-section") || document.querySelector(".jobs-section");
     return sec ? sec.getBoundingClientRect().top + window.scrollY - 80 : 0;
   });
   const STEPS = 14;
@@ -316,8 +321,16 @@ test("record README demo GIF", async ({ page }) => {
     await page.evaluate((y) => window.scrollTo(0, y), Math.round((jobsTarget * s) / STEPS));
     idx = await captureFor(page, 90, idx);
   }
-  // Hold on the jobs list so the matches are clearly readable in the GIF.
+  // Hold on the jobs list so the matches — and the bucket counts above them —
+  // are clearly readable in the GIF.
   idx = await captureFor(page, 1500, idx);
+
+  // Beat 6b — Mail: the tab, its badge, and the queue of messages to decide.
+  // The whole mailbox story shipped in 1.8.x and never appeared in the GIF.
+  await page.locator(".topnav .nav-link[data-view='mail']").click();
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  idx = await captureFor(page, 1800, idx);
 
   // Beat 7 — AI Usage panel (v1.5.4): tokens/calls per provider
   await page.locator(".topnav .nav-link[data-view='dashboard']").click();

@@ -382,16 +382,96 @@ CHAT_MESSAGES = [
 ]
 
 
+# What a user who has already run one scan would have on file. Without these the
+# readiness gate blocks the search screen and every screenshot shows the gate.
+DEMO_TERMS = ["python backend engineer", "ai product engineer", "data analyst"]
+DEMO_LOCATIONS = ["Milan", "Remote - EU"]
+
+#: The demo mailbox account. Nothing is fetched: these rows stand for messages
+#: the watcher already read, so the Mail tab, its badge and the review queue have
+#: something to show. Addresses are fictional on purpose.
+DEMO_MAIL_ACCOUNT = "demo@example.com"
+
+#: Proposals waiting for a decision. `attach` = a confirmation that could belong
+#: to an offer already in the archive; `import` = an application to a company the
+#: archive never knew about, which becomes a new row if the user says so.
+MAIL_REVIEW: list[dict] = [
+    {
+        "kind": "attach", "company": "Stripe", "role": "Junior Python Backend Engineer",
+        "sender": "no-reply@stripe.example", "rule": "subject:application received",
+        "days_ago": 1, "match_titles": ["Junior Python Backend Engineer"],
+    },
+    {
+        "kind": "attach", "company": "Anthropic", "role": "AI Product Engineer",
+        "sender": "careers@anthropic.example", "rule": "body:we received your application",
+        "days_ago": 2, "match_titles": ["AI Product Engineer"],
+    },
+    {
+        "kind": "import", "company": "Zalando", "role": "Backend Engineer (Platform)",
+        "sender": "jobs@zalando.example", "rule": "body:thank you for applying",
+        "days_ago": 4, "match_titles": [],
+    },
+]
+
+
+def insert_mail(db: Database) -> None:
+    """Messages the watcher has already read, and the ones still to decide."""
+    now = datetime.now(UTC)
+    by_title = {
+        str(row["titolo"]): int(row["id"])
+        for row in db.conn.execute("SELECT id, titolo FROM jobs").fetchall()
+    }
+    for index, item in enumerate(MAIL_REVIEW):
+        received = now - timedelta(days=item["days_ago"])
+        db.add_mail_review(
+            account=DEMO_MAIL_ACCOUNT,
+            mail_key=f"demo-review-{index}",
+            kind=item["kind"],
+            message_id=f"<demo-{index}@example.com>",
+            received_at=now_iso(received),
+            company=item["company"],
+            sender=item["sender"],
+            rule=item["rule"],
+            role=item["role"],
+            candidates=[by_title[t] for t in item["match_titles"] if t in by_title],
+        )
+    # A handful of already-decided messages, so the tab does not read as if the
+    # mailbox had never been checked.
+    for index in range(6):
+        db.conn.execute(
+            "INSERT INTO mail_seen (account, mail_key, message_id, received_at, verdict, "
+            "job_id, matched_rule, seen_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+            (
+                DEMO_MAIL_ACCOUNT,
+                f"demo-seen-{index}",
+                f"<demo-seen-{index}@example.com>",
+                now_iso(now - timedelta(days=index + 2)),
+                "ignored" if index % 2 else "newsletter",
+                "sender:newsletter",
+                now_iso(now - timedelta(days=index + 2)),
+            ),
+        )
+    db.conn.commit()
+
+
 def now_iso(dt: datetime) -> str:
     return dt.astimezone(UTC).isoformat()
 
 
 def wipe(conn: sqlite3.Connection) -> None:
+    # Every table this script writes, plus the ones a previous run of the app
+    # could have left behind. Wiping seven of sixteen left mail proposals and
+    # saved searches from an older seed sitting in the "fresh" demo.
     for table in (
         "job_actions", "chat_messages", "preferences",
         "candidate_profiles", "scan_runs", "jobs", "usage_log",
+        "mail_seen", "mail_review", "saved_searches", "score_feedback",
+        "watchlist_companies", "chat_sessions", "pinned_jobs", "recruiters",
     ):
-        conn.execute(f"DELETE FROM {table}")
+        try:
+            conn.execute(f"DELETE FROM {table}")
+        except sqlite3.DatabaseError:
+            pass  # a table this schema version does not have yet
     conn.commit()
 
 
@@ -549,11 +629,19 @@ def insert_profile_and_prefs(db: Database) -> None:
     db.set_preference("theme", "light")
     db.set_preference("location_default", "Italy")
     db.set_preference("chat_session_id", "default")
+    # Without these two the readiness gate blocks the search screen, and the
+    # screenshot shows the gate instead of the form. They are what a user who
+    # has already run one scan would have.
+    db.set_preference("last_scan_terms", json.dumps(DEMO_TERMS, ensure_ascii=False))
+    db.set_preference("last_scan_locations", json.dumps(DEMO_LOCATIONS, ensure_ascii=False))
+    db.set_preference("preferred_roles", ", ".join(DEMO_TERMS))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", type=Path, default=ROOT / "data" / "searcher.db")
+    # NOT the real archive. The default used to be data/searcher.db, so a
+    # distracted `--force` wiped a year of real applications to make screenshots.
+    parser.add_argument("--db", type=Path, default=ROOT / "data" / "demo.db")
     parser.add_argument("--force", action="store_true", help="Wipe existing rows first")
     args = parser.parse_args()
 
@@ -578,6 +666,8 @@ def main() -> int:
         print("  Inserted usage_log rows (AI Usage panel).")
         insert_sample_note(db)
         print("  Inserted a sample job note (timeline).")
+        insert_mail(db)
+        print(f"  Inserted {len(MAIL_REVIEW)} mail proposals + seen messages.")
 
         analytics = db.get_analytics()
         print("\nResult summary:")
