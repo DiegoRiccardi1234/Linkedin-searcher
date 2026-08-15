@@ -1186,6 +1186,50 @@
           </ol>
         </article>
 
+        <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">travel_explore</span>
+            <h3 data-i18n="info.scan.title">Scanning &amp; filters</h3>
+          </header>
+          <p data-i18n="info.scan.body">In Job Search you can pick experience level (internship → senior), contract type (full-time, part-time, internship, contract, temporary) and work mode (remote, hybrid, on-site). The scan shows live progress with percentage and estimated time remaining.</p>
+        </article>
+
+                <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">rule</span>
+            <h3 data-i18n="info.scoring.title">How an offer is scored</h3>
+          </header>
+          <p data-i18n="info.scoring.body">Deterministic checks run before the model.</p>
+          <p data-i18n="info.scoring.blocking">Blocking checks cap the score.</p>
+          <p data-i18n="info.scoring.weighted">Weighted checks lower a ceiling.</p>
+          <p data-i18n="info.scoring.unevaluated">Not evaluated is not a bad score.</p>
+        </article>
+
+        <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">work</span>
+            <h3 data-i18n="info.archive.title">The offer archive</h3>
+          </header>
+          <p data-i18n="info.archive.body">Offers are sliced into what is left to decide and what you did.</p>
+        </article>
+
+        <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">mark_email_read</span>
+            <h3 data-i18n="info.mail.title">Mailbox and applications</h3>
+          </header>
+          <p data-i18n="info.mail.body">Confirmation emails become applications.</p>
+          <p data-i18n="info.mail.guarantee">Two independent facts must agree.</p>
+        </article>
+
+        <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">schedule</span>
+            <h3 data-i18n="info.automation.title">Automation</h3>
+          </header>
+          <p data-i18n="info.automation.body">Automatic scans, reminders, saved searches and a company watchlist.</p>
+        </article>
+
         <article class="info-card info-card-wide">
           <header class="info-card-head">
             <span class="material-symbols-outlined">memory</span>
@@ -1200,24 +1244,25 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><strong>Groq</strong></td><td><span class="info-tag free">Free</span></td><td data-i18n="info.providers.groq">Free, fast, generous limits. Great default.</td></tr>
-              <tr><td><strong>OpenRouter</strong></td><td><span class="info-tag mixed">Mixed</span></td><td data-i18n="info.providers.openrouter">Access many models including free tiers.</td></tr>
-              <tr><td><strong>Cerebras</strong></td><td><span class="info-tag free">Free</span></td><td data-i18n="info.providers.cerebras">Very low latency.</td></tr>
-              <tr><td><strong>DeepSeek</strong></td><td><span class="info-tag mixed">Mixed</span></td><td data-i18n="info.providers.deepseek">Low-cost, strong general models.</td></tr>
-              <tr><td><strong>xAI (Grok)</strong></td><td><span class="info-tag paid">Paid</span></td><td data-i18n="info.providers.xai">Grok models from xAI.</td></tr>
-              <tr><td><strong>Zhipu GLM</strong></td><td><span class="info-tag mixed">Mixed</span></td><td data-i18n="info.providers.glm">Zhipu GLM models.</td></tr>
-              <tr><td><strong>Mistral</strong></td><td><span class="info-tag mixed">Mixed</span></td><td data-i18n="info.providers.mistral">European models, good free tier.</td></tr>
-              <tr><td><strong>Anthropic / OpenAI / Google</strong></td><td><span class="info-tag paid">Paid</span></td><td data-i18n="info.providers.paid">Paid, top-tier quality.</td></tr>
+              <tr><td><strong>Groq</strong></td><td><span class="info-tag free" data-i18n="info.providers.cost.free">Free</span></td><td data-i18n="info.providers.groq">Free, fast, generous limits. Great default.</td></tr>
+              <tr><td><strong>OpenRouter</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.openrouter">Access many models including free tiers.</td></tr>
+              <tr><td><strong>Cerebras</strong></td><td><span class="info-tag free" data-i18n="info.providers.cost.free">Free</span></td><td data-i18n="info.providers.cerebras">Very low latency.</td></tr>
+              <tr><td><strong>DeepSeek</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.deepseek">Low-cost, strong general models.</td></tr>
+              <tr><td><strong>xAI (Grok)</strong></td><td><span class="info-tag paid" data-i18n="info.providers.cost.paid">Paid</span></td><td data-i18n="info.providers.xai">Grok models from xAI.</td></tr>
+              <tr><td><strong>Zhipu GLM</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.glm">Zhipu GLM models.</td></tr>
+              <tr><td><strong>Mistral</strong></td><td><span class="info-tag mixed" data-i18n="info.providers.cost.mixed">Mixed</span></td><td data-i18n="info.providers.mistral">European models, good free tier.</td></tr>
+              <tr><td><strong>Local / custom</strong></td><td><span class="info-tag free" data-i18n="info.providers.cost.free">Free</span></td><td data-i18n="info.providers.custom">Any OpenAI-compatible endpoint.</td></tr>
+              <tr><td><strong>Anthropic / OpenAI / Google</strong></td><td><span class="info-tag paid" data-i18n="info.providers.cost.paid">Paid</span></td><td data-i18n="info.providers.paid">Paid, top-tier quality.</td></tr>
             </tbody>
           </table>
         </article>
 
         <article class="info-card">
           <header class="info-card-head">
-            <span class="material-symbols-outlined">travel_explore</span>
-            <h3 data-i18n="info.scan.title">Scanning &amp; filters</h3>
+            <span class="material-symbols-outlined">smart_toy</span>
+            <h3 data-i18n="info.models.title">Models and limits</h3>
           </header>
-          <p data-i18n="info.scan.body">In Job Search you can pick experience level (internship → senior), contract type (full-time, part-time, internship, contract, temporary) and work mode (remote, hybrid, on-site). The scan shows live progress with percentage and estimated time remaining.</p>
+          <p data-i18n="info.models.body">Pin a model per context, or run one on your own machine.</p>
         </article>
 
         <article class="info-card">
@@ -1228,8 +1273,25 @@
           <ul class="info-list">
             <li data-i18n="info.chat.multi">Multiple chats: use the dropdown next to the coach to switch between separate conversations, or start a new one.</li>
             <li data-i18n="info.chat.pin">Pin jobs to a chat: open a job's details and click "Pin to chat" to give the coach the full description, then ask questions like "compare these two".</li>
+            <li data-i18n="info.chat.actions">The coach proposes; you press the button.</li>
             <li data-i18n="info.chat.cover">Cover letter: from a job's detail panel you can generate a cover letter targeted at the recruiter when their info is visible on LinkedIn.</li>
           </ul>
+        </article>
+
+        <article class="info-card">
+          <header class="info-card-head">
+            <span class="material-symbols-outlined">cloud_off</span>
+            <h3 data-i18n="info.egress.title">What leaves this computer</h3>
+          </header>
+          <ul class="info-steps">
+            <li data-i18n="info.egress.ai">Your prompts go to the AI provider you configured.</li>
+            <li data-i18n="info.egress.mail">Your inbox, read-only, if you connect one.</li>
+            <li data-i18n="info.egress.boards">LinkedIn and Indeed, to read postings.</li>
+            <li data-i18n="info.egress.updates">GitHub, to check for a newer version.</li>
+            <li data-i18n="info.egress.models">Hugging Face, when you ask for a local-model suggestion.</li>
+            <li data-i18n="info.egress.market">A web search, for market questions that need fresh figures.</li>
+          </ul>
+          <p data-i18n="info.egress.body">Everything else stays in a database file on this computer.</p>
         </article>
 
         <article class="info-card">
@@ -1240,7 +1302,7 @@
           <p data-i18n="info.privacy.body">All your data (CV, jobs, chats, keys) is stored locally in a SQLite database under your user folder. Nothing is uploaded except your prompts to the AI provider you choose.</p>
         </article>
 
-        <article class="info-card info-card-wide info-card-version">
+<article class="info-card info-card-wide info-card-version">
           <header class="info-card-head">
             <span class="material-symbols-outlined">info</span>
             <h3 data-i18n="info.version.title">Version</h3>

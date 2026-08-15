@@ -750,17 +750,17 @@
   "info": {
     "title": "How Job",
     "titleEm": "Finder works",
-    "subtitle": "A short tour of every feature so you can get the most out of the app.",
+    "subtitle": "What the app does, what it decides for you, and what leaves this computer.",
     "what": {
       "title": "What is Job Finder?",
-      "body": "Job Finder is a local AI-powered job search assistant. It reads your CV, scans LinkedIn and Indeed, scores listings against your profile, and helps you write targeted cover letters and prepare interviews."
+      "body": "Job Finder reads your CV, searches LinkedIn and Indeed for the roles you are after, scores every posting against your profile and keeps track of what you applied to. Everything lives in a database file on this computer; the only thing that leaves it is what you send to the AI provider you configure, plus the connections listed below."
     },
     "start": {
       "title": "Getting started",
-      "step1": "Upload your CV in the Profile tab — Job Finder extracts your skills, experience and target roles.",
-      "step2": "Configure at least one AI provider key in Settings (Groq is free and easy to start).",
-      "step3": "Open Job Search, pick filters and keywords, then launch the scan.",
-      "step4": "Review results in the Dashboard and chat with the AI Coach about specific jobs."
+      "step1": "Add an AI provider key in Settings → AI. Reading a CV is already a model call, so this comes first.",
+      "step2": "Upload your CV in Profile → About me. The app reads your skills, your roles and — when the CV says so — your city.",
+      "step3": "Say what you are looking for and where, in Profile → What I'm looking for or straight in the search form. Without those two the scan stops and asks: it will not search for someone else's job.",
+      "step4": "Run a scan from Job Search, then work through the archive in Offers and ask the coach about anything you don't understand."
     },
     "providers": {
       "title": "AI providers",
@@ -776,25 +776,66 @@
         "name": "Provider",
         "cost": "Cost",
         "notes": "Notes"
+      },
+      "custom": "Any OpenAI-compatible endpoint: a model on your own machine (Ollama, LM Studio, vLLM) or a gateway.",
+      "cost": {
+        "free": "Free",
+        "mixed": "Mixed",
+        "paid": "Paid"
       }
     },
     "scan": {
       "title": "Scanning & filters",
-      "body": "In Job Search you can pick experience level (internship → senior), contract type (full-time, part-time, internship, contract, temporary) and work mode (remote, hybrid, on-site). The scan shows live progress with percentage and estimated time remaining."
+      "body": "A scan searches each term separately, on each location you list — a city, a region or a country — so two terms and two cities are four searches. You can narrow by experience level, contract type, work mode, minimum salary and which boards to use, keep a whole filter set as a saved search, and follow employers by name so their openings turn up even when your keywords would have missed them. Only LinkedIn and Indeed answer reliably from Europe."
     },
     "chat": {
       "title": "Chat with the AI Coach",
       "multi": "Multiple chats: use the dropdown next to the coach to switch between separate conversations, or start a new one.",
       "pin": "Pin jobs to a chat: open a job's details and click \"Pin to chat\" to give the coach the full description, then ask questions like \"compare these two\".",
-      "cover": "Cover letter: from a job's detail panel you can generate a cover letter targeted at the recruiter when their info is visible on LinkedIn."
+      "cover": "Cover letter: from a job's detail panel you can generate a cover letter targeted at the recruiter when their info is visible on LinkedIn.",
+      "actions": "The coach can prepare a search, save roles to look for, fill in a profile fact or open an offer — always as a button you press, never on its own."
     },
     "privacy": {
       "title": "Privacy",
-      "body": "All your data (CV, jobs, chats, keys) is stored locally in a SQLite database under your user folder. Nothing is uploaded except your prompts to the AI provider you choose."
+      "body": "Privacy Mode is on by default: your name, email, phone and address are stripped out of the CV before it reaches any model, and put back into what the model writes. It does not make you anonymous — the body of a CV identifies you on its own — so choose the provider you send it to accordingly."
     },
     "version": {
       "title": "Version",
       "changelog": "Changelog"
+    },
+    "scoring": {
+      "title": "How an offer is scored",
+      "body": "A model reads the posting against your CV, but the checks that decide whether you could take the job at all are deterministic and run first — no model gets a vote on them.",
+      "blocking": "Blocking: outside the EU without a visa, a degree mark above yours, an on-site role in a city you cannot reach, a post reserved to a protected-categories register, a job that needs a driving licence you said you lack. These cap the score and are hidden by the \"Applicable\" filter.",
+      "weighted": "Weighted: more years than you have, a higher degree, a different degree subject, a stated salary under your floor. These lower a ceiling and stay visible — people do get hired outside their subject.",
+      "unevaluated": "\"Not evaluated\" means no model judged it — a provider was down, or the description was too thin to be judged. It does not mean the offer is bad, and the app never invents a score to fill the gap."
+    },
+    "archive": {
+      "title": "The offer archive",
+      "body": "Offers are sliced into what is left to decide, what you applied to, what you discarded and what the retention window archived. \"Applicable\" is on by default and hides the offers a blocking check ruled out. The line under the filters always says how many of the matching offers are on screen, because a row cap that hides offers in silence is worse than a long page."
+    },
+    "mail": {
+      "title": "Mailbox and applications",
+      "body": "Connect your inbox and the app can turn confirmation emails into applications. It reads the folder read-only, never imports a message, and no model ever sees your mail: recognition is regular expressions plus a company-name comparison.",
+      "guarantee": "It marks an application only when two independent facts agree — the subject reads like a confirmation and the sender is a known hiring platform. When it cannot tell which offer a message is about, it asks you instead of guessing, and every automatic marking can be undone."
+    },
+    "automation": {
+      "title": "Automation",
+      "body": "Automatic scanning repeats the search you last ran by hand, on your schedule, and notifies you when something scores above your threshold — with nothing of yours to repeat it skips rather than inventing a search. Reminders nudge you about applications that have gone quiet. Saved searches store a whole filter set, and a company watchlist searches employers by name, which is how the good openings that never make the keyword grid turn up."
+    },
+    "models": {
+      "title": "Models and limits",
+      "body": "You can pin a different model for scoring, chat and CV tools, or point the app at a model running on your own machine. Free tiers rate-limit, so the app fails over between models and providers, remembers which ones truncate or refuse, and stops asking them for the rest of the scan. A daily request ceiling protects the quota; when everything fails, an offer is left unevaluated rather than guessed."
+    },
+    "egress": {
+      "title": "What leaves this computer",
+      "body": "Everything else — CV, offers, chats, keys — stays in a database file in your user folder.",
+      "ai": "Your prompts, and the CV text they contain, go to the AI provider you configured (redacted first, unless you turn Privacy Mode off).",
+      "mail": "Your inbox, over IMAP or Microsoft Graph, if you connect one. Read-only, and nothing from it goes to a model.",
+      "boards": "LinkedIn and Indeed, to read job postings; a posting's page, when you ask for the recruiter behind it.",
+      "updates": "GitHub, to check whether a newer version exists.",
+      "models": "Hugging Face, only when you ask the app to suggest a model your machine could run.",
+      "market": "A web search, only when you ask the coach a question about the market that needs fresh figures."
     }
   },
   "tutorial": {

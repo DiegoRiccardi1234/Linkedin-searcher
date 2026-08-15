@@ -750,17 +750,17 @@
   "info": {
     "title": "So funktioniert Job",
     "titleEm": "Finder",
-    "subtitle": "Ein kurzer Rundgang durch alle Funktionen.",
+    "subtitle": "Was die App tut, was sie für dich entscheidet und was diesen Rechner verlässt.",
     "what": {
       "title": "Was ist Job Finder?",
-      "body": "Job Finder ist ein lokaler KI-Assistent für die Jobsuche. Er liest deinen Lebenslauf, scannt LinkedIn und Indeed, bewertet Stellen und hilft beim Anschreiben."
+      "body": "Job Finder liest deinen Lebenslauf, sucht auf LinkedIn und Indeed nach den Rollen, die dich interessieren, bewertet jede Anzeige gegen dein Profil und behält im Blick, wo du dich beworben hast. Alles liegt in einer Datenbankdatei auf diesem Rechner: Nach außen geht nur, was du an den konfigurierten KI-Anbieter schickst, plus die unten aufgeführten Verbindungen."
     },
     "start": {
       "title": "Erste Schritte",
-      "step1": "Lade deinen Lebenslauf im Tab Profil hoch — Job Finder extrahiert Skills, Erfahrung und Zielrollen.",
-      "step2": "Hinterlege mindestens einen AI-Provider-Schlüssel in den Einstellungen (Groq ist kostenlos und einfach).",
-      "step3": "Öffne Job Search, wähle Filter und Stichworte und starte den Scan.",
-      "step4": "Sieh dir die Ergebnisse im Dashboard an und chatte mit dem AI Coach über konkrete Jobs."
+      "step1": "Trag einen KI-Anbieter-Schlüssel unter Einstellungen → KI ein. Einen Lebenslauf zu lesen ist bereits ein Modellaufruf, also kommt das zuerst.",
+      "step2": "Lade deinen Lebenslauf unter Profil → Über mich hoch. Die App liest daraus Fähigkeiten, Rollen und — wenn er es hergibt — deine Stadt.",
+      "step3": "Sag, wonach und wo du suchst, unter Profil → Was ich suche oder direkt im Suchformular. Ohne diese zwei Angaben bricht der Scan ab und fragt nach: Er sucht nicht die Arbeit von jemand anderem.",
+      "step4": "Starte einen Scan unter Jobsuche, arbeite das Archiv unter Angebote durch und frag den Coach alles, was unklar ist."
     },
     "providers": {
       "title": "AI-Provider",
@@ -776,25 +776,66 @@
         "name": "Anbieter",
         "cost": "Kosten",
         "notes": "Hinweise"
+      },
+      "custom": "Jeder OpenAI-kompatible Endpunkt: ein Modell auf deinem Rechner (Ollama, LM Studio, vLLM) oder ein Gateway.",
+      "cost": {
+        "free": "Kostenlos",
+        "mixed": "Gemischt",
+        "paid": "Kostenpflichtig"
       }
     },
     "scan": {
       "title": "Scan & Filter",
-      "body": "In Job Search wählst du Erfahrungslevel (Praktikum → Senior), Vertragsart und Arbeitsmodell. Der Scan zeigt Live-Fortschritt mit Prozent und Restzeit."
+      "body": "Ein Scan sucht jeden Begriff einzeln, an jedem angegebenen Ort — Stadt, Region oder Land — zwei Begriffe und zwei Städte sind also vier Suchen. Du kannst nach Erfahrungsstufe, Vertragsart, Arbeitsmodell, Mindestgehalt und Portalen filtern, einen ganzen Filtersatz als gespeicherte Suche sichern und Arbeitgeber beim Namen verfolgen, damit ihre Stellen auftauchen, auch wenn deine Stichwörter sie verpasst hätten. Aus Europa antworten zuverlässig nur LinkedIn und Indeed."
     },
     "chat": {
       "title": "Chat mit dem AI Coach",
       "multi": "Mehrere Chats: Über das Menü neben dem Coach wechselst du oder startest eine neue Unterhaltung.",
       "pin": "Jobs an den Chat anheften: Öffne die Details und klicke \"An Chat anheften\", um dem Coach die Beschreibung zu geben.",
-      "cover": "Anschreiben: Aus den Job-Details kannst du ein an den Recruiter gerichtetes Anschreiben generieren, wenn dessen Daten auf LinkedIn sichtbar sind."
+      "cover": "Anschreiben: Aus den Job-Details kannst du ein an den Recruiter gerichtetes Anschreiben generieren, wenn dessen Daten auf LinkedIn sichtbar sind.",
+      "actions": "Der Coach kann eine Suche vorbereiten, Rollen zum Suchen merken, ein Profilfeld ausfüllen oder ein Angebot öffnen — immer über einen Knopf, den du drückst, nie von selbst."
     },
     "privacy": {
       "title": "Datenschutz",
-      "body": "Alle Daten (CV, Jobs, Chats, Schlüssel) werden lokal in einer SQLite-DB im Benutzerordner gespeichert. Nur deine Prompts gehen an den gewählten AI-Provider."
+      "body": "Der Privatsphäre-Modus ist standardmäßig an: Name, E-Mail, Telefon und Adresse werden aus dem Lebenslauf entfernt, bevor er ein Modell erreicht, und in das, was das Modell schreibt, zurückgesetzt. Anonym macht dich das nicht — der Fließtext eines Lebenslaufs identifiziert dich von allein — also wähle den Anbieter entsprechend."
     },
     "version": {
       "title": "Version",
       "changelog": "Changelog"
+    },
+    "scoring": {
+      "title": "Wie ein Angebot bewertet wird",
+      "body": "Ein Modell liest die Anzeige zusammen mit deinem Lebenslauf, aber die Prüfungen, die entscheiden, ob die Stelle überhaupt erreichbar ist, sind deterministisch und laufen zuerst — da hat kein Modell eine Stimme.",
+      "blocking": "Blockierend: Standort außerhalb der EU ohne Visum, geforderte Note über deiner, Präsenzrolle in einer Stadt, die du nicht erreichst, Stelle für Schwerbehinderte reserviert, Job mit Führerschein, den du nicht hast. Sie deckeln die Note, und der Filter „Bewerbbar“ blendet sie aus.",
+      "weighted": "Gewichtet: mehr Jahre als du hast, ein höherer Abschluss, ein anderes Studienfach, ein genanntes Gehalt unter deinem Minimum. Sie senken eine Obergrenze, bleiben aber sichtbar — man wird auch fachfremd eingestellt.",
+      "unevaluated": "„Unbewertet“ heißt, dass kein Modell geurteilt hat: ein Anbieter war down oder die Beschreibung zu dünn. Es heißt nicht, dass das Angebot schlecht ist, und die App erfindet nie eine Note, um die Lücke zu füllen."
+    },
+    "archive": {
+      "title": "Das Angebotsarchiv",
+      "body": "Angebote werden aufgeteilt in das, was noch zu entscheiden ist, worauf du dich beworben hast, was du verworfen hast und was die Aufbewahrungsfrist archiviert hat. „Bewerbbar“ ist standardmäßig an und blendet aus, was eine blockierende Prüfung ausgeschlossen hat. Die Zeile unter den Filtern sagt immer, wie viele der gefundenen Angebote auf dem Schirm sind: eine Zeilengrenze, die Angebote still verbirgt, ist schlimmer als eine lange Seite."
+    },
+    "mail": {
+      "title": "Postfach und Bewerbungen",
+      "body": "Verbindest du dein Postfach, macht die App aus Bestätigungsmails Bewerbungen. Sie öffnet den Ordner nur lesend, importiert nie eine Nachricht, und kein Modell sieht deine Mail: Die Erkennung sind reguläre Ausdrücke plus ein Vergleich des Firmennamens.",
+      "guarantee": "Sie verbucht eine Bewerbung nur, wenn zwei unabhängige Fakten übereinstimmen: Der Betreff liest sich wie eine Bestätigung und der Absender ist eine bekannte Bewerbungsplattform. Wenn sie nicht erkennen kann, um welches Angebot es geht, fragt sie nach statt zu raten, und jede automatische Markierung lässt sich rückgängig machen."
+    },
+    "automation": {
+      "title": "Automatisierungen",
+      "body": "Der automatische Scan wiederholt die Suche, die du von Hand gestartet hast, im gewählten Takt, und meldet sich, wenn etwas deine Schwelle überschreitet — gibt es nichts von dir zu wiederholen, setzt er aus, statt eine Suche zu erfinden. Erinnerungen weisen auf stillstehende Bewerbungen hin. Gespeicherte Suchen halten einen ganzen Filtersatz fest, und die Firmenliste sucht Arbeitgeber beim Namen: So tauchen die guten Stellen auf, die es nie ins Stichwortraster schaffen."
+    },
+    "models": {
+      "title": "Modelle und Limits",
+      "body": "Du kannst für Bewertung, Chat und Lebenslauf-Werkzeuge je ein eigenes Modell festlegen oder die App auf ein Modell auf deinem Rechner richten. Kostenlose Kontingente drosseln, also wechselt die App zwischen Modellen und Anbietern, merkt sich, wer abschneidet oder ablehnt, und fragt die für den Rest des Scans nicht mehr. Ein Tageslimit schützt das Kontingent; scheitert alles, bleibt das Angebot unbewertet statt geraten."
+    },
+    "egress": {
+      "title": "Was diesen Rechner verlässt",
+      "body": "Alles andere — Lebenslauf, Angebote, Chats, Schlüssel — bleibt in einer Datenbankdatei in deinem Benutzerordner.",
+      "ai": "Deine Prompts und der darin enthaltene Lebenslauf gehen an den konfigurierten KI-Anbieter (vorher geschwärzt, außer du schaltest den Privatsphäre-Modus ab).",
+      "mail": "Dein Postfach, über IMAP oder Microsoft Graph, wenn du eines verbindest. Nur lesend, und nichts davon geht an ein Modell.",
+      "boards": "LinkedIn und Indeed, um Anzeigen zu lesen; die Seite einer Anzeige, wenn du nach dem Recruiter fragst.",
+      "updates": "GitHub, um zu prüfen, ob es eine neuere Version gibt.",
+      "models": "Hugging Face, nur wenn du nach einem Modell fragst, das dein Rechner ausführen könnte.",
+      "market": "Eine Websuche, nur wenn du dem Coach eine Marktfrage stellst, die frische Zahlen braucht."
     }
   },
   "tutorial": {

@@ -750,17 +750,17 @@
   "info": {
     "title": "Fonctionnement de Job",
     "titleEm": "Finder",
-    "subtitle": "Un tour rapide de chaque fonctionnalité pour tirer le meilleur de l'app.",
+    "subtitle": "Ce que fait l'app, ce qu'elle décide à votre place et ce qui sort de cet ordinateur.",
     "what": {
       "title": "Qu'est-ce que Job Finder ?",
-      "body": "Job Finder est un assistant local boosté par IA pour la recherche d'emploi. Il lit votre CV, scanne LinkedIn et Indeed, note les offres et aide à rédiger des lettres ciblées."
+      "body": "Job Finder lit votre CV, cherche sur LinkedIn et Indeed les postes qui vous intéressent, évalue chaque annonce par rapport à votre profil et garde la trace de vos candidatures. Tout vit dans un fichier de base de données sur cet ordinateur : la seule chose qui en sort, c'est ce que vous envoyez au fournisseur d'IA que vous configurez, plus les connexions listées ci-dessous."
     },
     "start": {
       "title": "Démarrage",
-      "step1": "Téléversez votre CV dans l'onglet Profil — Job Finder extrait compétences, expérience et rôles cibles.",
-      "step2": "Configurez au moins une clé de fournisseur IA dans les Paramètres (Groq est gratuit et facile).",
-      "step3": "Ouvrez Job Search, choisissez filtres et mots-clés, puis lancez le scan.",
-      "step4": "Consultez les résultats dans le Dashboard et discutez avec l'AI Coach des offres."
+      "step1": "Ajoutez une clé de fournisseur d'IA dans Réglages → IA. Lire un CV est déjà un appel au modèle, donc cela vient en premier.",
+      "step2": "Chargez votre CV dans Profil → Qui je suis. L'app en tire vos compétences, vos métiers et — si le CV le dit — votre ville.",
+      "step3": "Dites quoi chercher et où, dans Profil → Ce que je cherche ou directement dans le formulaire. Sans ces deux réponses la recherche s'arrête et vous les demande : elle ne cherchera pas le travail de quelqu'un d'autre.",
+      "step4": "Lancez une recherche depuis Recherche d'emploi, travaillez l'archive dans Offres et demandez au coach tout ce que vous ne comprenez pas."
     },
     "providers": {
       "title": "Fournisseurs IA",
@@ -776,25 +776,66 @@
         "name": "Fournisseur",
         "cost": "Coût",
         "notes": "Notes"
+      },
+      "custom": "N'importe quel endpoint compatible OpenAI : un modèle sur votre machine (Ollama, LM Studio, vLLM) ou une passerelle.",
+      "cost": {
+        "free": "Gratuit",
+        "mixed": "Mixte",
+        "paid": "Payant"
       }
     },
     "scan": {
       "title": "Scan et filtres",
-      "body": "Dans Job Search vous pouvez choisir niveau (stage → senior), type de contrat et mode de travail. Le scan affiche la progression en direct avec pourcentage et temps restant."
+      "body": "Une recherche interroge chaque terme séparément, pour chaque lieu indiqué — une ville, une région ou un pays — donc deux termes et deux villes font quatre recherches. Vous pouvez filtrer par niveau d'expérience, type de contrat, mode de travail, salaire minimum et sites, garder tout un jeu de filtres comme recherche enregistrée, et suivre des entreprises par nom pour que leurs offres remontent même quand vos mots-clés les auraient manquées. Depuis l'Europe, seuls LinkedIn et Indeed répondent de façon fiable."
     },
     "chat": {
       "title": "Chat avec l'AI Coach",
       "multi": "Plusieurs chats : utilisez le menu près du coach pour changer de conversation ou en créer une nouvelle.",
       "pin": "Épinglez des offres au chat : ouvrez les détails et cliquez \"Épingler au chat\" pour donner la description au coach.",
-      "cover": "Lettre de motivation : depuis les détails, générez une lettre ciblée pour le recruteur si ses infos sont visibles sur LinkedIn."
+      "cover": "Lettre de motivation : depuis les détails, générez une lettre ciblée pour le recruteur si ses infos sont visibles sur LinkedIn.",
+      "actions": "Le coach peut préparer une recherche, enregistrer des métiers à chercher, remplir une donnée du profil ou ouvrir une offre : toujours via un bouton que vous pressez, jamais tout seul."
     },
     "privacy": {
       "title": "Confidentialité",
-      "body": "Toutes vos données (CV, offres, chats, clés) sont stockées localement dans une base SQLite. Seuls vos prompts sont envoyés au fournisseur IA choisi."
+      "body": "Le mode confidentialité est activé par défaut : nom, e-mail, téléphone et adresse sont retirés du CV avant qu'il n'atteigne un modèle, puis remis dans ce que le modèle écrit. Il ne vous rend pas anonyme — le corps d'un CV vous identifie tout seul — choisissez donc en conséquence le fournisseur à qui vous l'envoyez."
     },
     "version": {
       "title": "Version",
       "changelog": "Changelog"
+    },
+    "scoring": {
+      "title": "Comment une offre est notée",
+      "body": "Un modèle lit l'annonce avec votre CV, mais les contrôles qui décident si le poste est hors de portée sont déterministes et passent avant : là-dessus aucun modèle n'a voix au chapitre.",
+      "blocking": "Bloquants : hors UE sans visa, mention minimale supérieure à la vôtre, poste sur site dans une ville que vous n'atteignez pas, poste réservé aux travailleurs handicapés, emploi exigeant un permis que vous avez dit ne pas avoir. Ils plafonnent la note et le filtre « Candidatables » les masque.",
+      "weighted": "Pondérés : plus d'années que les vôtres, un diplôme plus élevé, une autre matière, un salaire annoncé sous votre minimum. Ils abaissent un plafond mais restent visibles — on est recruté hors de sa matière aussi.",
+      "unevaluated": "« Non évaluée » veut dire qu'aucun modèle ne l'a jugée : un fournisseur était en panne, ou la description était trop maigre. Cela ne veut pas dire que l'offre est mauvaise, et l'app n'invente jamais une note pour combler le trou."
+    },
+    "archive": {
+      "title": "L'archive des offres",
+      "body": "Les offres sont réparties entre celles qui restent à évaluer, celles où vous avez postulé, celles que vous avez écartées et celles archivées par la fenêtre de conservation. « Candidatables » est activé par défaut et masque les offres écartées par un contrôle bloquant. La ligne sous les filtres indique toujours combien des offres trouvées sont à l'écran : un plafond de lignes qui cache des offres en silence est pire qu'une page longue."
+    },
+    "mail": {
+      "title": "Boîte mail et candidatures",
+      "body": "Si vous connectez votre boîte, l'app transforme les e-mails de confirmation en candidatures. Elle ouvre le dossier en lecture seule, n'importe jamais un message, et aucun modèle ne voit votre courrier : la reconnaissance, ce sont des expressions régulières et une comparaison de noms d'entreprise.",
+      "guarantee": "Elle enregistre une candidature seulement quand deux faits indépendants concordent : l'objet ressemble à une confirmation et l'expéditeur est une plateforme de recrutement connue. Quand elle ne peut pas savoir de quelle offre il s'agit, elle vous demande au lieu de deviner, et tout marquage automatique est annulable."
+    },
+    "automation": {
+      "title": "Automatisations",
+      "body": "La recherche automatique répète celle que vous avez lancée à la main, au rythme que vous choisissez, et vous prévient quand quelque chose dépasse votre seuil ; sans rien de vous à répéter, elle saute le tour au lieu d'inventer une recherche. Les rappels signalent les candidatures sans réponse. Les recherches enregistrées gardent tout un jeu de filtres, et la liste d'entreprises cherche par nom : c'est ainsi que sortent les bonnes offres qui n'entrent jamais dans la grille de mots-clés."
+    },
+    "models": {
+      "title": "Modèles et limites",
+      "body": "Vous pouvez fixer un modèle différent pour la notation, le chat et les outils CV, ou pointer l'app vers un modèle qui tourne sur votre machine. Les offres gratuites limitent les requêtes, donc l'app bascule d'un modèle et d'un fournisseur à l'autre, retient ceux qui tronquent ou refusent et cesse de les solliciter pour le reste de la recherche. Un plafond quotidien protège le quota ; si tout échoue, l'offre reste non évaluée plutôt que devinée."
+    },
+    "egress": {
+      "title": "Ce qui sort de cet ordinateur",
+      "body": "Tout le reste — CV, offres, conversations, clés — reste dans un fichier de base de données dans votre dossier utilisateur.",
+      "ai": "Vos prompts, et le texte de CV qu'ils contiennent, vont au fournisseur d'IA que vous avez configuré (caviardés d'abord, sauf si vous désactivez le mode confidentialité).",
+      "mail": "Votre boîte mail, via IMAP ou Microsoft Graph, si vous en connectez une. En lecture seule, et rien n'en part vers un modèle.",
+      "boards": "LinkedIn et Indeed, pour lire les annonces ; la page d'une annonce, quand vous demandez qui est le recruteur.",
+      "updates": "GitHub, pour vérifier s'il existe une version plus récente.",
+      "models": "Hugging Face, uniquement quand vous demandez un modèle que votre machine pourrait faire tourner.",
+      "market": "Une recherche web, uniquement quand vous posez au coach une question de marché qui demande des chiffres récents."
     }
   },
   "tutorial": {
