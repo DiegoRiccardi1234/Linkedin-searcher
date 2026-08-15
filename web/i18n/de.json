@@ -265,7 +265,9 @@
       "experienceLong": "Die Anzeige verlangt mehr Berufsjahre, als dein Profil ausweist: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl",
       "educationLong": "Die Anzeige verlangt einen höheren Abschluss als deinen: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl",
       "degreeField": "Anderes Fach",
-      "degreeFieldLong": "Die Anzeige verlangt einen Abschluss in einem anderen Fach als deinem: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl"
+      "degreeFieldLong": "Die Anzeige verlangt einen Abschluss in einem anderen Fach als deinem: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl",
+      "licence": "Führerschein nötig",
+      "licenceLong": "Die Anzeige verlangt den Führerschein Klasse B, und dein Profil gibt an, dass du keinen hast"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",

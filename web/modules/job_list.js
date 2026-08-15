@@ -64,6 +64,7 @@ const FLAG_BADGES = [
   // years and degree only lower a ceiling (see WEIGHTED_FLAGS), so they warn.
   { code: "sede_non_raggiungibile", cls: "flag-block", icon: "wrong_location", key: "jobs.flag.location" },
   { code: "categorie_protette", cls: "flag-block", icon: "accessible", key: "jobs.flag.protected" },
+  { code: "patente_richiesta", cls: "flag-block", icon: "no_crash", key: "jobs.flag.licence" },
   { code: "esperienza_richiesta", cls: "flag-warn", icon: "work_history", key: "jobs.flag.experience" },
   { code: "titolo_superiore", cls: "flag-warn", icon: "school", key: "jobs.flag.education" },
   { code: "campo_studio", cls: "flag-warn", icon: "menu_book", key: "jobs.flag.degreeField" },

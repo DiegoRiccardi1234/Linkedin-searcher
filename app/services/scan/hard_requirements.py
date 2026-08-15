@@ -375,17 +375,25 @@ FLAG_EDUCATION = "titolo_superiore"  # demands a degree above the candidate's
 FLAG_DEGREE_FIELD = "campo_studio"  # demands a degree in a subject the CV is not in
 FLAG_LOCATION = "sede_non_raggiungibile"  # on-site/hybrid outside the accepted cities
 FLAG_PROTECTED_CATEGORY = "categorie_protette"  # reserved to the L. 68/99 register
+FLAG_DRIVING_LICENCE = "patente_richiesta"  # needs a car the candidate said they lack
 
 #: Flags that mean "you cannot take this job", as opposed to "read carefully".
 #: ``FLAG_NOT_EVALUATED`` is deliberately NOT here: "nobody judged it" is not
 #: "you cannot apply" — the offer may well be the best one in the archive.
 #: Neither are the WEIGHTED ones below: those you can apply to and sometimes get.
+#: ``FLAG_DRIVING_LICENCE`` belongs here for the reason the note below already
+#: gave — "no driving licence" was listed among the non-arguable constraints for
+#: months while nothing checked one, on the assumption the unreachable-office
+#: rule covered it. It does not: a field role in your own city still needs the
+#: car. It cost a Tier-1 recommendation and an application, to Siemens' "Valid
+#: driving license and willingness to travel within Italy".
 BLOCKING_FLAGS = frozenset(
     {
         FLAG_GEO_BLOCKED,
         FLAG_GRADE_BLOCKED,
         FLAG_LOCATION,
         FLAG_PROTECTED_CATEGORY,
+        FLAG_DRIVING_LICENCE,
     }
 )
 
@@ -492,6 +500,7 @@ _CONSTRAINT_WEAKNESS = {
     FLAG_DEGREE_FIELD: "Chiede una laurea in una materia diversa da quella del profilo.",
     FLAG_SALARY_BELOW: "Retribuzione dichiarata sotto la RAL minima del profilo.",
     FLAG_LOCATION: "Sede e modalità fuori da quelle accettate.",
+    FLAG_DRIVING_LICENCE: "Richiede la patente B, che il profilo dichiara di non avere.",
 }
 
 

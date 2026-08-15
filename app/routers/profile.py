@@ -459,6 +459,10 @@ def build_router(container: AppContainer) -> APIRouter:
             container.db.set_preference(
                 cf.FACT_EDUCATION, level if level in cf.EDUCATION_LEVELS else ""
             )
+        if payload.driving_licence is not None:
+            container.db.set_preference(
+                cf.FACT_DRIVING_LICENCE, "1" if payload.driving_licence else "0"
+            )
         if payload.base_cities is not None:
             cities = [c.strip() for c in payload.base_cities if c and c.strip()]
             container.db.set_preference(cf.FACT_BASE_CITIES, ",".join(cities))
@@ -484,6 +488,8 @@ def build_router(container: AppContainer) -> APIRouter:
             "education_level": facts.education_level,
             "education_levels": list(cf.EDUCATION_LEVELS),
             "grade": facts.grade,
+            "degree_fields": sorted(facts.degree_fields),
+            "driving_licence": facts.driving_licence,
             "base_cities": list(rule.cities),
             "work_modes": [
                 mode

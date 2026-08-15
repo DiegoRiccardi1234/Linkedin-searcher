@@ -265,7 +265,9 @@
       "experienceLong": "The posting asks for more years than your profile states: it does not rule you out, it lowers the highest score this offer can reach",
       "educationLong": "The posting asks for a higher degree than yours: it does not rule you out, it lowers the highest score this offer can reach",
       "degreeField": "Different subject",
-      "degreeFieldLong": "The posting asks for a degree in a subject yours is not in: it does not rule you out, it lowers the highest score this offer can reach"
+      "degreeFieldLong": "The posting asks for a degree in a subject yours is not in: it does not rule you out, it lowers the highest score this offer can reach",
+      "licence": "Driving licence needed",
+      "licenceLong": "The posting requires a category B licence and your profile states you do not hold one"
     },
     "freshness": {
       "daysAgo": "Last seen {n} days ago",

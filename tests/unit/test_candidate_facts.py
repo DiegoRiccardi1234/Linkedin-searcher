@@ -516,6 +516,39 @@ def test_the_subject_is_read_from_the_education_lines_not_the_whole_cv(tmp_path)
         db.close()
 
 
+def test_a_posting_that_needs_a_car_is_blocked_only_when_you_said_you_have_none() -> None:
+    """"No driving licence" was listed among the non-arguable blockers for months
+    while nothing checked one — the barrier was assumed to be covered by the
+    unreachable-office rule, which it is not: a field role in your own city still
+    needs the car. It cost a Tier-1 recommendation and an application, to
+    Siemens' "Valid driving license and willingness to travel within Italy".
+
+    Rare enough to read precisely: 11 of 423 real descriptions mention a licence,
+    and the check fires on 7 — nothing like the L. 68/99 boilerplate trap.
+    """
+    none = cf.CandidateFacts(driving_licence=False)
+    has = cf.CandidateFacts(driving_licence=True)
+    unsaid = cf.CandidateFacts()
+
+    required = (
+        "Valid driving license and willingness to travel within Italy (company car provided)",
+        "Buona familiarita con l'uso del PC * Patente di guida B * Spiccata propensione",
+        "richiesta residenza su Torino e autonomia negli spostamenti (automunito/a)",
+        "Patente B in corso di validita. Disponibilita a trasferte su territorio nazionale",
+    )
+    for text in required:
+        assert cf.driving_licence_status(text, none)[1] is not None, text
+        assert cf.driving_licence_status(text, has)[1] is None, "holds one: nothing to block"
+        assert cf.driving_licence_status(text, unsaid)[1] is None, "never said: blocks nothing"
+
+    # Verbatim from EY, and the only one of the eleven phrased as a wish.
+    wish = "Nice to have: buona conoscenza della lingua inglese e patente B."
+    assert cf.driving_licence_status(wish, none)[1] is None
+
+    # And an ad that never mentions it says nothing about anyone.
+    assert cf.driving_licence_status("Sviluppatore backend a Torino, ibrido.", none)[1] is None
+
+
 def test_half_a_year_of_experience_is_zero_years_not_unknown(tmp_path) -> None:
     """The regression a rewritten CV shipped, silently.
 

@@ -46,6 +46,8 @@ FACT_WORK_MODES = f"{FACT_PREFIX}work_modes"
 #: "1"/"0" — whether the user is on the protected-categories register (L. 68/99).
 #: Absent means unknown, and unknown blocks nothing, like every other fact here.
 FACT_PROTECTED_CATEGORY = f"{FACT_PREFIX}protected_category"
+#: "1"/"0" — whether the user holds a category B driving licence.
+FACT_DRIVING_LICENCE = f"{FACT_PREFIX}driving_licence"
 
 _GRADE_RE = re.compile(r"(\d{2,3})\s*/\s*110")
 
@@ -138,6 +140,9 @@ class CandidateFacts:
     grade: int | None = None
     #: On the protected-categories register (L. 68/99). None = not stated.
     protected_category: bool | None = None
+    #: Whether the user holds a category B licence. None = never said, and never
+    #: said blocks nothing.
+    driving_licence: bool | None = None
     #: Degree families the CV shows, e.g. ``{"informatica"}``. A separate fact
     #: from ``education_level``: one answers "how high", this one "in what".
     degree_fields: frozenset[str] = frozenset()
@@ -289,12 +294,22 @@ def candidate_facts(db: Database) -> CandidateFacts:
         fields = frozenset(candidate_degree_fields(markdown, summary))
         sources["degree_fields"] = "cv" if fields else "mancante"
 
+    raw_licence = (db.get_preference(FACT_DRIVING_LICENCE, "") or "").strip().lower()
+    licence: bool | None
+    if raw_licence in ("1", "si", "sì", "yes", "true"):
+        licence, sources["driving_licence"] = True, "manuale"
+    elif raw_licence in ("0", "no", "false"):
+        licence, sources["driving_licence"] = False, "manuale"
+    else:
+        licence, sources["driving_licence"] = None, "mancante"
+
     rule = _work_rule_for(db, sources)
     return CandidateFacts(
         years_experience=years,
         education_level=education,
         grade=grade,
         protected_category=protected,
+        driving_licence=licence,
         degree_fields=fields,
         work_rule=rule,
         sources=sources,
@@ -540,6 +555,61 @@ def degree_field_status(descrizione: str, facts: CandidateFacts) -> tuple[str, s
     return subject, f"Chiede una laurea in {subject} (il profilo e' in {have})"
 
 
+# ── a driving licence, which is a barrier and not a skill ────────────────────
+#
+# The comment above ``BLOCKING_FLAGS`` has always listed "no driving licence"
+# among the non-arguable constraints, and no check ever read one: the barrier was
+# assumed to be covered by the unreachable-office rule, which it is not. A field
+# role in your own city still needs the car. Cost of the gap, measured: Siemens'
+# Implementation Consultant PLM — "Valid driving license and willingness to
+# travel within Italy" — was recommended as a Tier-1 offer and applied to.
+#
+# Rare enough to be worth reading precisely: 11 of 423 real descriptions mention
+# a licence at all, so this is nothing like the L. 68/99 boilerplate trap.
+_LICENCE_MENTION_RE = re.compile(
+    r"patente(?:\s+di\s+guida)?(?:\s+(?:cat\.?|categoria)\s*)?\s*b?\b"
+    r"|automunit|driving licen[cs]e|driver'?s licen[cs]e",
+    re.IGNORECASE,
+)
+#: "Nice to have: inglese e patente B" is a wish. Verbatim from EY's ad, and the
+#: only one of the eleven that phrases it that way — which is exactly why the
+#: guard is needed rather than assumed.
+_LICENCE_PREFERENCE_RE = re.compile(
+    r"nice to have|preferib|gradit|costituisce titolo|plus|desirable|preferential",
+    re.IGNORECASE,
+)
+
+
+def driving_licence_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
+    """``(label, blocking reason or None)`` for a posting that needs a car.
+
+    Blocks only when the user has explicitly said they do not hold one — an
+    unstated fact hides nothing, exactly like every other check here.
+
+    Fires on 7 of 423 real descriptions, all genuine requirements, and correctly
+    spares EY's "Nice to have: ... patente B". Known limit, left in deliberately:
+    the veto window keeps its left side wide (a heading governs the list under
+    it), so a posting that writes "MICROSOFT OFFICE - preferibile / Patenti:
+    Patente B - obbligatorio" has the neighbouring bullet's "preferibile" inside
+    the window and is missed. One posting in the archive, already blocked for
+    other reasons — and a miss leaves the status quo, while the opposite error
+    hides a job someone could take.
+    """
+    if facts.driving_licence is not False:
+        return "Non specificato", None
+    from app.services.scan.heuristics import _clause_window
+
+    text = str(descrizione or "")
+    for match in _LICENCE_MENTION_RE.finditer(text):
+        # A veto window, so the tail is clamped at the clause boundary: the next
+        # bullet is the next requirement, about something else.
+        window = _clause_window(text, match.start(), match.end(), 90)
+        if _LICENCE_PREFERENCE_RE.search(window):
+            continue
+        return "Patente richiesta", "L'annuncio richiede la patente B (il profilo non la ha)"
+    return "Non specificato", None
+
+
 def location_status(sede: str, modalita: str, facts: CandidateFacts) -> tuple[str, str | None]:
     """``(label, blocking reason or None)`` for where the job is worked from.
 
@@ -628,6 +698,7 @@ def blocking_reasons(
         return []
     from app.services.scan.hard_requirements import (
         FLAG_DEGREE_FIELD,
+        FLAG_DRIVING_LICENCE,
         FLAG_EDUCATION,
         FLAG_EXPERIENCE,
         FLAG_LOCATION,
@@ -640,6 +711,7 @@ def blocking_reasons(
         (FLAG_EDUCATION, education_status(descrizione, facts)),
         (FLAG_DEGREE_FIELD, degree_field_status(descrizione, facts)),
         (FLAG_LOCATION, location_status(sede, modalita, facts)),
+        (FLAG_DRIVING_LICENCE, driving_licence_status(descrizione, facts)),
         (FLAG_PROTECTED_CATEGORY, protected_category_status(descrizione, facts)),
     ):
         if reason:
