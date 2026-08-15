@@ -302,7 +302,9 @@
     "shownOf": "{shown} von {total} angezeigt",
     "showAll": "Alle anzeigen",
     "emptyBucket": "Nichts in diesem Tab.",
-    "minScore4": "Note 4+"
+    "minScore4": "Note 4+",
+    "fromMail": "Aus der Mail",
+    "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen"
   },
   "kanbanCols": {
     "open": "Offen",
@@ -1071,7 +1073,10 @@
       "apply": "Ausgewählte als beworben markieren",
       "dismiss": "Alle ignorieren",
       "noCandidates": "Kein passendes Angebot mehr im Archiv.",
-      "createEntry": "Als eigene Bewerbung erfassen"
+      "createEntry": "Als eigene Bewerbung erfassen",
+      "messageOf": "Nachricht {n} von {total}",
+      "dismissOne": "Diese Nachricht ignorieren",
+      "pick": "Um welches Angebot geht es?"
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {
@@ -1116,7 +1121,11 @@
       "degree_fields": "Studienfach",
       "driving_licence": "Führerschein",
       "protected_category": "Schwerbehindertenstatus",
-      "work_rule": "Wo du arbeiten kannst"
+      "work_rule": "Wo du arbeiten kannst",
+      "remote_mode": "Arbeitsmodell",
+      "prefer_role_qa": "Interesse an QA-Rollen",
+      "prefer_role_cyber": "Interesse an Cybersecurity-Rollen",
+      "prefer_role_data": "Interesse an Daten-Rollen"
     }
   },
   "chatAction": {

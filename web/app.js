@@ -501,6 +501,11 @@ async function sendChatMessage(message) {
     if (result.action) {
       renderChatAction(document.getElementById("chatBox"), result.action);
     }
+    // Preferences the message stated in passing. They used to be written on
+    // the spot; now they are offered, one card each.
+    for (const proposal of result.proposals || []) {
+      renderChatAction(document.getElementById("chatBox"), proposal);
+    }
   } catch (error) {
     if (pendingEl && pendingEl.parentNode) pendingEl.parentNode.removeChild(pendingEl);
     const isNoProvider = error && (error.status === 412 || /412|no_provider_configured|noProvider/i.test(error.message || ""));
@@ -1062,6 +1067,7 @@ document.getElementById("minScore").addEventListener("change", loadJobs);
 document.getElementById("maxAgeDays").addEventListener("change", loadJobs);
 document.getElementById("remoteOnly").addEventListener("change", loadJobs);
 document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
+document.getElementById("fromMail")?.addEventListener("change", loadJobs);
 initJobSorting();
 initJobBuckets();
 // Wired here rather than at the end of bootstrap(): a tab strip needs no

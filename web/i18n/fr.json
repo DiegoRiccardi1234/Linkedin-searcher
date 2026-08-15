@@ -302,7 +302,9 @@
     "shownOf": "affichées {shown} sur {total}",
     "showAll": "Tout afficher",
     "emptyBucket": "Rien dans cet onglet.",
-    "minScore4": "Note 4+"
+    "minScore4": "Note 4+",
+    "fromMail": "Depuis le courrier",
+    "fromMailHint": "Seulement les candidatures reconstruites depuis votre boîte mail"
   },
   "kanbanCols": {
     "open": "Ouvert",
@@ -1071,7 +1073,10 @@
       "apply": "Marquer la sélection comme envoyée",
       "dismiss": "Tout ignorer",
       "noCandidates": "Aucune offre correspondante ne subsiste dans l'archive.",
-      "createEntry": "L'enregistrer comme candidature à part"
+      "createEntry": "L'enregistrer comme candidature à part",
+      "messageOf": "message {n} sur {total}",
+      "dismissOne": "Ignorer ce message",
+      "pick": "De quelle offre s'agit-il ?"
     },
     "whereIdFrom": "Où trouver un id d'application ?",
     "idSource": {
@@ -1116,7 +1121,11 @@
       "degree_fields": "Matière du diplôme",
       "driving_licence": "Permis de conduire",
       "protected_category": "Statut de travailleur handicapé",
-      "work_rule": "Où vous pouvez travailler"
+      "work_rule": "Où vous pouvez travailler",
+      "remote_mode": "Mode de travail",
+      "prefer_role_qa": "Intérêt pour les postes QA",
+      "prefer_role_cyber": "Intérêt pour les postes cybersécurité",
+      "prefer_role_data": "Intérêt pour les postes data"
     }
   },
   "chatAction": {

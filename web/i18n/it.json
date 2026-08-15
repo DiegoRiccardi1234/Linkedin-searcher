@@ -302,7 +302,9 @@
     "shownOf": "mostrate {shown} di {total}",
     "showAll": "Mostra tutte",
     "emptyBucket": "Niente in questa scheda.",
-    "minScore4": "Voto 4+"
+    "minScore4": "Voto 4+",
+    "fromMail": "Dalla posta",
+    "fromMailHint": "Solo le candidature ricostruite dalla tua casella"
   },
   "kanbanCols": {
     "open": "Aperto",
@@ -1071,7 +1073,10 @@
       "apply": "Segna i selezionati come candidatura",
       "dismiss": "Ignora tutti",
       "noCandidates": "Nessuna offerta corrispondente rimasta in archivio.",
-      "createEntry": "Registrala come candidatura a sé"
+      "createEntry": "Registrala come candidatura a sé",
+      "messageOf": "messaggio {n} di {total}",
+      "dismissOne": "Ignora questo messaggio",
+      "pick": "Di quale offerta parla?"
     },
     "whereIdFrom": "Dove si prende un id applicazione?",
     "idSource": {
@@ -1116,7 +1121,11 @@
       "degree_fields": "Materia della laurea",
       "driving_licence": "Patente B",
       "protected_category": "Iscrizione alle categorie protette",
-      "work_rule": "Dove puoi lavorare"
+      "work_rule": "Dove puoi lavorare",
+      "remote_mode": "Modalità di lavoro",
+      "prefer_role_qa": "Interesse per i ruoli QA",
+      "prefer_role_cyber": "Interesse per i ruoli cybersecurity",
+      "prefer_role_data": "Interesse per i ruoli dati"
     }
   },
   "chatAction": {

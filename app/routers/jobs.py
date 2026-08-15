@@ -55,6 +55,7 @@ def build_router(container: AppContainer) -> APIRouter:
         min_score: int | None = Query(default=None, ge=0, le=10),
         max_age_days: int | None = Query(default=None, ge=1, le=365),
         applicable_only: bool = Query(default=False),
+        from_mail: bool = Query(default=False),
         limit: int = Query(default=200, ge=1, le=2000),
     ) -> dict[str, Any]:
         if bucket is not None and bucket not in JOB_BUCKETS:
@@ -74,6 +75,7 @@ def build_router(container: AppContainer) -> APIRouter:
             "min_score": min_score,
             "max_age_days": max_age_days,
             "blocking_flags": blocking,
+            "from_mail": from_mail,
         }
         jobs = container.db.list_jobs(limit=limit, **filters)
         total = container.db.count_jobs(**filters)
@@ -96,6 +98,7 @@ def build_router(container: AppContainer) -> APIRouter:
         min_score: int | None = Query(default=None, ge=0, le=10),
         max_age_days: int | None = Query(default=None, ge=1, le=365),
         applicable_only: bool = Query(default=False),
+        from_mail: bool = Query(default=False),
     ) -> dict[str, Any]:
         """How big each bucket is under the current filters (for the tabs).
 
@@ -111,6 +114,7 @@ def build_router(container: AppContainer) -> APIRouter:
                 min_score=min_score,
                 max_age_days=max_age_days,
                 blocking_flags=BLOCKING_FLAGS if applicable_only else None,
+                from_mail=from_mail,
             )
         }
 

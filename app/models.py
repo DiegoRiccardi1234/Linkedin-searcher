@@ -196,6 +196,9 @@ class ChatResponse(BaseModel):
     answer: str
     updated_preferences: dict[str, Any] = Field(default_factory=dict)
     action: dict[str, Any] | None = None
+    #: Preferences the message seemed to state, offered back as actions to
+    #: accept. They used to be written to the database on the spot.
+    proposals: list[dict[str, Any]] = Field(default_factory=list)
     suggested_roles: list[dict[str, Any]] = Field(default_factory=list)
     # ``chat_state`` (str from get_chat_state) and ``degraded`` (True when the
     # answer is the rule-based fallback, not a real LLM reply) are returned by

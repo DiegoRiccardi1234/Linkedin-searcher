@@ -181,6 +181,10 @@ _SETTABLE_FIELDS = {
     "protected_category",
     "min_ral",
     "goal",
+    "remote_mode",
+    "prefer_role_qa",
+    "prefer_role_cyber",
+    "prefer_role_data",
 }
 
 
@@ -214,6 +218,18 @@ def _unparseable_message(db: Database) -> str:
     return _UNPARSEABLE_MESSAGE.get(lang, _UNPARSEABLE_MESSAGE["en"])
 
 
+#: How a preference detected in passing is worded when offered back.
+_PREF_LABELS = {
+    "remote_mode": {"full_remote": "full remote", "hybrid": "ibrido", "onsite": "in sede"},
+}
+
+
+def _preference_proposal(key: str, value: str) -> dict[str, Any]:
+    """One detected preference, as an action the user can accept or ignore."""
+    label = _PREF_LABELS.get(key, {}).get(value, value)
+    return {"type": "SET_PROFILE_FIELD", "field": key, "value": value, "label": label}
+
+
 def handle_chat_message(
     db: Database,
     provider_manager: ProviderManager,
@@ -227,7 +243,7 @@ def handle_chat_message(
 
     Flow:
     1. Persist the user message.
-    2. Extract preference updates from the message and store them.
+    2. Notice preferences stated in passing and propose them (never write).
     3. Compute the chat state (``no_cv`` / ``onboarding`` / ``ready_to_search`` / ``advising``)
        and, separately, which page the user is looking at.
     4. Build profile, preferences, and jobs context blocks.
@@ -248,9 +264,12 @@ def handle_chat_message(
     # From here on the user message is already persisted: any unexpected failure
     # must still leave a coherent assistant reply, never an orphaned turn.
     try:
+        # Detected, not applied. This used to write straight to the database:
+        # say "full remote, minimo 25k" in passing and two preferences changed
+        # with no confirmation and no notice — the one silent write left after
+        # every chat action was turned into a card with a button.
         updates = extract_pref_updates(message)
-        for key, value in updates.items():
-            db.set_preference(key, value)
+        proposals = [_preference_proposal(key, value) for key, value in updates.items()]
 
         # Keep long conversations coherent without blowing up the prompt.
         try:
@@ -347,7 +366,11 @@ def handle_chat_message(
         return {
             "session_id": session_id,
             "answer": answer,
-            "updated_preferences": updates,
+            "updated_preferences": {},
+            # What the message seemed to say about the user's preferences, as
+            # proposals they can accept. ``updated_preferences`` stays in the
+            # response and stays empty: nothing was updated.
+            "proposals": proposals,
             "chat_state": state,
             "action": action_payload,
             "suggested_roles": suggested_roles,

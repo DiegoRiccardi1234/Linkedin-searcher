@@ -280,6 +280,8 @@ export async function loadJobs(opts) {
   const onlyFavorites = document.getElementById("onlyFavorites").checked;
   const remoteOnly = document.getElementById("remoteOnly").checked;
   const applicableOnly = document.getElementById("applicableOnly")?.checked || false;
+  // An origin, not a state: it composes with whichever tab is open.
+  const fromMail = document.getElementById("fromMail")?.checked || false;
   const searchText = document.getElementById("searchText").value.trim();
   // The kanban draws one column per status, so a single slice would empty most
   // of the board: there the buckets are the columns.
@@ -294,6 +296,7 @@ export async function loadJobs(opts) {
   });
   if (remoteOnly) query.set("remote_only", "true");
   if (applicableOnly) query.set("applicable_only", "true");
+  if (fromMail) query.set("from_mail", "true");
   if (searchText) query.set("search_text", searchText);
   if (bucket) query.set("bucket", bucket);
   if (minScoreRaw) query.set("min_score", minScoreRaw);
@@ -337,6 +340,7 @@ export async function loadJobs(opts) {
       onlyFavorites ||
       remoteOnly ||
       applicableOnly ||
+      fromMail ||
       searchText ||
       minScoreRaw ||
       maxAgeRaw;

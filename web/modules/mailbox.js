@@ -113,49 +113,65 @@ export async function loadMailReview() {
   // Resolving or dismissing a proposal reloads this list, so the badge follows
   // the queue without a second request.
   setMailBadge(items.length);
-  // One row per message, and the choice of WHICH offer is a radio inside it.
-  // Before, a proposal that could be about any of 275 offers rendered as a
-  // single checkbox naming whichever one happened to sort first — a question
-  // about Hays presented as a question about somebody else.
+  // One CARD per message. It used to be a two-column grid whose children were
+  // the radio options themselves, so with six candidates the first option
+  // landed to the right of the company name and the rest snaked across both
+  // columns — unreadable exactly when there was most to read. And four
+  // confirmations from the same agency on the same day rendered as four
+  // identical blocks with nothing saying they were different messages.
+  const seq = new Map();
+  for (const item of items) {
+    const key = `${item.company}|${(item.received_at || "").slice(0, 10)}`;
+    seq.set(key, (seq.get(key) || 0) + 1);
+  }
+  const seen = new Map();
   list.innerHTML = items
     .map((item) => {
-      const when = (item.received_at || "").slice(0, 10);
+      const day = (item.received_at || "").slice(0, 10);
+      const key = `${item.company}|${day}`;
+      const total = seq.get(key) || 1;
+      const n = (seen.get(key) || 0) + 1;
+      seen.set(key, n);
+      const which =
+        total > 1
+          ? `<span class="mail-review-seq">${escapeHtml(
+              t("mail.review.messageOf").replace("{n}", String(n)).replace("{total}", String(total)),
+            )}</span>`
+          : "";
       const from = item.sender ? ` · ${escapeHtml(item.sender)}` : "";
-      const options = (item.candidates || [])
-        .map(
-          (c) => `
+      const option = (value, label, checked = false) => `
         <label class="mail-review-option">
           <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
-                 data-review="${item.review_id}" value="${c.job_id}" />
-          <span>${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}</span>
-        </label>`,
+                 data-review="${item.review_id}" value="${value}"${checked ? " checked" : ""} />
+          <span>${label}</span>
+        </label>`;
+      const candidates = (item.candidates || [])
+        .map((c) =>
+          option(
+            String(c.job_id),
+            `${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}`,
+          ),
         )
         .join("");
-      // An import is an application to an employer the archive does not have.
-      // Any open offers from that employer come along as candidates, because
-      // attaching to the real posting beats a card with no title — but "record
-      // it on its own" stays available and is the default when nothing matches.
-      //
-      // Offered on ATTACH rows too. That the archive holds offers from an
-      // employer does not make one of them the offer applied for: on a real
-      // queue, 38 of 53 attach proposals turned out to be roles the archive had
-      // never collected. Without this the honest answer was missing — the row
-      // could only be attached to the wrong offer or dismissed and lost.
-      const createOption = `
-        <label class="mail-review-option">
-          <input type="radio" name="mrev-${item.review_id}" class="mail-review-pick"
-                 data-review="${item.review_id}" value="create"${options ? "" : " checked"} />
-          <span data-i18n="mail.review.createEntry">Record it as a new application</span>
-        </label>`;
-      const empty =
-        options || createOption
-          ? ""
-          : `<p class="micro" data-i18n="mail.review.noCandidates">No matching offer left in the archive.</p>`;
+      // "Record it on its own" is the honest default when nothing matches: on a
+      // real queue 38 of 53 attach proposals turned out to be roles the archive
+      // had never collected.
+      const create = option(
+        "create",
+        `<span data-i18n="mail.review.createEntry">Record it as a new application</span>`,
+        !candidates,
+      );
+      // Per message, not just "ignore them all": one unanswerable proposal used
+      // to force a choice between attaching it to the wrong offer and clearing
+      // the whole queue.
+      const dismiss = option(
+        "dismiss",
+        `<span data-i18n="mail.review.dismissOne">Ignore this message</span>`,
+      );
       // "Ask" mode: the title lives in the body, and the body is only read for
-      // the one message you press this on. Offered on attach rows as well —
-      // there the title is not a nicety but the whole decision: "Teoresi" with
-      // six offers in the archive is unanswerable, "Teoresi · AI Engineer"
-      // answers itself.
+      // the one message you press this on. On an attach row the title is not a
+      // nicety but the whole decision — "Teoresi" with six offers in the
+      // archive is unanswerable, "Teoresi · AI Engineer" answers itself.
       const roleBit = item.role
         ? `<span class="mail-review-role">${escapeHtml(item.role)}</span>`
         : _bodyMode === "ask"
@@ -163,14 +179,16 @@ export async function loadMailReview() {
                      data-review="${item.review_id}" data-i18n="mail.body.fetchOne">Get the job title</button>`
           : "";
       return `
-      <div class="mail-review-row" data-review-row="${item.review_id}">
-        <div class="mail-review-head">
+      <article class="mail-review-card" data-review-row="${item.review_id}">
+        <header class="mail-review-head">
           <strong>${escapeHtml(item.company || "?")}</strong>
+          <span class="micro">${escapeHtml(day)}${from}</span>
+          ${which}
           ${roleBit}
-          <span class="micro">${escapeHtml(when)}${from}</span>
-        </div>
-        ${options}${createOption}${empty}
-      </div>`;
+        </header>
+        <p class="mail-review-question micro" data-i18n="mail.review.pick">Which offer is this about?</p>
+        <div class="mail-review-options">${candidates}${create}${dismiss}</div>
+      </article>`;
     })
     .join("");
   applyTranslations(box);
@@ -364,15 +382,18 @@ export function wireMailbox() {
   $("mailReviewApplyBtn")?.addEventListener("click", async () => {
     const picked = [...document.querySelectorAll(".mail-review-pick:checked")];
     const attach = picked
-      .filter((el) => el.value !== "create")
+      .filter((el) => el.value !== "create" && el.value !== "dismiss")
       .map((el) => ({ review_id: Number(el.dataset.review), job_id: Number(el.value) }));
     const create = picked
       .filter((el) => el.value === "create")
       .map((el) => Number(el.dataset.review));
-    if (!attach.length && !create.length) return;
+    const dismiss = picked
+      .filter((el) => el.value === "dismiss")
+      .map((el) => Number(el.dataset.review));
+    if (!attach.length && !create.length && !dismiss.length) return;
     await api("/api/mail/review/resolve", {
       method: "POST",
-      body: JSON.stringify({ attach, create, dismiss: [] }),
+      body: JSON.stringify({ attach, create, dismiss }),
     });
     showToast(t("toast.mail.applied"), "info");
     await loadMailReview();

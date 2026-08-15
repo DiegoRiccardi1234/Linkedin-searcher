@@ -73,12 +73,18 @@ async function _apply(action) {
     }
     case "SET_PROFILE_FIELD": {
       const body = {};
-      if (action.field === "min_ral" || action.field === "goal") {
-        // These two live in the onboarding preferences, not on the profile.
-        await _deps.savePreference?.(
-          action.field === "min_ral" ? "onboarding_ral_min" : "onboarding_goal",
-          String(action.value),
-        );
+      // Some of these are preferences, not columns on the profile: the two
+      // onboarding answers, and the three the chat used to write by itself.
+      const PREFERENCE_KEYS = {
+        min_ral: "onboarding_ral_min",
+        goal: "onboarding_goal",
+        remote_mode: "remote_mode",
+        prefer_role_qa: "prefer_role_qa",
+        prefer_role_cyber: "prefer_role_cyber",
+        prefer_role_data: "prefer_role_data",
+      };
+      if (PREFERENCE_KEYS[action.field]) {
+        await _deps.savePreference?.(PREFERENCE_KEYS[action.field], String(action.value));
       } else {
         body[action.field] = action.value;
         await _deps.patchProfile?.(body);

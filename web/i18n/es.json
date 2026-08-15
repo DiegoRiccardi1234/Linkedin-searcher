@@ -302,7 +302,9 @@
     "shownOf": "mostradas {shown} de {total}",
     "showAll": "Mostrar todas",
     "emptyBucket": "Nada en esta pestaña.",
-    "minScore4": "Nota 4+"
+    "minScore4": "Nota 4+",
+    "fromMail": "Del correo",
+    "fromMailHint": "Solo las candidaturas reconstruidas desde tu buzón"
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -1071,7 +1073,10 @@
       "apply": "Marcar seleccionados como enviados",
       "dismiss": "Ignorar todos",
       "noCandidates": "No queda ninguna oferta correspondiente en el archivo.",
-      "createEntry": "Registrarla como candidatura propia"
+      "createEntry": "Registrarla como candidatura propia",
+      "messageOf": "mensaje {n} de {total}",
+      "dismissOne": "Ignorar este mensaje",
+      "pick": "¿De qué oferta habla?"
     },
     "whereIdFrom": "¿De dónde saco un id de aplicación?",
     "idSource": {
@@ -1116,7 +1121,11 @@
       "degree_fields": "Materia de la carrera",
       "driving_licence": "Carné de conducir",
       "protected_category": "Registro de discapacidad",
-      "work_rule": "Dónde puedes trabajar"
+      "work_rule": "Dónde puedes trabajar",
+      "remote_mode": "Modalidad de trabajo",
+      "prefer_role_qa": "Interés por puestos de QA",
+      "prefer_role_cyber": "Interés por puestos de ciberseguridad",
+      "prefer_role_data": "Interés por puestos de datos"
     }
   },
   "chatAction": {

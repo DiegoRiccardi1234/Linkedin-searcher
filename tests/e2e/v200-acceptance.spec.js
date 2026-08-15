@@ -178,3 +178,35 @@ test("the coach knows which page the question came from", async ({ page }) => {
   );
   expect(settings[0]).not.toBe(mail[0]);
 });
+
+test("the mail filter is an origin, and composes with the tabs", async ({ page }) => {
+  await open(page);
+  // Not a sixth tab: those partition the archive by state and their counts add
+  // up to the total. Where a row came from is a different question.
+  const [all, fromMail] = await page.evaluate(async () => {
+    const counts = async (query) =>
+      (await (await fetch(`/api/jobs/counts${query}`)).json()).counts;
+    return [await counts(""), await counts("?from_mail=true")];
+  });
+  for (const bucket of Object.keys(all)) {
+    expect(fromMail[bucket]).toBeLessThanOrEqual(all[bucket]);
+  }
+  await page.locator(".topnav .nav-link[data-view='jobs']").click();
+  await expect(page.locator("#fromMail")).toBeVisible();
+});
+
+test("the review queue is one card per message, each answerable on its own", async ({ page }) => {
+  await open(page);
+  await page.locator(".topnav .nav-link[data-view='mail']").click();
+  const cards = page.locator(".mail-review-card");
+  const count = await cards.count();
+  test.skip(count === 0, "no proposals queued in this database");
+
+  // The layout this replaces was a two-column grid whose children were the
+  // options, so the first one sat next to the company name.
+  const first = cards.first();
+  await expect(first.locator(".mail-review-options")).toHaveCount(1);
+  // Ignoring one unanswerable proposal used to mean clearing the whole queue.
+  await expect(first.locator('input[value="dismiss"]')).toHaveCount(1);
+  await expect(first.locator('input[value="create"]')).toHaveCount(1);
+});

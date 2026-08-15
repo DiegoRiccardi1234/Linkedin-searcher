@@ -1213,6 +1213,7 @@ class Database:
         min_score: int | None = None,
         max_age_days: int | None = None,
         blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
     ) -> tuple[str, list[Any]]:
         """The WHERE clause shared by the list, the total and the bucket counts.
 
@@ -1239,6 +1240,12 @@ class Database:
                 f" WHERE json_each.value IN ({placeholders}))"
             )
             params.extend(sorted(blocking_flags))
+        if from_mail:
+            # ``fonte`` marks where a row came from; 'mail' is an application
+            # rebuilt from a confirmation email rather than an offer that was
+            # scraped. An origin, not a funnel state — so it composes with the
+            # buckets instead of being one.
+            query += " AND fonte = 'mail'"
         if only_favorites:
             query += " AND is_favorite = 1"
         if only_new:
@@ -1277,6 +1284,7 @@ class Database:
         limit: int = 200,
         bucket: str | None = None,
         blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
     ) -> list[dict[str, Any]]:
         where, params = self._jobs_where(
             status=status,
@@ -1288,6 +1296,7 @@ class Database:
             min_score=min_score,
             max_age_days=max_age_days,
             blocking_flags=blocking_flags,
+            from_mail=from_mail,
         )
         query = f"SELECT * FROM jobs {where}"
 
@@ -1340,6 +1349,7 @@ class Database:
         max_age_days: int | None = None,
         bucket: str | None = None,
         blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
     ) -> int:
         """How many offers match, ignoring the row cap.
 
@@ -1356,6 +1366,7 @@ class Database:
             min_score=min_score,
             max_age_days=max_age_days,
             blocking_flags=blocking_flags,
+            from_mail=from_mail,
         )
         if blocking_flags and not self._has_json1:
             # No SQL flag filter available: count what the sift would keep.
@@ -1370,6 +1381,7 @@ class Database:
                     min_score=min_score,
                     max_age_days=max_age_days,
                     blocking_flags=blocking_flags,
+                    from_mail=from_mail,
                     limit=2000,
                 )
             )
@@ -1385,6 +1397,7 @@ class Database:
         min_score: int | None = None,
         max_age_days: int | None = None,
         blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
     ) -> dict[str, int]:
         """Every bucket's size under the *other* filters, in one query.
 
@@ -1403,6 +1416,7 @@ class Database:
                     min_score=min_score,
                     max_age_days=max_age_days,
                     blocking_flags=blocking_flags,
+                    from_mail=from_mail,
                 )
                 for name in JOB_BUCKETS
             }
@@ -1414,6 +1428,7 @@ class Database:
             min_score=min_score,
             max_age_days=max_age_days,
             blocking_flags=blocking_flags,
+            from_mail=from_mail,
         )
         selects = ", ".join(
             (f"SUM(CASE WHEN {clause} THEN 1 ELSE 0 END)" if clause else "COUNT(*)")

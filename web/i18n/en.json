@@ -302,7 +302,9 @@
     "shownOf": "showing {shown} of {total}",
     "showAll": "Show all",
     "emptyBucket": "Nothing in this tab.",
-    "minScore4": "Score 4+"
+    "minScore4": "Score 4+",
+    "fromMail": "From mail",
+    "fromMailHint": "Only the applications rebuilt from your inbox"
   },
   "kanbanCols": {
     "open": "Open",
@@ -1071,7 +1073,10 @@
       "apply": "Mark selected as applied",
       "dismiss": "Ignore all",
       "noCandidates": "No matching offer left in the archive.",
-      "createEntry": "Record it as a new application"
+      "createEntry": "Record it as a new application",
+      "messageOf": "message {n} of {total}",
+      "dismissOne": "Ignore this message",
+      "pick": "Which offer is this about?"
     },
     "whereIdFrom": "Where do I get an app id?",
     "idSource": {
@@ -1116,7 +1121,11 @@
       "degree_fields": "Degree subject",
       "driving_licence": "Driving licence",
       "protected_category": "Protected categories register",
-      "work_rule": "Where you can work"
+      "work_rule": "Where you can work",
+      "remote_mode": "Work mode",
+      "prefer_role_qa": "Interest in QA roles",
+      "prefer_role_cyber": "Interest in cybersecurity roles",
+      "prefer_role_data": "Interest in data roles"
     }
   },
   "chatAction": {

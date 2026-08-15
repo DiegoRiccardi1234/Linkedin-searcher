@@ -3237,11 +3237,43 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
   border-radius: 0.5rem; align-self: flex-start;
 }
 .mail-review { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-2); }
-.mail-review-row {
-  display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 0.6rem;
-  align-items: start; padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+/* One card per message. The two-column grid this replaces made the options
+   themselves grid children, so six candidates snaked across both columns and
+   the first one sat next to the company name. */
+.mail-review-card {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
 }
-.mail-review-row .micro { grid-column: 2; opacity: 0.75; }
+.mail-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+}
+.mail-review-head .micro { opacity: 0.75; }
+.mail-review-seq {
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+.mail-review-question { margin: 0 0 var(--space-2); opacity: 0.75; }
+.mail-review-options { display: flex; flex-direction: column; gap: 2px; }
+.mail-review-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+}
+.mail-review-option:hover { background: var(--accent-soft); }
+.mail-review-role { font-weight: 600; }
 .mail-review-job { font-weight: 600; }
 
 /* The coach's proposals. Rendered as a card with a button, because the model
