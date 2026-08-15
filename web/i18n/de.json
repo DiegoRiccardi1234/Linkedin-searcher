@@ -261,7 +261,9 @@
       "protected": "Geschützten Kategorien vorbehalten",
       "heuristicLong": "Kein Modell hat diese Anzeige gelesen: Die Bewertung folgt aus einer harten Vorgabe (Standort, Mindestnote)",
       "mailImport": "Aus dem Postfach",
-      "mailImportLong": "Aus einer Bestätigungsmail rekonstruierte Bewerbung: Die Anzeige lief nie über Job Finder, es gibt also weder Titel noch Beschreibung zu bewerten"
+      "mailImportLong": "Aus einer Bestätigungsmail rekonstruierte Bewerbung: Die Anzeige lief nie über Job Finder, es gibt also weder Titel noch Beschreibung zu bewerten",
+      "experienceLong": "Die Anzeige verlangt mehr Berufsjahre, als dein Profil ausweist: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl",
+      "educationLong": "Die Anzeige verlangt einen höheren Abschluss als deinen: Sie schließt dich nicht aus, sie senkt die erreichbare Höchstpunktzahl"
     },
     "freshness": {
       "daysAgo": "Zuletzt vor {n} Tagen gesehen",

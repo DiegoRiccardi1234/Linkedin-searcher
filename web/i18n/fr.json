@@ -261,7 +261,9 @@
       "protected": "Réservée aux catégories protégées",
       "heuristicLong": "Aucun modèle n'a lu cette annonce : la note est calculée à partir d'une contrainte ferme (lieu, note minimale)",
       "mailImport": "Depuis la boîte mail",
-      "mailImportLong": "Candidature reconstituée à partir d'un courriel de confirmation : l'annonce n'est jamais passée par Job Finder, il n'y a donc ni titre ni description à évaluer"
+      "mailImportLong": "Candidature reconstituée à partir d'un courriel de confirmation : l'annonce n'est jamais passée par Job Finder, il n'y a donc ni titre ni description à évaluer",
+      "experienceLong": "L'annonce demande plus d'années d'expérience que n'en indique votre profil : elle ne vous exclut pas, elle abaisse la note maximale atteignable",
+      "educationLong": "L'annonce demande un diplôme plus élevé que le vôtre : elle ne vous exclut pas, elle abaisse la note maximale atteignable"
     },
     "freshness": {
       "daysAgo": "Vue il y a {n} jours",
