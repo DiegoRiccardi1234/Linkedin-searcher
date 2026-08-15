@@ -121,13 +121,10 @@ from app.services.scan.scraping import (
 )
 from app.services.scan.synonyms import expand_terms
 from app.services.scan.vocab import (
-    _DOMAIN_VOCAB,
-    _TITLE_DOMAIN,
     BLACKLIST,
     STOPWORDS,
     TECH_KEYWORDS,
     _tokenize,
-    default_title_vocabulary,
     description_on_topic,
     pre_filtro,
     title_off_topic,
@@ -161,7 +158,6 @@ __all__ = [
     "_MATCH_AXES_KEYS",
     "_PER_OFFER_SCHEMA",
     "_SCORING_RULES",
-    "_TITLE_DOMAIN",
     "_analysis_prompt",
     "_apply_geo_eligibility",
     "_apply_grade_requirement",
@@ -974,7 +970,6 @@ def run_scan(
     skill_tokens = (
         _tokenize(" ".join(str(s) for s in _skills)) if isinstance(_skills, list) else set()
     )
-    relevance_vocab = _DOMAIN_VOCAB | skill_tokens
 
     # What the user declared about themselves (years, degree, grade, where they
     # can work), manual corrections first. Resolved once per scan and passed to
@@ -1051,10 +1046,16 @@ def run_scan(
             db.get_preference("onboarding_sector", ""),
         ],
     )
-    # With no profile at all (a first scan on a fresh install) the broad default
-    # gates the title — but it never rescues one, or every ad saying "software"
-    # would come back through.
-    gate_vocab = user_vocab or default_title_vocabulary()
+    # The title gate has nothing to fall back on any more, and does not need
+    # one: the scan refuses above unless it has terms of the user's, so
+    # ``user_vocab`` is only empty when every term is a bare role word
+    # ("Specialist", "Consultant"), and gating on nothing is right there —
+    # those words say nothing about a trade.
+    gate_vocab = user_vocab
+
+    # The CV's own words widen the gate: a posting that names a technology the
+    # candidate actually has is on topic even if the title does not say so.
+    gate_vocab = gate_vocab | skill_tokens
 
     is_remote_effective = payload.is_remote or ("remote" in work_types)
 
@@ -1426,22 +1427,15 @@ def run_scan(
                 log.info("RELEVANCE_SKIP (title): '%s' @ %s", titolo, azienda)
                 continue
 
-            desc_sufficient = len(descrizione) >= MIN_DESCRIPTION_CHARS
-            gate_text = f"{titolo} {descrizione}" if desc_sufficient else titolo
-            if (
-                not watched
-                and descrizione
-                and relevance_vocab
-                and not (_tokenize(gate_text) & relevance_vocab)
-            ):
-                totale_scartati += 1
-                log.info(
-                    "RELEVANCE_SKIP%s: '%s' @ %s (zero domain/skills overlap)",
-                    "" if desc_sufficient else " (title-only)",
-                    titolo,
-                    azienda,
-                )
-                continue
+            # A second, wider gate used to sit here: title+description against a
+            # fixed AI/software word list unioned with the CV's skills, dropping
+            # anything with zero overlap. It is gone, and not because of the
+            # word list alone. The title gate above (1.7.9) is the one that was
+            # measured — 26 of 47 real postings dropped, every false positive
+            # among them — and it reads the user's own vocabulary, with the
+            # description as a RESCUE rather than a second filter. Keeping a
+            # blunter copy of the same idea behind it could only take away what
+            # the measured one had decided to keep.
 
             skip, _reason = pre_filtro(titolo=titolo, descrizione=descrizione)
             if skip:

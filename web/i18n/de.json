@@ -119,7 +119,8 @@
       "fromCv": "aus dem CV",
       "fromYou": "von dir eingegeben",
       "missing": "fehlt",
-      "saved": "Daten aktualisiert"
+      "saved": "Daten aktualisiert",
+      "citiesPlaceholder": "Stadt, Stadt"
     },
     "tabs": {
       "about": "Über mich",
@@ -569,8 +570,9 @@
     "postScanRenderFailed": "Scan fertig (Zusammenfassung nicht darstellbar).",
     "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern.",
     "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen.",
-    "vagueTermWarning": "„{terms}“: Ein bloßes Rollenwort trifft auf alles zu (Payroll, Vertrieb, Partnerschaften). Ergänze ein Fachwort, z. B. „AI QA“.",
-    "unscoredWarning": "{count} Angebote bisher nicht bewertet."
+    "vagueTermWarning": "„{terms}“: eine bloße Rollenbezeichnung trifft alles (Lohnbuchhaltung, Vertrieb, Partnerschaften). Ergänze ein Wort, das den Beruf benennt, z. B. „{example}“.",
+    "unscoredWarning": "{count} Angebote bisher nicht bewertet.",
+    "vagueTermWarningPlain": "„{terms}“: eine bloße Rollenbezeichnung trifft alles (Lohnbuchhaltung, Vertrieb, Partnerschaften). Ergänze ein Wort, das den gesuchten Beruf benennt."
   },
   "toast": {
     "enterKeyOrProvider": "Gib mindestens einen Schlüssel ein oder wähle einen primären Anbieter.",

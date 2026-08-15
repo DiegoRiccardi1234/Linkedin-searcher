@@ -83,7 +83,7 @@ def _run_capturing_scrape(
     settings.delay_tra_ricerche = 0.0
     db = Database(tmp_path / "s.db")
     try:
-        payload = ScanRequest(search_terms=["x"], sites=sites, location="Torino")
+        payload = ScanRequest(search_terms=["AI engineer"], sites=sites, location="Torino")
         list(ss.run_scan(db, settings, _NoopPM(), payload))
     finally:
         db.close()
@@ -169,7 +169,7 @@ def test_run_scan_nan_description_job_is_not_blindly_scored(
     try:
         events = list(
             ss.run_scan(
-                db, settings, _NoopPM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")
+                db, settings, _NoopPM(), ScanRequest(search_terms=["AI engineer"], sites=["linkedin"], location="Milano")
             )
         )
     finally:
@@ -319,7 +319,7 @@ def test_relevance_gate_drops_offtopic_keeps_tech(
     db = Database(tmp_path / "s.db")
     try:
         events = list(
-            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano"))
+            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["AI engineer"], sites=["linkedin"], location="Milano"))
         )
     finally:
         db.close()

@@ -110,7 +110,7 @@ def _run(df: pd.DataFrame, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> l
     try:
         return list(
             ss.run_scan(
-                db, settings, _CountingPM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")
+                db, settings, _CountingPM(), ScanRequest(search_terms=["Data Engineer"], sites=["linkedin"], location="Milano")
             )
         )
     finally:
@@ -145,7 +145,8 @@ def test_gate_short_desc_offtopic_title_dropped(
 def test_gate_short_desc_relevant_title_kept_unscored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Relevant title ("data" is domain vocab) → kept, but with no score: the
+    # Relevant title ("data" is one of the terms searched for) → kept, but with
+    # no score: the
     # description is too thin for anyone, model or app, to judge it.
     df = pd.DataFrame([_row("Data Scientist", _SHORT_DESC)], columns=_COLS)
     events = _run(df, tmp_path, monkeypatch)

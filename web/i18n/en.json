@@ -119,7 +119,8 @@
       "fromCv": "from CV",
       "fromYou": "entered by you",
       "missing": "missing",
-      "saved": "Matching data updated"
+      "saved": "Matching data updated",
+      "citiesPlaceholder": "City, city"
     },
     "tabs": {
       "about": "About me",
@@ -569,8 +570,9 @@
     "postScanRenderFailed": "Scan complete (summary couldn't render).",
     "volumeWarning": "Large scan ({n} searches) — this may take a while.",
     "quotaReached": "Today's request budget is spent — the scan would stop halfway. It resets at midnight UTC, or raise the limit in Settings.",
-    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a domain word, e.g. “AI QA”.",
-    "unscoredWarning": "{count} offers unevaluated so far."
+    "vagueTermWarning": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a word that names the trade, e.g. “{example}”.",
+    "unscoredWarning": "{count} offers unevaluated so far.",
+    "vagueTermWarningPlain": "“{terms}”: a bare role word matches anything (payroll, sales, partnerships). Add a word that names the trade you want."
   },
   "toast": {
     "enterKeyOrProvider": "Enter at least one key or choose a primary provider.",

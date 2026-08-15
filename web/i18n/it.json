@@ -119,7 +119,8 @@
       "fromCv": "dal CV",
       "fromYou": "inserito da te",
       "missing": "manca",
-      "saved": "Dati aggiornati"
+      "saved": "Dati aggiornati",
+      "citiesPlaceholder": "Città, città"
     },
     "tabs": {
       "about": "Chi sono",
@@ -569,8 +570,9 @@
     "postScanRenderFailed": "Scansione completata (riepilogo non mostrabile).",
     "volumeWarning": "Scan ampio ({n} ricerche) — potrebbe richiedere un po'.",
     "quotaReached": "Il budget di richieste di oggi è esaurito — lo scan si fermerebbe a metà. Si azzera a mezzanotte UTC, oppure alza il limite nelle Impostazioni.",
-    "vagueTermWarning": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola di dominio, es. «AI QA».",
-    "unscoredWarning": "{count} offerte non valutate finora."
+    "vagueTermWarning": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola che dica il mestiere, es. «{example}».",
+    "unscoredWarning": "{count} offerte non valutate finora.",
+    "vagueTermWarningPlain": "«{terms}»: un ruolo generico da solo pesca di tutto (payroll, vendite, partnership). Aggiungi una parola che dica il mestiere che cerchi."
   },
   "toast": {
     "enterKeyOrProvider": "Inserisci almeno una chiave o scegli un provider primario.",

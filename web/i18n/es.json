@@ -119,7 +119,8 @@
       "fromCv": "del CV",
       "fromYou": "introducido por ti",
       "missing": "falta",
-      "saved": "Datos actualizados"
+      "saved": "Datos actualizados",
+      "citiesPlaceholder": "Ciudad, ciudad"
     },
     "tabs": {
       "about": "Quién soy",
@@ -569,8 +570,9 @@
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
     "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
     "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes.",
-    "vagueTermWarning": "«{terms}»: un rol genérico solo devuelve de todo (nóminas, ventas, alianzas). Añade una palabra de dominio, p. ej. «AI QA».",
-    "unscoredWarning": "{count} ofertas sin evaluar hasta ahora."
+    "vagueTermWarning": "«{terms}»: un rol genérico por sí solo atrae de todo (nóminas, ventas, alianzas). Añade una palabra que nombre el oficio, p. ej. «{example}».",
+    "unscoredWarning": "{count} ofertas sin evaluar hasta ahora.",
+    "vagueTermWarningPlain": "«{terms}»: un rol genérico por sí solo atrae de todo (nóminas, ventas, alianzas). Añade una palabra que nombre el oficio que buscas."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",

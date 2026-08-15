@@ -9,7 +9,7 @@ emitted anything but what was typed.
 from __future__ import annotations
 
 from app.services.scan import synonyms
-from app.services.scan.vocab import _DOMAIN_VOCAB
+from app.services.scan.vocab import title_vocabulary
 
 
 def test_the_internship_case() -> None:
@@ -55,6 +55,8 @@ def test_expansion_does_not_duplicate_what_the_user_already_typed() -> None:
 def test_entry_route_words_survive_the_relevance_gate() -> None:
     """A posting titled only "Tirocinio curriculare" used to be dropped: with an
     empty description the gate judges the title, and it shared no word with the
-    vocabulary."""
+    vocabulary. The words now ride along with whatever the user searched for,
+    since the fixed domain list they used to live in is gone."""
+    vocab = title_vocabulary(search_terms=["infermiere pediatrico"])
     for word in ("tirocinio", "stage", "internship", "trainee", "apprendistato"):
-        assert word in _DOMAIN_VOCAB
+        assert word in vocab

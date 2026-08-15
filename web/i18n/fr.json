@@ -119,7 +119,8 @@
       "fromCv": "du CV",
       "fromYou": "saisi par toi",
       "missing": "manquant",
-      "saved": "Données mises à jour"
+      "saved": "Données mises à jour",
+      "citiesPlaceholder": "Ville, ville"
     },
     "tabs": {
       "about": "Qui je suis",
@@ -569,8 +570,9 @@
     "postScanRenderFailed": "Scan terminé (résumé non affichable).",
     "volumeWarning": "Grande recherche ({n} requêtes) — cela peut prendre du temps.",
     "quotaReached": "Le budget de requêtes du jour est épuisé — le scan s'arrêterait à mi-chemin. Il se réinitialise à minuit UTC, ou augmente la limite dans les Réglages.",
-    "vagueTermWarning": "« {terms} » : un intitulé générique ramène de tout (paie, ventes, partenariats). Ajoutez un mot de domaine, par ex. « AI QA ».",
-    "unscoredWarning": "{count} offres non évaluées jusqu'ici."
+    "vagueTermWarning": "« {terms} » : un intitulé générique attrape tout (paie, ventes, partenariats). Ajoutez un mot qui nomme le métier, p. ex. « {example} ».",
+    "unscoredWarning": "{count} offres non évaluées jusqu'ici.",
+    "vagueTermWarningPlain": "« {terms} » : un intitulé générique attrape tout (paie, ventes, partenariats). Ajoutez un mot qui nomme le métier que vous cherchez."
   },
   "toast": {
     "enterKeyOrProvider": "Entrez au moins une clé ou choisissez un fournisseur principal.",

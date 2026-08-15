@@ -118,11 +118,22 @@ const _VAGUE_TERMS = new Set([
 ]);
 
 function warnAboutVagueTerms(tags) {
-  const vague = (tags || []).filter((tag) => {
+  const all = tags || [];
+  const vague = all.filter((tag) => {
     const words = String(tag).trim().toLowerCase().split(/\s+/).filter(Boolean);
     return words.length === 1 && _VAGUE_TERMS.has(words[0]);
   });
-  if (vague.length) showToast(t("scan.vagueTermWarning", { terms: vague.join(", ") }), "info");
+  if (!vague.length) return;
+  // The example used to be a fixed "AI QA" — one trade, shown to everyone.
+  // A term the user has already typed makes the same point in their own
+  // vocabulary, and when there isn't one the advice stands without an example.
+  const example = all.find((tag) => String(tag).trim().split(/\s+/).length > 1);
+  showToast(
+    example
+      ? t("scan.vagueTermWarning", { terms: vague.join(", "), example })
+      : t("scan.vagueTermWarningPlain", { terms: vague.join(", ") }),
+    "info",
+  );
 }
 
 async function _onScanSubmit(event) {

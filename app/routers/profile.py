@@ -210,6 +210,14 @@ def build_router(container: AppContainer) -> APIRouter:
                 "preferred_roles", ",".join(str(r) for r in preferred_roles)
             )
 
+        # Where the candidate lives, if the CV said so and nobody has corrected
+        # it by hand. Never an overwrite: a manual value is the user answering,
+        # and a re-uploaded CV must not undo the answer (same rule the rest of
+        # the matching facts follow).
+        base_city = str(summary.get("base_city") or "").strip()
+        if base_city and not (container.db.get_preference(cf.FACT_BASE_CITIES, "") or "").strip():
+            container.db.set_preference(cf.FACT_BASE_CITIES, base_city)
+
         return {
             "profile_id": profile_id,
             "source": file.filename,

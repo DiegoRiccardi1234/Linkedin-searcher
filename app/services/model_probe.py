@@ -26,11 +26,16 @@ PROBE_PROMPT = 'Rispondi SOLO con JSON valido e nulla altro: {"ok": true, "n": 7
 # posting, which is the workload that truncates. The scoring probe therefore
 # runs the REAL prompt against a fixed sample offer kept here (no network, no
 # scraping, identical across runs so results are comparable).
+# Invented, and on purpose: this shipped for a while as the real CV of the
+# person who wrote the app — degree mark included — in a public repository, and
+# it is shown to whatever model every user happens to be testing. The length is
+# what matters to a probe, not whose life it describes.
 SAMPLE_CV = (
-    "Laurea Triennale in Informatica (95/110). Esperienza: 2 mesi come AI Data "
-    "Annotator su valutazione di output LLM, 4 mesi di tirocinio frontend "
-    "React/TypeScript. Stack: Python, Java, TypeScript, React, PostgreSQL, Git. "
-    "Inglese B2. Cerca ruoli AI QA / LLM evaluation, remoto o Torino."
+    "Laurea Triennale in Economia aziendale (voto 101/110). Esperienza: 8 mesi "
+    "come impiegata amministrativa in uno studio commercialista, 3 mesi di "
+    "tirocinio in segreteria organizzativa. Strumenti: Excel avanzato, gestionale "
+    "Zucchetti, fatturazione elettronica. Inglese B1. Cerca ruoli in "
+    "amministrazione e controllo di gestione, ibrido o in sede."
 )
 SAMPLE_OFFER = {
     "titolo": "AI Quality Analyst (LLM Evaluation)",
