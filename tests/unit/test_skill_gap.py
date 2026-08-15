@@ -44,6 +44,35 @@ def test_compute_skill_gap_aggregates_and_excludes_owned(tmp_path: Path) -> None
         db.close()
 
 
+def test_a_blocking_reason_is_not_a_skill_to_learn(tmp_path: Path) -> None:
+    """The panel says "learning these unlocks more matches". Some of it could not.
+
+    The deterministic blockers are copied into ``mancano`` so the offer's own
+    page can say why it is capped, and this aggregate counted them as skills.
+    On a real archive the top five of twelve rows were "Richiede 3+ anni di
+    esperienza (il profilo ne dichiara 0)" at 99, the two-year version at 40,
+    the master's at 27 and two unreachable cities at 16 and 15 — with Power BI,
+    the first thing on the list anyone could actually go and learn, at 7.
+    """
+    db = Database(tmp_path / "b.db")
+    try:
+        reason = "Richiede 3+ anni di esperienza (il profilo ne dichiara 0)"
+        for n in (1, 2, 3):
+            jid, _, _ = db.upsert_job({"titolo": f"A{n}", "azienda": "X", "link": f"l{n}"})
+            db.update_job_analysis(
+                jid,
+                {
+                    "blocchi": ["esperienza_richiesta"],
+                    "blocchi_dettaglio": {"esperienza_richiesta": reason},
+                    "skills_match": {"hai": [], "mancano": [reason, "Power BI"]},
+                },
+            )
+        gaps = {g["skill"]: g["count"] for g in compute_skill_gap(db)["gaps"]}
+        assert gaps == {"Power BI": 3}, "the constraint is reported, not offered as homework"
+    finally:
+        db.close()
+
+
 def test_compute_skill_gap_empty_when_no_analysis(tmp_path: Path) -> None:
     db = Database(tmp_path / "s.db")
     try:

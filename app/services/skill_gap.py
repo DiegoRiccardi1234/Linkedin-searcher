@@ -69,13 +69,27 @@ def compute_skill_gap(db: Database, *, top: int = 12) -> dict[str, Any]:
         missing = match.get("mancano")
         if not isinstance(missing, list):
             continue
+        # The deterministic blockers are copied into the same list, because the
+        # offer's own page has to say why it is capped. They are not skills:
+        # "Richiede 3+ anni di esperienza (il profilo ne dichiara 0)" is not
+        # something anyone can go and learn, and on a real archive those
+        # sentences took the top five rows of a twelve-row panel — 99, 40, 27,
+        # 16 and 15 occurrences, burying Power BI at 7. Matched against the
+        # offer's own ``blocchi_dettaglio`` rather than by shape, so a genuine
+        # skill that happens to read like a sentence is still counted.
+        blocked = analysis.get("blocchi_dettaglio")
+        reasons = (
+            {_normalize(str(v)) for v in blocked.values() if str(v).strip()}
+            if isinstance(blocked, dict)
+            else set()
+        )
         job_id = int(job.get("id", 0) or 0)
         for raw in missing:
             label = str(raw).strip()
             if not label:
                 continue
             key = _normalize(label)
-            if key in have:
+            if key in have or key in reasons:
                 continue
             counts[key] = counts.get(key, 0) + 1
             labels.setdefault(key, label)
