@@ -73,6 +73,7 @@ def test_run_once_records_highlights(tmp_path: Path) -> None:
     db = Database(tmp_path / "s.db")
     try:
         db.set_preference("autoscan_score_threshold", "7")
+        db.set_preference("last_scan_terms", '["analista funzionale"]')
         sched = AutoScanScheduler(
             FakeContainer(db), run_scan_fn=_fake_run_scan, clock=lambda: 1000.0
         )
@@ -92,6 +93,7 @@ def test_maybe_run_respects_enabled_and_interval(tmp_path: Path) -> None:
     db = Database(tmp_path / "s.db")
     try:
         now = [100_000.0]
+        db.set_preference("last_scan_terms", '["analista funzionale"]')
         sched = AutoScanScheduler(
             FakeContainer(db), run_scan_fn=_fake_run_scan, clock=lambda: now[0]
         )
@@ -132,6 +134,7 @@ def test_failed_run_still_stamps_the_attempt(tmp_path: Path) -> None:
     db = Database(tmp_path / "s.db")
     try:
         now = [100_000.0]
+        db.set_preference("last_scan_terms", '["analista funzionale"]')
         sched = AutoScanScheduler(
             FakeContainer(db), run_scan_fn=_failing_run_scan, clock=lambda: now[0]
         )
@@ -207,3 +210,19 @@ def test_scheduler_run_now_and_dismiss(client: TestClient) -> None:
     # No provider configured in test env -> run_once skips, no network hit.
     assert client.post("/api/scheduler/run-now").status_code == 202
     assert client.post("/api/scheduler/dismiss").json()["ok"] is True
+
+
+def test_a_scheduled_scan_with_nothing_to_repeat_skips(tmp_path: Path) -> None:
+    """It used to fall back to the app's built-in terms and city.
+
+    That fallback is the whole reason a stranger's install ended up scanning
+    for AI QA roles in Turin: one empty-form scan wrote those values into
+    ``last_scan_*``, and the scheduler replayed them forever after.
+    """
+    db = Database(tmp_path / "s.db")
+    try:
+        db.set_preference("autoscan_enabled", "1")
+        sched = AutoScanScheduler(FakeContainer(db), run_scan_fn=_fake_run_scan)
+        assert sched.run_once() == {"status": "skipped", "reason": "no_search_intent"}
+    finally:
+        db.close()

@@ -69,7 +69,7 @@ def _run(monkeypatch, tmp_path: Path, sites: list[str], fake_scrape) -> list[dic
     settings.delay_tra_ricerche = 0.0
     db = Database(tmp_path / "s.db")
     try:
-        return list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=sites)))
+        return list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=sites, location="Milano")))
     finally:
         db.close()
 

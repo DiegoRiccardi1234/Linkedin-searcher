@@ -49,6 +49,75 @@ export async function loadProviderHealth() {
     `<div class="micro provider-health-title">${t("settings.providers.healthTitle")}</div>${rows}`;
 }
 
+// A reason arrives as a bare code, or as `code:value` when the number is the
+// point ("allowance:1000", "measured_success:92%"). Rendering it here rather
+// than sentence-building on the server keeps all five languages in the i18n
+// files, where check_i18n.py can see them.
+function _reasonText(reason) {
+  const [code, value] = String(reason).split(":");
+  return t(`settings.advice.reason.${code}`, { n: value ?? "" });
+}
+
+function _warningText(warning) {
+  return t(`settings.advice.warn.${warning.code}`, {
+    provider: warning.provider || "",
+    on: warning.on || "",
+  });
+}
+
+function _adviceRow(row, label) {
+  const reasons = (row.why || []).map((r) => escapeHtml(_reasonText(r))).join(" · ");
+  const links = [
+    row.signup && !row.configured
+      ? `<a href="${escapeHtml(row.signup)}" target="_blank" rel="noopener">${t("settings.advice.getKey")}</a>`
+      : "",
+    row.terms
+      ? `<a href="${escapeHtml(row.terms)}" target="_blank" rel="noopener">${t("settings.advice.terms")}</a>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    `<div class="advice-row"><span class="advice-label">${escapeHtml(label)}</span>` +
+    `<strong>${escapeHtml(row.provider)}</strong>` +
+    `<span class="micro">${reasons}</span>` +
+    (links ? `<span class="micro advice-links">${links}</span>` : "") +
+    `</div>`
+  );
+}
+
+// Which provider to open in the first place. The ⭐ on the cards below has
+// always answered "which model on the provider you already chose"; nobody
+// answered the question a new user actually has.
+export async function loadProviderAdvice() {
+  const box = document.getElementById("providerAdvice");
+  if (!box) return;
+  let advice = null;
+  try {
+    advice = await api("/api/providers/advice");
+  } catch {
+    box.innerHTML = "";
+    return; // a hint must never be the thing that breaks the settings page
+  }
+  if (!advice || !advice.recommended) {
+    box.innerHTML = `<p class="micro">${escapeHtml(t("settings.advice.none"))}</p>`;
+    return;
+  }
+  const warnings = (advice.warnings || [])
+    .map((w) => `<li>${escapeHtml(_warningText(w))}</li>`)
+    .join("");
+  const alternatives = (advice.alternatives || [])
+    .slice(0, 2)
+    .map((row) => _adviceRow(row, t("settings.advice.alternatives")))
+    .join("");
+  box.innerHTML =
+    `<div class="micro provider-health-title">${escapeHtml(t("settings.advice.title"))}</div>` +
+    `<p class="micro">${escapeHtml(t("settings.advice.subtitle"))}</p>` +
+    _adviceRow(advice.recommended, t("settings.advice.best")) +
+    alternatives +
+    (warnings ? `<ul class="advice-warnings micro">${warnings}</ul>` : "");
+}
+
 const PROVIDER_KEY_IDS = ["cerebrasKey", "groqKey", "openaiKey", "anthropicKey", "googleKey", "openrouterKey", "deepseekKey", "xaiKey", "glmKey", "mistralKey"];
 
 // `free`/`signup`/`hint` exist because the card said nothing about what a
@@ -93,6 +162,17 @@ const PROVIDER_CATALOG = [
     hint: "many :free models · ~200 req/day · one key, many models",
   },
   {
+    name: "cloudflare",
+    label: "Cloudflare Workers AI",
+    icon: "cloud",
+    placeholder: "API token",
+    free: true,
+    signup: "https://dash.cloudflare.com/profile/api-tokens",
+    // Measured 2026-08-15: 1.2s and clean JSON on the 70B, ~196 Neurons per
+    // scored offer. The token only needs the "Workers AI: Read" permission.
+    hint: "10.000 Neurons/day ≈ 50 scored offers · Workers AI Read token · no card",
+  },
+  {
     name: "mistral",
     label: "Mistral",
     icon: "air",
@@ -100,6 +180,18 @@ const PROVIDER_CATALOG = [
     free: true,
     signup: "https://console.mistral.ai/api-keys",
     hint: "free Experiment tier · rate-limited · no card",
+  },
+  {
+    name: "ovh",
+    label: "OVHcloud AI Endpoints",
+    icon: "public",
+    placeholder: "anonymous",
+    free: true,
+    signup: "https://endpoints.ai.cloud.ovh.net/",
+    // The only EU-hosted catalog here, which matters because the prompt carries
+    // a CV. Type "anonymous" to use the free shared tier: it works, but it is
+    // two requests a minute and the bigger models are usually busy.
+    hint: "hosted in the EU · type «anonymous» for the free shared tier (slow) · paid per token with a key",
   },
   {
     name: "custom",

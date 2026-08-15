@@ -89,13 +89,13 @@ def test_watchlist_for_scan_needs_the_toggle_or_an_explicit_list(tmp_path: Path)
     db = Database(tmp_path / "w.db")
     try:
         db.add_watchlist_company("RWS")
-        payload = ScanRequest(search_terms=["x"])
+        payload = ScanRequest(search_terms=["x"], location="Milano")
         # Following a company must not silently add a search to every scan.
         assert ss._watchlist_for_scan(db, payload) == []
         db.set_preference("watchlist_enabled", "1")
         assert [c["canonical"] for c in ss._watchlist_for_scan(db, payload)] == ["rws"]
         # An explicit list wins over the stored one.
-        explicit = ScanRequest(search_terms=["x"], companies=["Toloka", "  "])
+        explicit = ScanRequest(search_terms=["x"], companies=["Toloka", "  "], location="Milano")
         assert [c["name"] for c in ss._watchlist_for_scan(db, explicit)] == ["Toloka"]
     finally:
         db.close()
@@ -175,7 +175,6 @@ def test_company_pass_keeps_only_that_employer_and_skips_the_relevance_gate(
     settings.delay_tra_ricerche = 0.0
     # An empty payload falls back to the configured defaults, so the company
     # pass has to be the ONLY pass for the assertions below to mean anything.
-    settings.default_search_terms = []
     db = Database(tmp_path / "s.db")
     try:
         db.add_watchlist_company("RWS Group")
@@ -200,13 +199,12 @@ def test_company_pass_records_that_the_channel_delivered(
     monkeypatch.setattr(ss, "scrape_jobs", lambda **k: _watch_df())
     settings = load_settings(tmp_path)
     settings.delay_tra_ricerche = 0.0
-    settings.default_search_terms = []
     db = Database(tmp_path / "s.db")
     try:
         db.add_watchlist_company("RWS Group")
         db.set_preference("watchlist_enabled", "1")
         list(
-            ss.run_scan(db, settings, _WatchPM(), ScanRequest(search_terms=[], sites=["linkedin"]))
+            ss.run_scan(db, settings, _WatchPM(), ScanRequest(search_terms=[], sites=["linkedin"], location="Milano"))
         )
         row = db.list_watchlist_companies()[0]
         assert row["last_seen_at"]

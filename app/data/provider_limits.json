@@ -1,0 +1,154 @@
+{
+  "_note": [
+    "Starting points, not truths. A provider's free-tier limits are per PROJECT and",
+    "per KEY: the same model can be 15 requests a minute for one user and something",
+    "else for the next, and Google no longer publishes the per-model numbers outside",
+    "a logged-in console. So these are what to assume until the app has watched its",
+    "own calls (app/services/rate_limits.py), and the measured value always wins.",
+    "Patterns are matched most-specific-first with fnmatch.",
+    "rpm = requests per minute, rpd = requests per day, tpm = input tokens per minute."
+  ],
+  "_providers": {
+    "_note": [
+      "What the app knows about each provider BEYOND its rate limits, used to answer",
+      "'which free provider should I use?'. `trains` has three values and the third is",
+      "the honest one: 'yes' and 'no' are only written where a primary source says so,",
+      "everything else is 'unknown' and the UI links the terms instead of reassuring.",
+      "`region` is where the inference runs; `sunset` is the day a free tier closes."
+    ],
+    "google": {
+      "free": true,
+      "card": false,
+      "trains": "yes",
+      "region": "global",
+      "signup": "https://aistudio.google.com/apikey",
+      "terms": "https://ai.google.dev/gemini-api/terms",
+      "note": "Free tier prompts are used to improve Google products and human reviewers may read them."
+    },
+    "groq": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "global",
+      "signup": "https://console.groq.com/keys",
+      "terms": "https://groq.com/privacy-policy/"
+    },
+    "cerebras": {
+      "free": true,
+      "card": true,
+      "trains": "unknown",
+      "region": "global",
+      "sunset": "2026-08-17",
+      "signup": "https://cloud.cerebras.ai",
+      "terms": "https://www.cerebras.ai/privacy"
+    },
+    "openrouter": {
+      "free": true,
+      "card": false,
+      "trains": "depends",
+      "region": "global",
+      "signup": "https://openrouter.ai/keys",
+      "terms": "https://openrouter.ai/docs/features/privacy-and-logging",
+      "note": "Each upstream provider has its own policy; some train on free-model prompts. OpenRouter account settings can refuse to route to those."
+    },
+    "cloudflare": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "global",
+      "signup": "https://dash.cloudflare.com/profile/api-tokens",
+      "terms": "https://www.cloudflare.com/privacypolicy/"
+    },
+    "ovh": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "eu",
+      "signup": "https://endpoints.ai.cloud.ovh.net/",
+      "terms": "https://www.ovhcloud.com/en/personal-data-protection/"
+    },
+    "mistral": {
+      "free": true,
+      "card": false,
+      "trains": "unknown",
+      "region": "eu",
+      "signup": "https://console.mistral.ai/api-keys",
+      "terms": "https://mistral.ai/terms"
+    },
+    "custom": {
+      "free": true,
+      "card": false,
+      "trains": "no",
+      "region": "local",
+      "note": "A model on your own machine: the prompt never leaves it."
+    },
+    "openai": { "free": false, "card": true, "trains": "no", "region": "global" },
+    "anthropic": { "free": false, "card": true, "trains": "no", "region": "global" },
+    "deepseek": { "free": false, "card": true, "trains": "unknown", "region": "global" },
+    "xai": { "free": false, "card": true, "trains": "unknown", "region": "global" },
+    "glm": { "free": false, "card": true, "trains": "unknown", "region": "global" }
+  },
+  "google": {
+    "*flash-lite*": {
+      "rpm": 15,
+      "rpd": 500,
+      "tpm": 250000,
+      "source": "AI Studio rate-limit console, free tier, 2026-08-15"
+    },
+    "gemma*": {
+      "rpm": 30,
+      "rpd": 14400,
+      "tpm": 16000,
+      "note": "Plenty of requests, tiny token budget: a 4k-token scoring prompt fits about twice a minute."
+    },
+    "*flash*": {
+      "rpm": 5,
+      "rpd": 20,
+      "tpm": 250000,
+      "note": "Twenty requests a DAY. Enough to try the model, never enough to scan with it."
+    },
+    "*pro*": {
+      "rpm": 5,
+      "rpd": 20,
+      "tpm": 250000
+    }
+  },
+  "openrouter": {
+    "*:free": {
+      "rpm": 20,
+      "rpd": 1000,
+      "note": "1000/day per model applies once the account has bought credit at least once; 50/day before that. The per-minute ceiling is the host's shared pool and is not published — 20 is a conservative guess, and the measured value replaces it."
+    }
+  },
+  "cerebras": {
+    "*": {
+      "rpm": 30,
+      "note": "Free tier closes 2026-08-17. Its throttle is per-minute and tight: 94 calls in five minutes saturated it."
+    }
+  },
+  "groq": {
+    "*": {
+      "rpm": 30,
+      "rpd": 1000,
+      "source": "groq.com free tier, verified 2026-08-06"
+    }
+  },
+  "cloudflare": {
+    "*70b*": {
+      "rpd": 50,
+      "note": "Not a request cap: the free allowance is 10.000 Neurons a day, and a real scored offer costs about 196 of them on a 70B (26.668 neurons per million input tokens, 204.805 per million output). Fifty is that budget expressed in offers.",
+      "source": "developers.cloudflare.com/workers-ai pricing, 2026-08-15"
+    },
+    "*": {
+      "rpd": 120,
+      "note": "Same 10.000 Neurons, spent on a smaller model. Measured per-offer cost is what matters, not the request count."
+    }
+  },
+  "ovh": {
+    "*": {
+      "rpm": 2,
+      "note": "The anonymous tier: two requests a minute per IP and per model. Measured 2026-08-15 — the bigger models answer 429 even at that rate, because the pool is shared. A key raises it to 400/min, billed per token.",
+      "source": "help.ovhcloud.com AI Endpoints getting started, 2026-08-15"
+    }
+  }
+}

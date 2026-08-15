@@ -313,7 +313,65 @@ CHIP_TEMPLATES: dict[str, dict[str, str]] = {
 }
 
 
-def suggest_chat_prompts(db: Database, lang: str = "en", limit: int = 2) -> list[str]:
+#: Two questions per page, because the same coach is useful in different ways
+#: depending on what is on screen. The chips used to be picked from the CV
+#: alone, so the app offered career advice while the user was looking at the
+#: provider keys.
+_VIEW_CHIPS: dict[str, dict[str, list[str]]] = {
+    "dashboard": {
+        "en": ["What do my numbers say?", "Which applications have gone quiet?"],
+        "it": ["Cosa dicono i miei numeri?", "Quali candidature sono ferme?"],
+        "es": ["¿Qué dicen mis números?", "¿Qué candidaturas están paradas?"],
+        "fr": ["Que disent mes chiffres ?", "Quelles candidatures sont au point mort ?"],
+        "de": ["Was sagen meine Zahlen?", "Welche Bewerbungen liegen still?"],
+    },
+    "job-search": {
+        "en": ["Which search terms should I use?", "Where is it worth searching?"],
+        "it": ["Che termini di ricerca mi consigli?", "Dove conviene cercare?"],
+        "es": ["¿Qué términos de búsqueda uso?", "¿Dónde conviene buscar?"],
+        "fr": ["Quels termes de recherche utiliser ?", "Où vaut-il mieux chercher ?"],
+        "de": ["Welche Suchbegriffe soll ich nehmen?", "Wo lohnt sich die Suche?"],
+    },
+    "jobs": {
+        "en": ["Which of these should I send first?", "Why did this offer score that?"],
+        "it": ["Quali mando per prime?", "Perché questa offerta ha questo voto?"],
+        "es": ["¿Cuáles envío primero?", "¿Por qué esta oferta tiene esa nota?"],
+        "fr": ["Lesquelles envoyer en premier ?", "Pourquoi cette offre a cette note ?"],
+        "de": ["Welche zuerst abschicken?", "Warum hat dieses Angebot diese Note?"],
+    },
+    "mail": {
+        "en": ["What can the app read from my inbox?", "Why was this email not recognised?"],
+        "it": [
+            "Cosa riesce a leggere dalla mia posta?",
+            "Perché questa mail non è stata riconosciuta?",
+        ],
+        "es": ["¿Qué puede leer de mi correo?", "¿Por qué no reconoció este correo?"],
+        "fr": ["Que lit l'app dans ma boîte mail ?", "Pourquoi cet e-mail n'a pas été reconnu ?"],
+        "de": ["Was liest die App aus meinem Postfach?", "Warum wurde diese Mail nicht erkannt?"],
+    },
+    "profile": {
+        "en": ["What is missing from my profile?", "Does my CV fit the goal I set?"],
+        "it": ["Cosa manca al mio profilo?", "Il mio CV è adatto all'obiettivo che ho scritto?"],
+        "es": ["¿Qué le falta a mi perfil?", "¿Mi CV encaja con el objetivo que puse?"],
+        "fr": ["Qu'est-ce qui manque à mon profil ?", "Mon CV correspond-il à mon objectif ?"],
+        "de": ["Was fehlt in meinem Profil?", "Passt mein Lebenslauf zu meinem Ziel?"],
+    },
+    "settings": {
+        "en": ["Which AI provider suits me?", "Why are some offers left unevaluated?"],
+        "it": ["Quale provider IA mi conviene?", "Perché alcune offerte restano non valutate?"],
+        "es": ["¿Qué proveedor de IA me conviene?", "¿Por qué algunas ofertas quedan sin evaluar?"],
+        "fr": [
+            "Quel fournisseur d'IA me convient ?",
+            "Pourquoi certaines offres restent non évaluées ?",
+        ],
+        "de": ["Welcher KI-Anbieter passt zu mir?", "Warum bleiben manche Angebote unbewertet?"],
+    },
+}
+
+
+def suggest_chat_prompts(
+    db: Database, lang: str = "en", limit: int = 4, view: str | None = None
+) -> list[str]:
     """Return localized, CV-derived quick-prompt suggestions for the chat.
 
     No CV → onboarding prompts. CV present → detect signals in the markdown
@@ -321,17 +379,20 @@ def suggest_chat_prompts(db: Database, lang: str = "en", limit: int = 2) -> list
     """
     lang_key = lang if lang in CHIP_TEMPLATES else "en"
     templates = CHIP_TEMPLATES[lang_key]
+    # What the user is looking at comes first: it is the most likely subject of
+    # the next question, whatever their CV says.
+    picks: list[str] = list(_VIEW_CHIPS.get(view or "", {}).get(lang_key, []))
 
     profile = db.get_active_candidate_profile()
     if not profile:
         return [
+            *picks,
             templates["onboarding_goal"],
             templates["onboarding_area"],
             templates["onboarding_start"],
-        ]
+        ][:limit]
 
     profile_text = (profile.get("markdown") or "").lower()
-    picks: list[str] = []
     seen_keys: set[str] = set()
     for signals, key in _CV_SIGNALS:
         if key in seen_keys:

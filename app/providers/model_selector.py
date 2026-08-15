@@ -106,6 +106,18 @@ def score_model_name(model_name: str, policy: dict[str, Any] | None = None) -> i
         score += _weight(policy, "family", 40) + 4
     elif "gemini" in name:
         score += _weight(policy, "family", 40) + 2
+        # Measured on the free tier, 2026-08-15, with the app's own prompt and
+        # budget: the "-lite" line answered 6/6 with all 19 fields in ~2.3s,
+        # while gemini-3.5-flash spent 2186 tokens on hidden reasoning, took
+        # 40s and came back with truncated JSON. Nothing in either name says
+        # so — the same lesson as nemotron and gpt-oss. The free tier also
+        # gives the bigger flash models twenty requests a DAY against five
+        # hundred for the lite ones, so preferring lite is both a quality and
+        # a quota decision.
+        if "lite" in name:
+            score += 12
+        elif "flash" in name or "pro" in name:
+            score -= 10
     elif (
         "mistral" in name
         or "mixtral" in name

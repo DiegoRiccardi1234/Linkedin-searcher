@@ -86,7 +86,7 @@ def test_cancelled_scan_makes_no_further_model_calls(
                 db,
                 settings,
                 pm,  # type: ignore[arg-type]
-                ScanRequest(search_terms=["ai qa"], sites=["linkedin"]),
+                ScanRequest(search_terms=["ai qa"], sites=["linkedin"], location="Milano"),
                 cancel_check=lambda: True,
             )
         )
@@ -112,7 +112,7 @@ def test_a_normal_scan_still_scores(tmp_path: Path, monkeypatch: pytest.MonkeyPa
                 db,
                 settings,
                 pm,  # type: ignore[arg-type]
-                ScanRequest(search_terms=["ai qa"], sites=["linkedin"]),
+                ScanRequest(search_terms=["ai qa"], sites=["linkedin"], location="Milano"),
             )
         )
         assert pm.calls == 3

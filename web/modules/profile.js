@@ -496,16 +496,22 @@ export async function loadProfile() {
     _state.profile = payload.profile;
     syncFeatureToggles();
     const empty = document.getElementById("profileEmpty");
-    const content = document.getElementById("profileContent");
+    // The CV-dependent cards are now spread across four sub-tabs, so one
+    // wrapper can no longer hide them — they carry `data-needs-profile` and a
+    // class on the view does it. Which also fixes something the wrapper got
+    // wrong: the privacy switch used to be hidden until a CV existed, and
+    // whether the CV is redacted before it reaches a model is exactly what you
+    // want to decide BEFORE uploading one.
+    const view = document.getElementById("view-profile");
     if (!_state.profile) {
       _updateAvatar(null);
       empty?.classList.remove("hidden");
-      content?.classList.add("hidden");
+      view?.classList.add("no-profile");
       return;
     }
     _updateAvatar(_state.profile);
     empty?.classList.add("hidden");
-    content?.classList.remove("hidden");
+    view?.classList.remove("no-profile");
     const summary = _state.profile.summary_json || {};
     _renderChips("profileRoles", summary.preferred_roles || [], "preferred_roles");
     _renderChips("profileSkills", summary.skills || [], "skills");

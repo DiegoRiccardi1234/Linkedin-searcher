@@ -437,7 +437,74 @@ def summarize_profile(markdown_text: str) -> dict[str, Any]:
         # to be one of the ordered levels rather than a sentence.
         "education_level": _degree_level(markdown_text),
         "languages": languages,
+        # Read locally, on purpose: Privacy Mode redacts the address before the
+        # CV reaches a model, so the model cannot answer this even when asked.
+        # And this is the field that turns a CV into a search — without it the
+        # app only learnt where you live from a scan it had already chosen the
+        # city for.
+        "base_city": _extract_base_city(markdown_text),
     }
+
+
+#: A residence line, as CV headers actually write it. Deliberately narrow: a
+#: wrong city sends every scan to the wrong place, and an empty answer is a
+#: question the app knows how to ask.
+_BASE_CITY_RE = re.compile(
+    r"(?im)^\s*(?:residenza|residente\s+(?:a|in)|domicilio|indirizzo|citt[aà]|"
+    r"address|based\s+in|location|city)\s*[:\-–]?\s*(.+)$"  # noqa: RUF001
+)
+#: "20139 Milano (MI), Italia" -> "Milano". Postcodes, province codes and the
+#: country say nothing a job board needs.
+_CITY_NOISE_RE = re.compile(
+    r"(?i)\b\d{4,6}\b|\(\s*[a-z]{2}\s*\)|\b(?:italia|italy|france|españa|spain|"
+    r"deutschland|germany|schweiz|suisse)\b"
+)
+
+
+#: Words that appear where a city would and are not one.
+_NOT_A_CITY_LINE = {"remote", "da remoto", "worldwide", "europe", "europa", "n/a", "-"}
+
+#: The header line of a real CV, which is where the city actually lives: no
+#: "Residenza:" label anywhere, just contacts separated by pipes or bullets —
+#: ``334 5829619 | name@example.com | Torino, Italia``. Measured on a real CV,
+#: where the labelled pattern above found nothing at all.
+_CONTACT_LINE_RE = re.compile(
+    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|\d[\d\s().\-]{7,}\d"
+)
+#: "Torino, Italia" — one or two capitalised words, then a country.
+_CITY_COUNTRY_RE = re.compile(
+    r"^\s*([A-ZÀ-Ü][\w'’\-]+(?:\s+[A-ZÀ-Ü][\w'’\-]+)?)\s*,\s*[A-ZÀ-Ü][\w'’\-]+\.?\s*$"  # noqa: RUF001
+)
+
+
+def _city_from_contact_header(text: str) -> str:
+    """The city out of a CV's contact line, when nothing is labelled."""
+    for line in (text or "").splitlines()[:15]:
+        if not _CONTACT_LINE_RE.search(line):
+            continue
+        for chunk in re.split(r"[|•·]|\s{3,}", line):
+            match = _CITY_COUNTRY_RE.match(chunk)
+            if match and match.group(1).lower() not in _NOT_A_CITY_LINE:
+                return match.group(1).strip()
+    return ""
+
+
+def _extract_base_city(text: str) -> str:
+    for match in _BASE_CITY_RE.finditer(text or ""):
+        raw = _CITY_NOISE_RE.sub(" ", match.group(1))
+        # A street address on the same line ("Via Roma 12, 20139 Milano, Italia"):
+        # the city is the last part that still has words in it — the country and
+        # the postcode have just been stripped, which can empty the tail.
+        parts = [p for p in (raw.split(",") if "," in raw else [raw]) if p.strip()]
+        city = parts[-1] if parts else ""
+        city = re.sub(r"[^\w\s'\-]", " ", city, flags=re.UNICODE).strip()
+        city = re.sub(r"\s{2,}", " ", city)
+        if city.lower() in _NOT_A_CITY_LINE:
+            continue
+        # Two words is a city ("Reggio Emilia"); more is a sentence.
+        if city and len(city) <= 40 and len(city.split()) <= 3 and not city.isdigit():
+            return city
+    return _city_from_contact_header(text)
 
 
 def _degree_level(text: str) -> str:
@@ -769,6 +836,14 @@ def summarize_profile_with_llm(
         "- industries: list of industries the candidate has experience in\n"
         "- education: highest education level and field\n"
         "- languages: list of spoken languages with level if stated, e.g. 'Italian (Native)', 'English (B2)'\n"
+        # Nothing extracted a place before this, so "where do you want to work"
+        # could only be learnt from a scan the user had already run — with a
+        # location the app had supplied. Asked for plainly: it is the one field
+        # that turns a CV into a search.
+        "- base_city: the city the candidate lives in or nearest to, as written "
+        "on the CV (string). Use null unless the CV actually states a place of "
+        "residence or contact address — never guess it from an employer's or a "
+        "university's location.\n"
         "- summary: 2-3 sentence professional summary\n\n"
         f"Write the values of 'summary', 'strengths', 'industries' and 'education' in "
         f"{language_name}, regardless of the CV's language. Keep 'skills' and "

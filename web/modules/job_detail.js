@@ -186,6 +186,13 @@ export async function showJobDetail(jobId) {
   }
   setText("detailMeta", metaParts.join(" | "));
 
+  // Empty for everything scored before v2.0.0: the column is filled from here
+  // on, and guessing who wrote an old verdict would be a fact-shaped guess.
+  setText(
+    "detailScoredBy",
+    job.analysis_model ? t("jobs.scoredBy", { model: job.analysis_model }) : "",
+  );
+
   const detailLinkBtn = document.getElementById("detailLinkBtn");
   if (detailLinkBtn) {
     if (job.link) {

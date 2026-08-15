@@ -118,11 +118,22 @@ const _VAGUE_TERMS = new Set([
 ]);
 
 function warnAboutVagueTerms(tags) {
-  const vague = (tags || []).filter((tag) => {
+  const all = tags || [];
+  const vague = all.filter((tag) => {
     const words = String(tag).trim().toLowerCase().split(/\s+/).filter(Boolean);
     return words.length === 1 && _VAGUE_TERMS.has(words[0]);
   });
-  if (vague.length) showToast(t("scan.vagueTermWarning", { terms: vague.join(", ") }), "info");
+  if (!vague.length) return;
+  // The example used to be a fixed "AI QA" — one trade, shown to everyone.
+  // A term the user has already typed makes the same point in their own
+  // vocabulary, and when there isn't one the advice stands without an example.
+  const example = all.find((tag) => String(tag).trim().split(/\s+/).length > 1);
+  showToast(
+    example
+      ? t("scan.vagueTermWarning", { terms: vague.join(", "), example })
+      : t("scan.vagueTermWarningPlain", { terms: vague.join(", ") }),
+    "info",
+  );
 }
 
 async function _onScanSubmit(event) {
@@ -147,6 +158,13 @@ async function _onScanSubmit(event) {
   if (locInputRaw) {
     getLocations.addMultiple([locInputRaw]);
     document.getElementById("locationsInput").value = '';
+  }
+
+  if (typeof _deps.ensureProfileReady === "function") {
+    // After the pending text became tags, or someone who typed a term without
+    // pressing enter would be told they had not said what to look for.
+    const ready = await _deps.ensureProfileReady();
+    if (!ready) return;
   }
 
   const termsText = getKeywords.getTags().join(", ");

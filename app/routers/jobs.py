@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app import rate_limit
+from app.db import JOB_BUCKETS
 from app.models import (
     FavoriteRequest,
     JobActionRequest,
@@ -46,6 +47,7 @@ def build_router(container: AppContainer) -> APIRouter:
     @router.get("/api/jobs")
     def list_jobs(
         status: str | None = Query(default=None),
+        bucket: str | None = Query(default=None),
         only_favorites: bool = Query(default=False),
         only_new: bool = Query(default=False),
         remote_only: bool = Query(default=False),
@@ -53,27 +55,68 @@ def build_router(container: AppContainer) -> APIRouter:
         min_score: int | None = Query(default=None, ge=0, le=10),
         max_age_days: int | None = Query(default=None, ge=1, le=365),
         applicable_only: bool = Query(default=False),
+        from_mail: bool = Query(default=False),
         limit: int = Query(default=200, ge=1, le=2000),
     ) -> dict[str, Any]:
-        jobs = container.db.list_jobs(
-            status=status,
-            only_favorites=only_favorites,
-            only_new=only_new,
-            remote_only=remote_only,
-            search_text=search_text,
-            min_score=min_score,
-            max_age_days=max_age_days,
-            limit=limit,
-        )
-        if applicable_only:
-            jobs = [job for job in jobs if not (set(job.get("flags") or []) & BLOCKING_FLAGS)]
+        if bucket is not None and bucket not in JOB_BUCKETS:
+            raise HTTPException(status_code=422, detail="unknown_bucket")
+        # The blocking codes are passed in rather than imported by the database
+        # layer: they live in ``scan.hard_requirements``, which reaches ``db``
+        # through ``candidate_facts``, and importing them there would close the
+        # loop.
+        blocking = BLOCKING_FLAGS if applicable_only else None
+        filters: dict[str, Any] = {
+            "status": status,
+            "bucket": bucket,
+            "only_favorites": only_favorites,
+            "only_new": only_new,
+            "remote_only": remote_only,
+            "search_text": search_text,
+            "min_score": min_score,
+            "max_age_days": max_age_days,
+            "blocking_flags": blocking,
+            "from_mail": from_mail,
+        }
+        jobs = container.db.list_jobs(limit=limit, **filters)
+        total = container.db.count_jobs(**filters)
         # The list view renders none of these, and they are by far the heaviest
         # columns (a full posting is ~5k chars; 200 of them is megabytes per
         # refresh). The detail endpoint still serves them.
         for job in jobs:
             for heavy in ("descrizione", "analysis_json", "sources_json"):
                 job.pop(heavy, None)
-        return {"jobs": jobs}
+        # ``shown`` and ``total`` differ exactly when the cap is hiding
+        # something, which is the one thing the old response could not say.
+        return {"jobs": jobs, "shown": len(jobs), "total": total}
+
+    @router.get("/api/jobs/counts")
+    def job_counts(
+        only_favorites: bool = Query(default=False),
+        only_new: bool = Query(default=False),
+        remote_only: bool = Query(default=False),
+        search_text: str | None = Query(default=None),
+        min_score: int | None = Query(default=None, ge=0, le=10),
+        max_age_days: int | None = Query(default=None, ge=1, le=365),
+        applicable_only: bool = Query(default=False),
+        from_mail: bool = Query(default=False),
+    ) -> dict[str, Any]:
+        """How big each bucket is under the current filters (for the tabs).
+
+        Declared before ``/api/jobs/{job_id}`` on purpose: routes match in
+        declaration order and "counts" is not an int.
+        """
+        return {
+            "counts": container.db.bucket_counts(
+                only_favorites=only_favorites,
+                only_new=only_new,
+                remote_only=remote_only,
+                search_text=search_text,
+                min_score=min_score,
+                max_age_days=max_age_days,
+                blocking_flags=BLOCKING_FLAGS if applicable_only else None,
+                from_mail=from_mail,
+            )
+        }
 
     @router.get("/api/jobs/{job_id}")
     def get_job_detail(job_id: int) -> dict[str, Any]:

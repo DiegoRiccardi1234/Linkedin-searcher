@@ -93,166 +93,13 @@ TECH_KEYWORDS = {
     "learning",
 }
 
-# Domain vocabulary (bilingual it+en) for the relevance gate: a scraped job whose
-# title+description shares NONE of these — nor any of the candidate's own skill
-# tokens — is off-topic (kitchen/spa/food-QC/pharma) and dropped before wasting an
-# LLM scoring call. Deliberately excludes generic role words (analyst/engineer/
-# quality) so it keys on the actual tech/AI/data domain, not the fuzzy match.
-_DOMAIN_VOCAB = {
-    # AI / data / ML
-    "ai",
-    "ml",
-    "nlp",
-    "llm",
-    "genai",
-    "data",
-    "dati",
-    "dataset",
-    "analytics",
-    "analisi",
-    "machine",
-    "learning",
-    "apprendimento",
-    "deep",
-    "neural",
-    "rete",
-    "reti",
-    "model",
-    "modelli",
-    "modello",
-    "algorithm",
-    "algoritmo",
-    "algoritmi",
-    "intelligenza",
-    "artificiale",
-    "annotation",
-    "annotazione",
-    "labeling",
-    "etichettatura",
-    "linguistic",
-    "linguistica",
-    "linguistico",
-    "computational",
-    "computazionale",
-    "prompt",
-    "embedding",
-    # software / dev
-    "software",
-    "sviluppo",
-    "sviluppatore",
-    "developer",
-    "development",
-    "programmazione",
-    "programming",
-    "coding",
-    "informatica",
-    "informatico",
-    "backend",
-    "frontend",
-    "fullstack",
-    "api",
-    "database",
-    "cloud",
-    "devops",
-    "python",
-    "java",
-    "javascript",
-    "typescript",
-    "react",
-    "node",
-    "sql",
-    "docker",
-    # Entry routes. Without these a posting titled only "Tirocinio curriculare"
-    # — no description, so the relevance gate judges the title alone — shares no
-    # word with the vocabulary and is dropped before anyone can read it.
-    "tirocinio",
-    "tirocinante",
-    "stage",
-    "stagista",
-    "internship",
-    "intern",
-    "trainee",
-    "apprendistato",
-    "apprenticeship",
-    "neolaureato",
-    "neolaureati",
-    "graduate",
-}
-
-
-# What the TITLE has to say for the posting to be worth reading. Narrower than
-# ``_DOMAIN_VOCAB`` on purpose: that list is matched against title+description,
-# where words like "data", "software" and "cloud" appear in every corporate ad —
-# which is why the gate below dropped nothing. A title names the trade, and a
-# trade this candidate does not practise is not worth an LLM call.
-#
-# Measured on 47 real postings: this keeps 21 and drops 26, and every dropped
-# posting that had scored >=7 was a false positive (Application Specialist,
-# Security Associate Specialist, PAYROLL SPECIALIST, RAI Specialist…).
-_TITLE_DOMAIN = {
-    # AI / data / language
-    "ai",
-    "a.i",
-    "ia",
-    "ml",
-    "nlp",
-    "llm",
-    "genai",
-    "data",
-    "dati",
-    "dataset",
-    "annotation",
-    "annotator",
-    "annotazione",
-    "annotatore",
-    "labeling",
-    "prompt",
-    "machine",
-    "learning",
-    "deep",
-    "artificial",
-    "artificiale",
-    "intelligence",
-    "intelligenza",
-    "linguistic",
-    "linguistica",
-    "linguistico",
-    "linguist",
-    "computational",
-    "computazionale",
-    # quality / testing / automation
-    "qa",
-    "test",
-    "tester",
-    "testing",
-    "quality",
-    "automation",
-    "automazione",
-    "evaluation",
-    "valutazione",
-    # software
-    "software",
-    "developer",
-    "sviluppatore",
-    "sviluppatrice",
-    "sviluppo",
-    "engineer",
-    "engineering",
-    "programmatore",
-    "informatico",
-    "informatica",
-    "backend",
-    "frontend",
-    "fullstack",
-    "full-stack",
-    "devops",
-    "python",
-    "java",
-    "javascript",
-    "typescript",
-    "react",
-    "sql",
-}
+# There used to be two fixed word lists here — one for titles, one matched
+# against title+description — and both described exactly one trade: the AI
+# and software vocabulary of the person this app was first written for. A
+# nurse's postings share no word with either, so they were dropped before
+# anyone could read them. The vocabulary is now built from what THIS user
+# asked for, on their CV and in their goals (see :func:`title_vocabulary`),
+# and when there is nothing to build it from the gate simply does not run.
 
 #: Entry-level routes never name the trade in the title ("Tirocinio curriculare",
 #: "Graduate Program"), and dropping them would cut exactly the openings a recent
@@ -335,8 +182,8 @@ def title_vocabulary(
     searching "infermiere pediatrico" would have every posting dropped by a gate
     that only recognises AI and software words.
 
-    :data:`_TITLE_DOMAIN` remains as the fallback for an empty profile, which is
-    what a first scan on a fresh install looks like.
+    Returns an empty set when there is nothing to build from: the callers
+    treat that as "do not filter", not as "use a default trade".
     """
     tokens: set[str] = set()
     for source in (search_terms, skills, roles):
@@ -347,31 +194,23 @@ def title_vocabulary(
     return (tokens | _TITLE_ENTRY_ROUTES) if tokens else set()
 
 
-def default_title_vocabulary() -> set[str]:
-    """The fallback for an empty profile — a first scan on a fresh install.
-
-    Kept apart from :func:`title_vocabulary` because the two are used
-    differently: this list is broad enough to gate a title on, but too broad to
-    RESCUE one with. It contains "software" and "data", which every corporate ad
-    repeats, so counting them in a description would wave everything through —
-    precisely the hole the old gate had.
-    """
-    return _TITLE_DOMAIN | _TITLE_ENTRY_ROUTES
-
-
-def title_off_topic(titolo: str, allowed_tokens: set[str] | None = None) -> bool:
+def title_off_topic(titolo: str, allowed_tokens: set[str]) -> bool:
     """True when the title names no trade in ``allowed_tokens``.
 
     The relevance gate used to read title+description and fire only on ZERO
     overlap, which no corporate posting ever reaches. Reading the title alone,
     against the user's own vocabulary, is what actually separates "this is my
     job" from "this ad contains words I know".
+
+    The vocabulary is required: it used to default to a fixed list, which meant
+    a caller with nothing to say about the user silently got somebody else's
+    trade. An empty set keeps everything, which is the right answer when we
+    know nothing.
     """
     tokens = _title_tokens(titolo)
-    if not tokens:
+    if not tokens or not allowed_tokens:
         return False  # nothing to judge: keep it and let the rest decide
-    allowed = allowed_tokens or default_title_vocabulary()
-    return not (tokens & allowed)
+    return not (tokens & allowed_tokens)
 
 
 #: How often the user's own words must appear in a posting for it to overrule a
@@ -398,9 +237,7 @@ def description_on_topic(
     ad whatsoever, while "AI" is the acronym that actually means something.
     """
     text = descrizione or ""
-    # No text, or no idea what this user is after: nothing to rescue WITH. The
-    # broad fallback list is deliberately not used here (see
-    # :func:`default_title_vocabulary`).
+    # No text, or no idea what this user is after: nothing to rescue WITH.
     if not text or not allowed_tokens:
         return False
     allowed = allowed_tokens

@@ -154,13 +154,18 @@ html, body {
 /* Compact density (Settings). Windows display scaling at 125-150% shrinks the
    CSS viewport without shrinking the design, so a 1920 screen behaves like a
    1536 or 1280 one: this gives back a step of room on demand, on any screen. */
+:root[data-density="xcompact"] { --density: 0.86; }
 :root[data-density="compact"] { --density: 0.92; }
 :root[data-density="normal"] { --density: 1; }
 :root[data-density="comfortable"] { --density: 1.08; }
 :root[data-density="large"] { --density: 1.16; }
-:root[data-density="compact"] .analytics-card { min-height: 220px; }
-:root[data-density="compact"] .table-wrap td { padding: 7px 10px; }
-:root[data-density="compact"] .table-wrap th { padding: 6px 10px; }
+:root[data-density="xlarge"] { --density: 1.26; }
+:root[data-density="compact"] .analytics-card,
+:root[data-density="xcompact"] .analytics-card { min-height: 220px; }
+:root[data-density="compact"] .table-wrap td,
+:root[data-density="xcompact"] .table-wrap td { padding: 7px 10px; }
+:root[data-density="compact"] .table-wrap th,
+:root[data-density="xcompact"] .table-wrap th { padding: 6px 10px; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
@@ -654,6 +659,153 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
   color: var(--accent);
   border-color: var(--accent);
   z-index: 1;
+}
+
+/* The archive's slices. A row of tabs rather than a dropdown so the state you
+   are looking at, and how much of the archive it holds, are both readable
+   without opening anything. */
+.bucket-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.bucket-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.bucket-tab:hover { border-color: var(--accent); color: var(--text); }
+.bucket-tab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bucket-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--text-secondary);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.12));
+  border-radius: 999px;
+  padding: 0 6px;
+  min-width: 1.4em;
+  text-align: center;
+}
+.bucket-tab.is-active .bucket-count { color: var(--accent); background: transparent; }
+.bucket-count:empty { display: none; }
+
+/* Sub-tabs inside a view (Settings, Profile). Panels are hidden by class, not
+   by the hidden attribute, so getElementById and applyTranslations keep
+   working on a panel nobody is looking at. */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4, 20px);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-2);
+}
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.subtab:hover { background: var(--surface); color: var(--text); }
+.subtab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.subtab .material-symbols-outlined { font-size: 1.1rem; }
+.subtab-badge {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs, 0.75rem);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  min-width: 1.4em;
+  text-align: center;
+}
+.subtab-panel { display: none; }
+.subtab-panel.is-active { display: block; }
+/* Cards that only mean something once a CV exists. Marked rather than wrapped,
+   because they now live in four different panels. */
+.view.no-profile [data-needs-profile] { display: none; }
+
+/* What the app still needs to know, at the top of the tab where it can be
+   answered. A gap named without a way to fill it is just a complaint. */
+.readiness-strip { margin-bottom: var(--space-3); }
+.readiness-strip:empty { display: none; }
+.readiness-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.readiness-label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.readiness-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: default;
+}
+button.readiness-chip { cursor: pointer; }
+button.readiness-chip:hover { border-color: var(--accent); color: var(--text); }
+.readiness-chip.is-blocking {
+  border-color: var(--danger, #d33);
+  color: var(--danger, #d33);
+}
+.readiness-chip.is-warning { border-style: dashed; }
+.readiness-chip.is-ok { opacity: 0.75; }
+.readiness-done { font-size: var(--fs-sm); color: var(--text-secondary); }
+
+.jobs-count-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(var(--space-3) * -1 + 2px) 0 var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* ============== jobs table ============== */
@@ -3045,6 +3197,20 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
 }
 .provider-health-row > span:last-child { color: var(--text-muted); text-align: right; }
 
+/* Which provider to use: measured first, published second */
+.provider-advice {
+  margin-bottom: var(--space-3); padding: var(--space-2);
+  border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.advice-row {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  flex-wrap: wrap; padding: 3px 0; font-size: var(--fs-sm);
+}
+.advice-label { font-weight: 600; opacity: 0.7; min-width: 7rem; }
+.advice-row > span.micro { color: var(--text-muted); }
+.advice-links { margin-left: auto; }
+.advice-warnings { margin: var(--space-2) 0 0; padding-left: 1.1rem; color: var(--text-muted); }
+
 /* Provider cards: what a provider costs, and where to get a key */
 .provider-free-badge {
   background: rgba(0, 135, 90, 0.14); color: var(--success);
@@ -3085,9 +3251,61 @@ th.th-sort.is-sorted[data-dir="desc"]::after { content: " v"; font-size: 0.7em; 
   border-radius: 0.5rem; align-self: flex-start;
 }
 .mail-review { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-2); }
-.mail-review-row {
-  display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 0.6rem;
-  align-items: start; padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+/* One card per message. The two-column grid this replaces made the options
+   themselves grid children, so six candidates snaked across both columns and
+   the first one sat next to the company name. */
+.mail-review-card {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
 }
-.mail-review-row .micro { grid-column: 2; opacity: 0.75; }
+.mail-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+}
+.mail-review-head .micro { opacity: 0.75; }
+.mail-review-seq {
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+.mail-review-question { margin: 0 0 var(--space-2); opacity: 0.75; }
+.mail-review-options { display: flex; flex-direction: column; gap: 2px; }
+.mail-review-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+}
+.mail-review-option:hover { background: var(--accent-soft); }
+.mail-review-role { font-weight: 600; }
 .mail-review-job { font-weight: 600; }
+
+/* The coach's proposals. Rendered as a card with a button, because the model
+   suggesting something and the app doing it are two different events. */
+.chat-action-card {
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.chat-action-text { margin: 0 0 var(--space-2); font-size: var(--fs-sm); }
+.chat-action-buttons { display: flex; gap: var(--space-2); }
+.chat-action-buttons button { padding: 4px 12px; font-size: var(--fs-sm); }
+.chat-action-done { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+
+/* The rate-limit table: three columns of numbers plus a place to type your own. */
+.limits-table { overflow-x: auto; margin: var(--space-2) 0; }
+.limits-table table { width: 100%; }
+.limits-edit { display: flex; gap: 6px; align-items: center; }
+.limits-edit input { width: 5.5rem; }

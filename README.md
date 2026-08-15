@@ -6,7 +6,7 @@
 [![CI](https://github.com/DiegoRiccardi1234/job-finder/actions/workflows/tests.yml/badge.svg)](https://github.com/DiegoRiccardi1234/job-finder/actions/workflows/tests.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DiegoRiccardi1234/job-finder/main/coverage.json)](https://github.com/DiegoRiccardi1234/job-finder/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![AI Powered](https://img.shields.io/badge/AI-10%20LLM%20providers-blueviolet)](#supported-llm-providers)
+[![AI Powered](https://img.shields.io/badge/AI-13%20LLM%20providers-blueviolet)](#supported-llm-providers)
 [![Mypy: strict](https://img.shields.io/badge/mypy-strict-2A6DB2)](https://mypy.readthedocs.io/)
 [![Ruff](https://img.shields.io/badge/ruff-checked-261230)](https://github.com/astral-sh/ruff)
 [![Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange)](CHANGELOG.md)
@@ -28,9 +28,9 @@ Don't want to install Python? Grab the standalone Windows bundle from the [lates
 2. Right-click → "Extract All" anywhere you like.
 3. Open the extracted folder and double-click `JobFinder.exe`.
 4. Your browser opens automatically on `http://127.0.0.1:8000`.
-5. The app shows a "No API key configured" banner — click **Get a free Cerebras key** to register (no credit card, free tier, 30 seconds), copy your key into **Settings → API keys**, you're done.
+5. The app shows a "No API key configured" banner. Open **Settings → AI**: the top of the page names the free provider to use right now and links straight to its signup — it reads what the app has measured on your own key, and it knows when a free tier is closing (v2.0.0). Paste the key, you're done.
 
-Everything stays on your machine: the SQLite DB, your CV, your notes. The bundle is just Python packaged as a single executable, no telemetry, no remote calls except the LLM provider you configure and the LinkedIn / Indeed scrape — the charting library and the icon font ship inside the bundle (v1.7.7), so the app also works offline.
+Everything stays on your machine: the SQLite DB, your CV, your notes. The bundle is just Python packaged as a single executable, with no telemetry. It does make outbound calls, and the **Info tab lists every one of them**: the LLM provider you configure, the LinkedIn / Indeed scrape, your mailbox if you connect one, and the update check. Nothing else — the charting library and the icon font ship inside the bundle (v1.7.7), so the rest of the app works offline.
 
 > **Windows SmartScreen**: the first launch may show "Windows protected your PC". Click **More info** → **Run anyway**. The exe is unsigned (code-signing certificates cost ~$200/year and are out of scope for a personal project).
 
@@ -58,7 +58,7 @@ The result is a portfolio-grade FastAPI app with a multi-provider LLM backbone, 
 - **Smart CV analysis** — Upload PDF / DOCX / TXT or images (JPG / PNG / AVIF / WEBP / TIFF / BMP / SVG). Scanned PDFs and image CVs are read via Tesseract OCR; the LLM extracts skills, seniority, languages, and ideal roles — with the narrative summary written in your UI language (v1.5.0+).
 - **Profile tab** — Inspect what the AI understood from your CV, edit `preferred_roles` / `skills` / `languages` inline (chip-list with PATCH), switch between previously uploaded CVs (multi-CV history with **Set active**, delete unwanted CVs).
 - **AI Career Coach** — Chat that learns your preferences, suggests search terms via clickable role pills, and can autofill the scan form via structured `action` payloads. Quick-prompt suggestions derived from your CV. Override the active provider **and model** per turn; a one-shot toast offers to persist the choice as default.
-- **Provider cards** (Settings) — One card per LLM (Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI/Grok, Zhipu GLM, Mistral) with its own state (empty → configured → fetching → active), per-provider Save & fetch, ⭐-recommended model dropdown populated live from the provider's `list_models`, and a refresh button (5-min TTL cache).
+- **Provider cards** (Settings) — One card per LLM (Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI/Grok, Zhipu GLM, Mistral, Cloudflare Workers AI, OVHcloud, plus any OpenAI-compatible endpoint of your own) with its own state (empty → configured → fetching → active), per-provider Save & fetch, ⭐-recommended model dropdown populated live from the provider's `list_models`, and a refresh button (5-min TTL cache).
 - **Job Search** — Flat layout with profile-derived role chips, keyword/location tag inputs, parallel LinkedIn + Indeed scan with one-click delete on jobs you don't want.
 - **Multi-source scan** — LinkedIn + Indeed in parallel, streamed via Server-Sent Events.
 - **Personalized scoring** — Each job gets a 1-10 AI score with pros/cons and an apply/skip recommendation.
@@ -96,9 +96,15 @@ The result is a portfolio-grade FastAPI app with a multi-provider LLM backbone, 
 - **Degree requirements count** (v1.7.5) — a role asking for a Master's or PhD can no longer score 9 against a Bachelor's CV: the scorer compares the posting's hard requirements (degree, minimum grade, years, language) with your CV and must make the gap visible. Indeed also stopped returning a handful of results per search (its API applies only one server-side filter, so the freshness window silently cancelled the others).
 - **Offers you can't take stop outranking the ones you can** (v1.7.6) — postings based outside the EU (no visa, no relocation) and postings demanding a degree grade above yours are capped, and detected *before* the AI call so they cost no quota. Work mode is read from the posting instead of your search flag. You can set a **minimum and target salary** (with an AI suggestion from your CV and market) and the match radar hides the salary axis when nothing is known about pay, instead of drawing a confident average.
 - **Every score says why** (v1.7.7) — the reasons behind a capped score are shown as badges on the job row, the kanban card and the detail drawer ("Outside the EU", "Grade requirement", "Task work", "Local estimate"), translated in all five languages, with a filter to hide offers you can't apply to. Offers can be **compared side by side** (up to three: axes, blockers, matching and missing skills), the table sorts by score / title / company / location, and a freshness badge flags postings the scan hasn't seen in a while. Under the hood, the app now picks its scoring model from **what each model actually did** on your past calls (valid JSON rate, truncations, latency — read from the usage log, no extra requests) rather than from its name, and the app no longer needs a CDN to draw its charts and icons.
-- **Multilingual UI** — English, Italian, Spanish, French, German (100% key parity across locales).
+- **Your mailbox, read-only** (v1.8.2–v1.8.5) — connect the address you apply with (Outlook via OAuth or any IMAP account with an app password) and the app recognises application confirmations and marks those offers as applied. It never sends, never deletes, and never stores a message: bodies are read in memory and, if you ask it to, only the job title is taken from them. It can also **rebuild applications the archive never knew about** — a year of confirmations from companies you applied to elsewhere — and anything it cannot assign on its own goes to a **review queue** that survives restarts: one card per message, three choices (this offer / record as a new application / ignore), and nothing changes until you decide.
+- **The app asks instead of guessing** (v2.0.0) — this used to be one person's tool, and it showed: an empty search form quietly resolved to that person's roles and city, then saved them as *your* last search. All of it is gone. What to search for now comes from your own profile, the city is read from your CV, and when there is nothing to go on the scan **refuses and says what it needs** rather than inventing a search. A readiness strip on the Profile tab shows exactly what is still missing, and a pre-scan gate stops a run that would have searched for somebody else.
+- **An archive you can navigate** (v2.0.0) — five buckets with live counts (To review · Applied · Discarded · Archived · All), "showing X of Y" so a filter can never hide rows silently, a **From mail** filter for applications rebuilt from your inbox, sub-tabs in Settings and Profile, and six display densities that actually change the layout.
+- **Rate limits the app measures itself** (v2.0.0) — free-tier limits belong to a project and a key, not to a provider: the same model is 500 requests a day for one user and fifty for the next. The app ships sensible defaults, **watches its own 429s to learn the real ceiling**, paces its calls to stay under it, skips a model whose daily allowance is spent, and lets you type the numbers from your own console. A weekly workflow re-reads the providers' pricing pages and opens an issue when one moves.
+- **It tells you which provider to use** (v2.0.0) — Settings names the free provider to open right now, with the reasons: what it measured on your key, the daily allowance, where the models run, whether the free tier trains on your prompts. Where that last answer is not verified it says so and links the provider's own terms, instead of implying your CV is safe.
+- **Every verdict names its model** (v2.0.0) — a year of failover means the archive holds scores written by a dozen different models, all rendered as the same number out of ten. New scores record who wrote them.
+- **Multilingual UI** — English, Italian, Spanish, French, German (100% key parity across locales, 1000 keys each).
 - **Responsive layout** (v1.4.2+) — mobile-friendly below 960px: hamburger nav, off-canvas Career Coach drawer, horizontally-scrollable tables, single-column dashboards. Desktop layout unchanged.
-- **Multi-LLM fallback** — Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI (Grok), Zhipu GLM, Mistral — configurable order, skips a dead (401) key, exponential backoff retry.
+- **Multi-LLM fallback** — Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI (Grok), Zhipu GLM, Mistral, Cloudflare Workers AI, OVHcloud AI Endpoints, and any OpenAI-compatible endpoint you point it at — configurable order, skips a dead (401) key, skips a model whose daily quota is gone, exponential backoff retry.
 - **Resilient by default** — Structured logging, no silent `except Exception`, WAL-mode SQLite, file size + MIME validation on uploads.
 - **Token usage tracker** (v1.1.0+) — every LLM call is logged to `usage_log`; `GET /api/usage/stats?range=today|week|month|all` returns aggregates (total / per-provider / per-day), surfaced in the **AI Usage** dashboard card (v1.5.4) so you always know how many tokens you've burned.
 - **Soft onboarding gate** (v1.1.0+) — fresh installs land on a non-dismissable banner pointing to Settings; non-Settings tabs are visually locked until you save at least one provider key. Backend `/api/chat` and `/api/scan` return HTTP 412 if no provider is configured.
@@ -116,13 +122,15 @@ The animated hero above walks through the full flow end-to-end:
 4. **Job Search** — flat layout with profile-derived role chips ready to click into keywords, plus tag-input filters for locations and sites.
 5. **Chat coach** — natural-language Q&A with clickable role pills and CV-derived quick prompts.
 6. **Live scan** — animated progress bar, per-job score chips (green/yellow/red), real-time feed.
-7. **AI Usage panel** — tokens and calls per provider, with a today / 7 / 30-day / all-time range (v1.5.4).
-8. **Add a job manually** — a quick form to track referrals and off-board finds (v1.5.4).
-9. **Dark mode** — the whole UI switches theme from the top bar (v1.5.3).
+7. **The archive** — five buckets with counts, and "showing X of Y" (v2.0.0).
+8. **Mail** — the review queue: one card per message, three choices, nothing decided for you (v1.8.5+).
+9. **AI Usage panel** — tokens and calls per provider, with a today / 7 / 30-day / all-time range (v1.5.4).
+10. **Add a job manually** — a quick form to track referrals and off-board finds (v1.5.4).
+11. **Dark mode** — the whole UI switches theme from the top bar (v1.5.3).
 
 ### Static screenshots
 
-For readers who can't render the GIF, five still frames cover the main flows:
+For readers who can't render the GIF, these still frames cover the main flows:
 
 | Dashboard + Analytics | Career Coach in action |
 |-----------------------|------------------------|
@@ -137,7 +145,17 @@ For readers who can't render the GIF, five still frames cover the main flows:
 | Settings — AI providers | AI Usage panel (v1.5.4) |
 |-------------------------|-------------------------|
 | ![Settings providers](screenshots/readme/settings-providers-en.png) | ![AI Usage](screenshots/readme/usage-panel-en.png) |
-| Ten provider cards with searchable model pickers, ⭐-recommended models, "Auto (→ model)" hint, one-click key removal. | Tokens & calls per provider, over today / 7-day / 30-day / all-time. |
+| Thirteen provider cards, each provider's own track record, and — at the top — which one to use right now and why (v2.0.0). | Tokens & calls per provider, over today / 7-day / 30-day / all-time. |
+
+| The archive (v2.0.0) | Mail: the review queue (v1.8.5+) |
+|----------------------|----------------------------------|
+| ![Archive buckets](screenshots/readme/archive-buckets-en.png) | ![Mail review](screenshots/readme/mail-review-en.png) |
+| Five buckets with live counts and "showing X of Y" — a filter can no longer hide rows in silence. | One card per message: this offer, record it as a new application, or ignore. Nothing changes until you choose. |
+
+| Provider rate limits (v2.0.0) | Profile readiness (v2.0.0) |
+|-------------------------------|-----------------------------|
+| ![Provider limits](screenshots/readme/provider-limits-en.png) | ![Profile readiness](screenshots/readme/profile-readiness-en.png) |
+| What the app ships knowing, what it has measured on *your* key, what you spent today, and the numbers you typed from your own console. | What the app still needs before it can search for you — two blocking items, the rest advice. |
 
 | Add a job manually (v1.5.4) | Per-job timeline + notes (v1.5.4) |
 |-----------------------------|-----------------------------------|
@@ -215,12 +233,12 @@ The chat service is split into single-responsibility modules:
 | Backend | Python 3.11+, FastAPI, uvicorn |
 | Database | SQLite (WAL mode, `threading.Lock` shared connection, numbered migrations) |
 | Frontend | Vanilla JS (ES2020 modules), CSS3 glassmorphism, no framework |
-| AI / LLM | 10-provider factory: Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI, GLM, Mistral — exponential-backoff retry |
+| AI / LLM | 13-provider factory: Cerebras, Groq, OpenAI, Anthropic, Google, OpenRouter, DeepSeek, xAI, GLM, Mistral, Cloudflare Workers AI, OVHcloud, plus any OpenAI-compatible endpoint — failover, measured rate limits, exponential-backoff retry |
 | OCR | Tesseract 5.x (via `pytesseract` + `pdf2image`) — scanned PDFs and image CVs (JPG/PNG/AVIF/WEBP/TIFF). Bundle ships **5 languages**: EN/IT/ES/FR/DE (~13 MB tessdata) |
 | Scraping | [python-jobspy](https://github.com/Bunsly/JobSpy) |
 | Streaming | Server-Sent Events |
-| Testing | pytest (unit, 552 tests), Playwright (E2E) |
-| Quality | ruff, mypy strict, pre-commit, 59% line coverage |
+| Testing | pytest (985 unit tests across 96 files), Playwright (9 E2E specs) |
+| Quality | ruff, mypy strict, pre-commit, coverage badge published from CI |
 | Deployment | Multi-stage Dockerfile + docker-compose, healthcheck, non-root user |
 | Distribution | Standalone Windows bundle via PyInstaller (`make build-exe`) — Tesseract bundled, auto-update over GitHub Releases |
 | Logging | stdlib `logging` + RotatingFileHandler → `data/logs/app.log` |
@@ -245,8 +263,8 @@ app/
 ├── version.py               Version metadata + GitHub release checker
 ├── migrations/              Numbered SQLite schema migrations (idempotent runner)
 ├── prompts/                 Prompt templates (.txt) for chat and generation
-├── providers/               LLM factory + 10 provider implementations (retry + backoff)
-├── routers/                 9 API routers (jobs, chat, scan, profile, providers, …)
+├── providers/               LLM factory + 13 providers (failover, penalties, rate-limit pacing)
+├── routers/                 10 API routers (jobs, chat, scan, profile, providers, mail, …)
 └── services/
     ├── chat/                Chat package (state/context/memory/prompts/intents/fallback/handler)
     ├── scanner_service.py   Job scraping + scoring orchestration
@@ -255,6 +273,11 @@ app/
     ├── model_scoreboard.py  Per-model track record read back from usage_log
     ├── model_stats.py       OpenRouter live health (free, no inference)
     ├── model_probe.py       Opt-in probe with the real scoring prompt
+    ├── rate_limits.py       Shipped defaults + the limits measured from your own 429s
+    ├── provider_advice.py   Which provider to use, and the reasons why
+    ├── readiness.py         What the app still needs before it can search
+    ├── search_intent.py     Where the terms and the city come from (never a default)
+    ├── mail/                Read-only mailbox: confirmations, recovery, review queue
     ├── autoscan.py          In-process scheduler
     ├── skill_gap.py         Aggregated missing skills + learning ideas
     ├── job_import.py        Import a posting from a URL / pasted text
@@ -265,19 +288,20 @@ app/
 web/
 ├── app.js                   Bootstrap + per-feature wiring (ES module entry)
 ├── index.html               Single-page shell, mounts /web/* assets
-├── modules/                 16 feature modules (job_list, job_detail, compare, scan,
-│                            providers, profile, features, update, analytics, i18n, …)
+├── modules/                 29 feature modules (job_list, job_detail, compare, scan,
+│                            providers, limits, mailbox, readiness, analytics, i18n, …)
 ├── vendor/                  Chart.js + icon font, bundled so the app works offline
 ├── styles/                  Per-feature CSS (chat.css extracted)
 ├── styles.css               Core stylesheet (glassmorphism + tokens)
-└── i18n/                    Per-locale JSON (en, it, es, fr, de — 649 keys each)
+└── i18n/                    Per-locale JSON (en, it, es, fr, de — 1000 keys each)
 tests/
-├── unit/                    pytest suite (552 tests, FakeProviderManager fixture)
+├── unit/                    pytest suite (985 tests, FakeProviderManager fixture)
 └── e2e/                     Playwright specs (smoke, README screenshots, demo GIF)
 scripts/
 ├── check_i18n.py            i18n coverage audit (fails CI on missing keys)
 ├── coverage_badge.py        coverage.xml → coverage.json shields.io endpoint
-├── seed_demo.py             Pre-populate a demo DB for screenshots / GIF
+├── seed_demo.py             Pre-populate data/demo.db for screenshots / GIF
+├── watch_provider_limits.py Weekly check that a provider's free tier has not moved
 ├── update.py                Source-mode self-update (git pull + pip)
 ├── launch_exe.py            PyInstaller entry — workspace next to .exe, browser auto-open
 ├── updater.py               Bundled as Updater.exe — sync new release, preserve data/
@@ -292,7 +316,7 @@ vendor/tesseract/            Bundled Tesseract OCR (created by build_exe.py)
 
 ### Prerequisites
 - Python 3.11+
-- At least one LLM API key (any of the 10 supported providers)
+- At least one LLM API key (any of the 13 supported providers; Settings → AI says which free one to get)
 - Tesseract OCR (optional but recommended — required to upload image CVs and scanned PDFs):
   - **Windows**: `winget install UB-Mannheim.TesseractOCR`
   - **macOS**: `brew install tesseract tesseract-lang`
@@ -367,8 +391,13 @@ When offline, online features fail gracefully and fall back to rule-based answer
 | **xAI (Grok)** | Grok 4, Grok 3, Grok 3 mini |
 | **Zhipu GLM** | GLM-4.6, GLM-4.5, GLM-4.5-Air |
 | **Mistral** | Mistral Large, Small, Codestral |
+| **Cloudflare Workers AI** | Free tier on one token: 10,000 Neurons/day ≈ 50 scored offers on a 70B. Measured 1.2s and clean JSON on `llama-3.3-70b-fp8-fast`. The account id is read from the token, so you only paste a key |
+| **OVHcloud AI Endpoints** | Models hosted in the EU — the only catalog here that keeps your CV in Europe. Key optional: store the word `anonymous` for the free shared tier (2 req/min, and the big models are usually busy) |
+| **Local / custom** | Any OpenAI-compatible endpoint: Ollama, LM Studio, vLLM, llama.cpp, or a gateway. Nothing leaves the machine |
 
-The `ProviderManager` picks the first available provider from your configured order, skips a provider whose key is invalid (401), logs the choice, and exposes a `metadata()` endpoint for the UI status badge. New OpenAI-compatible providers subclass `OpenAICompatibleProvider` (base URL + default model).
+The `ProviderManager` picks the first available provider from your configured order, skips a provider whose key is invalid (401) or whose daily allowance is spent, paces its calls under the limit it has measured, logs the choice, and exposes a `metadata()` endpoint for the UI status badge. New OpenAI-compatible providers subclass `OpenAICompatibleProvider` (base URL + default model).
+
+**Which one should you use?** The app answers that itself, in Settings → AI: it ranks providers from what it has measured on *your* key first and what they publish second, warns when a free tier is about to close, and — when it does not know whether a free tier trains on your prompts — says so and links their terms instead of implying your CV is safe.
 
 ---
 
@@ -399,6 +428,14 @@ The `ProviderManager` picks the first available provider from your configured or
 | POST | `/api/chat` | Chat with AI Career Coach (accepts optional `provider` + `model` overrides) |
 | GET | `/api/analytics` | Dashboard stats |
 | GET | `/api/recommendations` | Top AI-recommended jobs |
+| GET | `/api/profile/readiness` | What the app still needs before it can search (two blocking items, the rest advice) |
+| GET | `/api/providers/advice` | Which provider to use, the runners-up, and the warnings |
+| GET | `/api/providers/limits` | Per-model limits: shipped, measured, yours, and what today has spent |
+| POST | `/api/providers/limits` | Override one model's limits with the numbers from your own console |
+| GET | `/api/providers/health` | Per-provider track record, read from `usage_log` (no inference) |
+| GET | `/api/mail/status` | Mailbox connection state + how many messages await a decision |
+| GET | `/api/mail/review` | The review queue: a company, a date, the rule that fired, the offers it could be |
+| POST | `/api/mail/review/resolve` | Apply, record as new, or ignore — one decision per message |
 
 ---
 
@@ -469,13 +506,23 @@ Existing migrations:
 - `008_saved_searches.py` — `saved_searches` table for named scan presets.
 - `009_usage_latency.py` — `usage_log.duration_ms` for latency tracking.
 - `010_jobs_list_index.py` — composite index on `jobs(status, punteggio_ai, last_seen_at)`.
+- `011`–`021` — score feedback, watchlist companies, analysis version marker, job source flags.
+- `022_link_opened.py` — outbound click tracking + how an application was confirmed.
+- `023_mail_seen.py` / `025_mail_review.py` / `026_mail_review_role.py` — the mailbox: messages already judged, and the queue of the ones that need you.
+- `024_years_in_words.py` — experience written in words ("three years") counts as a requirement.
+- `027_degree_field_and_salary.py` — a degree has a subject, and a declared salary below your floor lowers the ceiling.
+- `028_driving_licence.py` — the blocker that was declared and never checked.
+- `029_analysis_model.py` — `jobs.analysis_model`: which model wrote a verdict. Filled from here on; old rows stay NULL rather than being attributed by guesswork.
+
+The full list is `ls app/migrations/` — 29 of them today.
 
 ---
 
 ## Local data
 
 Everything lives in `data/`:
-- `searcher.db` — SQLite (WAL journal mode)
+- `searcher.db` — SQLite (WAL journal mode, 16 tables)
+- `demo.db` — the throwaway database behind the screenshots (`python scripts/seed_demo.py --force`)
 - `local_secrets.json` — provider API keys (gitignored)
 - `settings.json` — user preferences
 - `logs/app.log` — rotating application log

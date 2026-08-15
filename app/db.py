@@ -6,11 +6,11 @@ import sqlite3
 import threading
 import unicodedata
 from collections.abc import Callable, Collection, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
-from app.scoring_schema import ANALYSIS_VERSION_KEY, CURRENT_ANALYSIS_VERSION
+from app.scoring_schema import ANALYSIS_VERSION_KEY, ANSWERED_BY_KEY, CURRENT_ANALYSIS_VERSION
 from app.services.scan.companies import canonical_company
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,53 @@ def _analysis_flags(raw: Any) -> list[str]:
     return [str(f) for f in flags] if isinstance(flags, list) else []
 
 
+#: The ways the archive gets sliced, as SQL. ``to_review`` is what the list
+#: opens on — what is left to decide, i.e. neither applied to nor discarded —
+#: and it is deliberately the same predicate ``open_offers_from`` has always
+#: used, which is why that method now goes through the shared builder too.
+#: ``applied`` absorbs ``interviewing``, and also an offer that was reopened
+#: after an application: ``applied_at`` survives a reopen on purpose, so such a
+#: row is neither "still to decide" nor a plain open offer, and keying that
+#: bucket on the status alone left it in no slice at all. The five clauses
+#: partition the archive — every row lands in exactly one — which is what lets
+#: the tab counts be read as a total.
+JOB_BUCKETS: dict[str, str] = {
+    "to_review": "status = 'open' AND (applied_at IS NULL OR applied_at = '')",
+    "applied": (
+        "status IN ('applied', 'interviewing') "
+        "OR (status = 'open' AND applied_at IS NOT NULL AND applied_at <> '')"
+    ),
+    "rejected": "status = 'rejected'",
+    "archived": "status = 'archived'",
+    "all": "",
+}
+
+#: Flags live inside ``analysis_json`` rather than in a column, so filtering on
+#: them means reading JSON from SQL. The CASE is not decoration: ``json_extract``
+#: raises "malformed JSON" on a single unparseable row and takes the whole query
+#: down with it — measured — so anything that is not valid JSON is read as an
+#: empty flag list, which keeps the row (rows with no analysis at all, such as
+#: applications recovered from the mailbox, must stay visible).
+_FLAGS_JSON_EXPR = (
+    "json_each(CASE WHEN json_valid(COALESCE(analysis_json, '')) "
+    "THEN COALESCE(json_extract(analysis_json, '$.blocchi'), '[]') ELSE '[]' END)"
+)
+
+
+def _probe_json1(conn: sqlite3.Connection) -> bool:
+    """Does this SQLite have the JSON1 functions the flag filter needs?
+
+    Probed once per connection instead of assumed: the frozen bundle ships its
+    own SQLite, and a build without JSON1 has to degrade to filtering in Python
+    rather than raise on every request for the offer list.
+    """
+    try:
+        conn.execute("SELECT json_valid('{}'), (SELECT count(*) FROM json_each('[]'))")
+    except sqlite3.DatabaseError:
+        return False
+    return True
+
+
 def _merge_source(sources: list[dict[str, str]], fonte: str, link: str) -> list[dict[str, str]]:
     """Append ``{fonte, link}`` unless an entry with the same link already exists."""
     link_norm = (link or "").strip().lower()
@@ -144,6 +191,7 @@ class Database:
             self.conn.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.DatabaseError:
             pass
+        self._has_json1 = _probe_json1(self.conn)
         from app.migrations import apply_migrations
 
         apply_migrations(self.conn)
@@ -332,11 +380,15 @@ class Database:
             version = int(raw_version) if raw_version is not None else None
         except (TypeError, ValueError):
             version = None
+        # Who answered, stamped by the provider factory. Kept in its own column
+        # rather than left inside the JSON blob because the point of it is to be
+        # filterable: "show me everything the model I no longer trust scored".
+        answered_by = str(analysis.get(ANSWERED_BY_KEY) or "") or None
         self.conn.execute(
             """
             UPDATE jobs
             SET analysis_json = ?, punteggio_ai = ?, consiglio = ?, analysis_v = ?,
-                analyzed_at = ?, updated_at = ?
+                analysis_model = ?, analyzed_at = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -344,6 +396,7 @@ class Database:
                 score,
                 consiglio,
                 version,
+                answered_by,
                 now_iso(),
                 now_iso(),
                 job_id,
@@ -745,12 +798,16 @@ class Database:
         return [int(r["id"]) for r in rows if company_matches(str(r["azienda"] or ""), company)]
 
     def open_offers_from(self, company: str) -> list[int]:
-        """Open, unapplied offers from this company — the ones worth asking about."""
+        """Open, unapplied offers from this company — the ones worth asking about.
+
+        Shares its predicate with the ``to_review`` bucket rather than restating
+        it: "still to decide" has to mean the same thing to the mailbox matcher
+        and to the offer list, or the two drift and only one of them is right.
+        """
         if not canonical_company(company):
             return []
         rows = self.conn.execute(
-            "SELECT id, azienda FROM jobs WHERE status = 'open' "
-            "AND (applied_at IS NULL OR applied_at = '')"
+            f"SELECT id, azienda FROM jobs WHERE {JOB_BUCKETS['to_review']}"
         ).fetchall()
         from app.services.scan.companies import company_matches
 
@@ -1149,23 +1206,51 @@ class Database:
         self.conn.commit()
         return cur.rowcount or 0
 
-    def list_jobs(
+    def _jobs_where(
         self,
+        *,
         status: str | None = None,
+        bucket: str | None = None,
         only_favorites: bool = False,
         only_new: bool = False,
         remote_only: bool = False,
         search_text: str | None = None,
         min_score: int | None = None,
         max_age_days: int | None = None,
-        limit: int = 200,
-    ) -> list[dict[str, Any]]:
-        query = "SELECT * FROM jobs WHERE 1=1"
+        blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
+    ) -> tuple[str, list[Any]]:
+        """The WHERE clause shared by the list, the total and the bucket counts.
+
+        One builder, because those three used to be a query plus a Python loop
+        that ran AFTER the LIMIT: asking for "open and applicable" returned 123
+        rows at limit 250 and 174 at limit 500 — the row cap was deciding what
+        you were allowed to see rather than how much of it. A filter has to be
+        part of the question, not something applied to the answer.
+        """
+        query = "WHERE 1=1"
         params: list[Any] = []
 
-        if status:
+        if bucket is not None and bucket in JOB_BUCKETS:
+            clause = JOB_BUCKETS[bucket]
+            if clause:
+                query += f" AND ({clause})"
+        elif status:
             query += " AND status = ?"
             params.append(status)
+        if blocking_flags and self._has_json1:
+            placeholders = ", ".join("?" for _ in blocking_flags)
+            query += (
+                f" AND NOT EXISTS (SELECT 1 FROM {_FLAGS_JSON_EXPR}"
+                f" WHERE json_each.value IN ({placeholders}))"
+            )
+            params.extend(sorted(blocking_flags))
+        if from_mail:
+            # ``fonte`` marks where a row came from; 'mail' is an application
+            # rebuilt from a confirmation email rather than an offer that was
+            # scraped. An origin, not a funnel state — so it composes with the
+            # buckets instead of being one.
+            query += " AND fonte = 'mail'"
         if only_favorites:
             query += " AND is_favorite = 1"
         if only_new:
@@ -1190,10 +1275,45 @@ class Database:
         if max_age_days is not None:
             query += " AND julianday('now') - julianday(last_seen_at) <= ?"
             params.append(max_age_days)
+        return query, params
+
+    def list_jobs(
+        self,
+        status: str | None = None,
+        only_favorites: bool = False,
+        only_new: bool = False,
+        remote_only: bool = False,
+        search_text: str | None = None,
+        min_score: int | None = None,
+        max_age_days: int | None = None,
+        limit: int = 200,
+        bucket: str | None = None,
+        blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
+    ) -> list[dict[str, Any]]:
+        where, params = self._jobs_where(
+            status=status,
+            bucket=bucket,
+            only_favorites=only_favorites,
+            only_new=only_new,
+            remote_only=remote_only,
+            search_text=search_text,
+            min_score=min_score,
+            max_age_days=max_age_days,
+            blocking_flags=blocking_flags,
+            from_mail=from_mail,
+        )
+        query = f"SELECT * FROM jobs {where}"
+
+        # Without JSON1 the flag filter still has to run in Python, and then the
+        # cap must be generous: sifting AFTER a small LIMIT is precisely the bug
+        # this rewrite exists to remove.
+        sift_in_python = bool(blocking_flags) and not self._has_json1
+        fetch_limit = max(limit, 2000) if sift_in_python else limit
 
         ordered = query + " ORDER BY punteggio_ai DESC, last_seen_at DESC LIMIT ?"
         cur = self.conn.cursor()
-        cur.execute(ordered, [*params, limit])
+        cur.execute(ordered, [*params, fetch_limit])
         rows = cur.fetchall()
 
         # The row cap is about how many OFFERS to show. It must never decide how
@@ -1202,8 +1322,10 @@ class Database:
         # mailbox carry no score by design (there is no posting to judge), and on
         # a real archive 73 of 97 applications fell past the 250-row cap. The
         # kanban's "Applied" column read 23. They are fetched separately and
-        # appended, which is where they sorted anyway, so nothing moves.
-        if len(rows) >= limit:
+        # appended, which is where they sorted anyway, so nothing moves. (With a
+        # bucket that excludes applications the extra query returns nothing,
+        # which is the right answer there.)
+        if len(rows) >= fetch_limit:
             seen = {row["id"] for row in rows}
             cur.execute(query + " AND applied_at IS NOT NULL ORDER BY applied_at DESC", params)
             rows = list(rows) + [row for row in cur.fetchall() if row["id"] not in seen]
@@ -1216,7 +1338,149 @@ class Database:
             raw["sources"] = _parse_sources(raw.get("sources_json"))
             raw["flags"] = _analysis_flags(raw.get("analysis_json"))
             output.append(raw)
+        if sift_in_python:
+            blocking = set(blocking_flags or ())
+            output = [job for job in output if not (set(job["flags"]) & blocking)][:limit]
         return output
+
+    def count_jobs(
+        self,
+        status: str | None = None,
+        only_favorites: bool = False,
+        only_new: bool = False,
+        remote_only: bool = False,
+        search_text: str | None = None,
+        min_score: int | None = None,
+        max_age_days: int | None = None,
+        bucket: str | None = None,
+        blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
+    ) -> int:
+        """How many offers match, ignoring the row cap.
+
+        This is the number the list has to show next to what it rendered:
+        "showing 123 of 369" is the only thing that tells you a cap is in play.
+        """
+        where, params = self._jobs_where(
+            status=status,
+            bucket=bucket,
+            only_favorites=only_favorites,
+            only_new=only_new,
+            remote_only=remote_only,
+            search_text=search_text,
+            min_score=min_score,
+            max_age_days=max_age_days,
+            blocking_flags=blocking_flags,
+            from_mail=from_mail,
+        )
+        if blocking_flags and not self._has_json1:
+            # No SQL flag filter available: count what the sift would keep.
+            return len(
+                self.list_jobs(
+                    status=status,
+                    bucket=bucket,
+                    only_favorites=only_favorites,
+                    only_new=only_new,
+                    remote_only=remote_only,
+                    search_text=search_text,
+                    min_score=min_score,
+                    max_age_days=max_age_days,
+                    blocking_flags=blocking_flags,
+                    from_mail=from_mail,
+                    limit=2000,
+                )
+            )
+        row = self.conn.execute(f"SELECT COUNT(*) FROM jobs {where}", params).fetchone()
+        return int(row[0] or 0)
+
+    def bucket_counts(
+        self,
+        only_favorites: bool = False,
+        only_new: bool = False,
+        remote_only: bool = False,
+        search_text: str | None = None,
+        min_score: int | None = None,
+        max_age_days: int | None = None,
+        blocking_flags: Collection[str] | None = None,
+        from_mail: bool = False,
+    ) -> dict[str, int]:
+        """Every bucket's size under the *other* filters, in one query.
+
+        The counts react to the search box and the checkboxes but not to which
+        bucket is selected — otherwise the tab you are not looking at would
+        report the size of the tab you are.
+        """
+        if blocking_flags and not self._has_json1:
+            return {
+                name: self.count_jobs(
+                    bucket=name,
+                    only_favorites=only_favorites,
+                    only_new=only_new,
+                    remote_only=remote_only,
+                    search_text=search_text,
+                    min_score=min_score,
+                    max_age_days=max_age_days,
+                    blocking_flags=blocking_flags,
+                    from_mail=from_mail,
+                )
+                for name in JOB_BUCKETS
+            }
+        where, params = self._jobs_where(
+            only_favorites=only_favorites,
+            only_new=only_new,
+            remote_only=remote_only,
+            search_text=search_text,
+            min_score=min_score,
+            max_age_days=max_age_days,
+            blocking_flags=blocking_flags,
+            from_mail=from_mail,
+        )
+        selects = ", ".join(
+            (f"SUM(CASE WHEN {clause} THEN 1 ELSE 0 END)" if clause else "COUNT(*)")
+            + f' AS "{name}"'
+            for name, clause in JOB_BUCKETS.items()
+        )
+        row = self.conn.execute(f"SELECT {selects} FROM jobs {where}", params).fetchone()
+        return {name: int(row[name] or 0) for name in JOB_BUCKETS}
+
+    def recent_usage(self, provider: str, model: str, days: int = 7) -> list[dict[str, Any]]:
+        """Calls to one model, with the timestamp as an epoch float.
+
+        Written for the rate limiter: a 429 and the calls that preceded it are
+        the only honest source for what a free tier actually allows this key.
+        """
+        floor = (datetime.now(UTC) - timedelta(days=max(1, days))).isoformat(timespec="seconds")
+        try:
+            rows = self.conn.execute(
+                "SELECT ts, success, error_type FROM usage_log "
+                "WHERE provider = ? AND model = ? AND ts >= ?",
+                (provider, model, floor),
+            ).fetchall()
+        except sqlite3.DatabaseError:
+            return []
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                stamp = datetime.fromisoformat(str(row["ts"])).timestamp()
+            except (TypeError, ValueError):
+                continue
+            out.append(
+                {"ts": stamp, "success": bool(row["success"]), "error_type": row["error_type"]}
+            )
+        return out
+
+    def usage_count_today(self, provider: str, model: str) -> int:
+        """Successful calls to this model since midnight UTC (the daily cap)."""
+        floor = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        try:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM usage_log WHERE provider = ? AND model = ? "
+                "AND ts >= ? AND success = 1",
+                (provider, model, floor),
+            ).fetchone()
+        except sqlite3.DatabaseError:
+            return 0
+        return int(row[0] or 0)
 
     def get_top_jobs(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.list_jobs(status="open", limit=limit)

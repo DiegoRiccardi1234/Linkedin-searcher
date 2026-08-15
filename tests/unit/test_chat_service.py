@@ -157,3 +157,34 @@ def test_handle_chat_message_strips_markdown_fence(tmp_path, fake_provider) -> N
         db.close()
 
     assert result["answer"] == "wrapped"
+
+
+def test_a_preference_mentioned_in_passing_is_not_written(tmp_path) -> None:
+    """The detector still detects; nobody applies it behind the user's back."""
+    from app.db import Database
+
+    db = Database(tmp_path / "s.db")
+    try:
+        detected = extract_pref_updates("cerco solo full remote, minimo 25000")
+        assert detected["remote_mode"] == "full_remote"
+        # Nothing touched the database: extraction and persistence are now two
+        # different events, and the second one needs a click.
+        assert db.get_preference("remote_mode", "") == ""
+        assert db.get_preference("min_ral", "") == ""
+    finally:
+        db.close()
+
+
+def test_a_profile_filled_from_the_form_counts_as_onboarded(tmp_path) -> None:
+    """The form writes onboarding_*, and the chat used to read only its own keys."""
+    from app.db import Database
+
+    db = Database(tmp_path / "s.db")
+    try:
+        db.save_candidate_profile(
+            source_name="cv.md", markdown="# CV", summary={}, content_hash="h", name="X"
+        )
+        db.set_preference("onboarding_ral_min", "24000")
+        assert get_chat_state(db) != "onboarding"
+    finally:
+        db.close()

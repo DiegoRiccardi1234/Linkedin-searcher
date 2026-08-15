@@ -6,7 +6,8 @@
     "settings": "Ajustes",
     "info": "Info",
     "quit": "Salir",
-    "jobs": "Ofertas"
+    "jobs": "Ofertas",
+    "mail": "Correo"
   },
   "profile": {
     "title": "Tu Perfil",
@@ -118,7 +119,14 @@
       "fromCv": "del CV",
       "fromYou": "introducido por ti",
       "missing": "falta",
-      "saved": "Datos actualizados"
+      "saved": "Datos actualizados",
+      "citiesPlaceholder": "Ciudad, ciudad"
+    },
+    "tabs": {
+      "about": "Quién soy",
+      "target": "Qué busco",
+      "constraints": "Restricciones",
+      "tools": "Herramientas IA"
     }
   },
   "jobSearch": {
@@ -191,11 +199,6 @@
     "favorites": "Favoritos",
     "new": "Nuevos",
     "remote": "Remoto",
-    "allStatuses": "Todos los estados",
-    "open": "Abierto",
-    "applied": "Postulado",
-    "interviewing": "Entrevista",
-    "rejected": "Rechazado",
     "csv": "CSV",
     "score": "Puntuación",
     "title": "Título",
@@ -287,7 +290,22 @@
     "applyPending": "Esperando confirmación",
     "notApplied": "No me he postulado",
     "csvApplications": "CSV candidaturas",
-    "undoMail": "Deshacer la marca del correo"
+    "undoMail": "Deshacer la marca del correo",
+    "bucket": {
+      "toReview": "Por valorar",
+      "applied": "Enviadas",
+      "rejected": "Descartadas",
+      "archived": "Archivadas",
+      "all": "Todas"
+    },
+    "bucketHint": "Lo que queda por decidir: ni enviadas ni descartadas.",
+    "shownOf": "mostradas {shown} de {total}",
+    "showAll": "Mostrar todas",
+    "emptyBucket": "Nada en esta pestaña.",
+    "minScore4": "Nota 4+",
+    "fromMail": "Del correo",
+    "fromMailHint": "Solo las candidaturas reconstruidas desde tu buzón",
+    "scoredBy": "Evaluada por {model}"
   },
   "kanbanCols": {
     "open": "Abierto",
@@ -420,13 +438,72 @@
       "densityCompact": "Compacta",
       "densitySaved": "Densidad actualizada",
       "densityComfortable": "Cómoda",
-      "densityLarge": "Grande"
+      "densityLarge": "Grande",
+      "densityXCompact": "Muy compacta",
+      "densityXLarge": "Muy grande"
     },
     "usage": {
       "limitLabel": "Límite de peticiones al día (0 = sin límite)",
       "limitSaved": "Límite diario actualizado."
     },
-    "keysDiagnostics": "Diagnóstico de claves"
+    "keysDiagnostics": "Diagnóstico de claves",
+    "tabs": {
+      "ai": "IA",
+      "search": "Búsqueda",
+      "appearance": "Apariencia",
+      "system": "Sistema"
+    },
+    "limits": {
+      "title": "Límites de frecuencia",
+      "subtitle": "A qué ritmo puede preguntar la app. Parte de lo que sabemos, se corrige con lo que tu clave permite de verdad, y tú puedes imponerte a ambos.",
+      "model": "Modelo",
+      "default": "De serie",
+      "observed": "Medido",
+      "yours": "Tuyo",
+      "today": "Usadas hoy",
+      "rpm": "sol./min",
+      "rpd": "sol./día",
+      "save": "Guardar",
+      "saved": "Límite guardado",
+      "empty": "Nada que mostrar: la app aún no ha hecho llamadas y no conoce límites para estos modelos.",
+      "exhausted": "Cuota de hoy agotada: la app se salta este modelo hasta mañana.",
+      "hint": "Los números reales están en la consola de tu proveedor. Escríbelos aquí y mandan sobre todo lo demás.",
+      "perMin": "/min",
+      "perDay": "/día"
+    },
+    "advice": {
+      "title": "Qué proveedor usar",
+      "subtitle": "A partir de lo que la app ha medido con tu clave y de lo que publica cada proveedor.",
+      "best": "Recomendado",
+      "why": "Por qué",
+      "alternatives": "También válidos",
+      "getKey": "Consigue una clave",
+      "terms": "Sus condiciones de datos",
+      "none": "Todavía no hay nada que recomendar.",
+      "measuredOn": "Medido en los últimos {days} días",
+      "reason": {
+        "free": "plan gratuito",
+        "no_card": "sin tarjeta",
+        "configured": "clave ya configurada",
+        "allowance": "{n} peticiones al día",
+        "eu_hosted": "alojado en la UE",
+        "stays_on_this_machine": "se ejecuta en este ordenador",
+        "needs_a_model_installed_first": "antes hay que instalar un modelo",
+        "trains_on_prompts": "se entrena con tus prompts",
+        "training_depends_on_model": "el entrenamiento depende del modelo",
+        "measured_success": "{n} de tus llamadas funcionaron",
+        "measured_median_ms": "{n} ms de mediana",
+        "closes_in_days": "cierra en {n} días"
+      },
+      "warn": {
+        "free_tier_closed": "{provider}: el plan gratuito cerró el {on}.",
+        "free_tier_closing": "{provider}: el plan gratuito cierra el {on}.",
+        "trains_on_prompts": "{provider} usa los prompts del plan gratuito —que contienen tu CV— para mejorar sus productos.",
+        "training_unverified": "Aquí no está verificado si {provider} se entrena con tus prompts. Lee sus condiciones antes de enviar un CV.",
+        "no_key_configured": "Aún no hay ninguna clave, así que no se puede evaluar nada.",
+        "key_rejected": "{provider} está rechazando la clave que guardaste."
+      }
+    }
   },
   "coach": {
     "title": "Career Coach",
@@ -547,8 +624,9 @@
     "postScanRenderFailed": "Escaneo completo (resumen no disponible).",
     "volumeWarning": "Búsqueda amplia ({n} búsquedas) — puede tardar.",
     "quotaReached": "El presupuesto de solicitudes de hoy se agotó: el escaneo se detendría a medias. Se reinicia a medianoche UTC, o sube el límite en Ajustes.",
-    "vagueTermWarning": "«{terms}»: un rol genérico solo devuelve de todo (nóminas, ventas, alianzas). Añade una palabra de dominio, p. ej. «AI QA».",
-    "unscoredWarning": "{count} ofertas sin evaluar hasta ahora."
+    "vagueTermWarning": "«{terms}»: un rol genérico por sí solo atrae de todo (nóminas, ventas, alianzas). Añade una palabra que nombre el oficio, p. ej. «{example}».",
+    "unscoredWarning": "{count} ofertas sin evaluar hasta ahora.",
+    "vagueTermWarningPlain": "«{terms}»: un rol genérico por sí solo atrae de todo (nóminas, ventas, alianzas). Añade una palabra que nombre el oficio que buscas."
   },
   "toast": {
     "enterKeyOrProvider": "Introduce al menos una clave o elige un proveedor primario.",
@@ -726,17 +804,17 @@
   "info": {
     "title": "Cómo funciona Job",
     "titleEm": "Finder",
-    "subtitle": "Un recorrido por todas las funciones para sacar el máximo provecho.",
+    "subtitle": "Qué hace la app, qué decide por ti y qué sale de este ordenador.",
     "what": {
       "title": "¿Qué es Job Finder?",
-      "body": "Job Finder es un asistente local con IA para la búsqueda de empleo. Lee tu CV, escanea LinkedIn e Indeed, puntúa los anuncios y te ayuda con cartas de presentación."
+      "body": "Job Finder lee tu CV, busca en LinkedIn e Indeed los puestos que te interesan, evalúa cada oferta frente a tu perfil y lleva la cuenta de dónde te has inscrito. Todo vive en un archivo de base de datos en este ordenador: lo único que sale es lo que envías al proveedor de IA que configures, más las conexiones que se enumeran abajo."
     },
     "start": {
       "title": "Para empezar",
-      "step1": "Sube tu CV en la pestaña Perfil — Job Finder extrae habilidades, experiencia y roles objetivo.",
-      "step2": "Configura al menos una clave de proveedor de IA en Configuración (Groq es gratis y fácil).",
-      "step3": "Abre Job Search, elige filtros y palabras clave, y lanza la búsqueda.",
-      "step4": "Revisa los resultados en el Dashboard y conversa con el AI Coach sobre trabajos concretos."
+      "step1": "Añade la clave de un proveedor de IA en Ajustes → IA. Leer un CV ya es una llamada al modelo, así que esto va primero.",
+      "step2": "Sube tu CV en Perfil → Quién soy. La app extrae tus competencias, tus puestos y —si el CV lo dice— tu ciudad.",
+      "step3": "Di qué buscas y dónde, en Perfil → Qué busco o directamente en el formulario de búsqueda. Sin esas dos cosas el escaneo se detiene y te las pide: no buscará el trabajo de otra persona.",
+      "step4": "Lanza un escaneo desde Buscar empleo, trabaja el archivo en Ofertas y pregunta al coach lo que no entiendas."
     },
     "providers": {
       "title": "Proveedores de IA",
@@ -752,25 +830,69 @@
         "name": "Proveedor",
         "cost": "Coste",
         "notes": "Notas"
-      }
+      },
+      "custom": "Cualquier endpoint compatible con OpenAI: un modelo en tu propia máquina (Ollama, LM Studio, vLLM) o una pasarela.",
+      "cost": {
+        "free": "Gratis",
+        "mixed": "Mixto",
+        "paid": "De pago"
+      },
+      "cloudflare": "10.000 Neurons al día gratis: unas cincuenta ofertas evaluadas con un modelo de 70B. Un solo token, sin tarjeta.",
+      "ovh": "Modelos alojados en la UE: el único aquí que mantiene tu CV en Europa. El nivel gratuito compartido es lento (2 peticiones por minuto); con clave se paga por consumo.",
+      "google": "Rápido y gratis para empezar. En el plan gratuito Google usa tus prompts —que incluyen tu CV— para mejorar sus productos, y revisores humanos pueden leerlos."
     },
     "scan": {
       "title": "Escaneo y filtros",
-      "body": "En Job Search puedes elegir nivel (prácticas → senior), tipo de contrato y modalidad. El escaneo muestra progreso en vivo con porcentaje y tiempo estimado."
+      "body": "Un escaneo busca cada término por separado, en cada ubicación que indiques —una ciudad, una región o un país—, así que dos términos y dos ciudades son cuatro búsquedas. Puedes filtrar por nivel de experiencia, tipo de contrato, modalidad, salario mínimo y portales, guardar todo un conjunto de filtros como búsqueda guardada, y seguir empresas por nombre para que sus vacantes aparezcan aunque tus palabras clave no las hubieran encontrado. Desde Europa solo responden con fiabilidad LinkedIn e Indeed."
     },
     "chat": {
       "title": "Chat con el AI Coach",
       "multi": "Varios chats: usa el menú junto al coach para cambiar de conversación o crear una nueva.",
       "pin": "Fija trabajos al chat: abre los detalles y pulsa \"Fijar al chat\" para pasar la descripción al coach.",
-      "cover": "Carta de presentación: desde los detalles puedes generar una carta dirigida al recruiter si su info está visible en LinkedIn."
+      "cover": "Carta de presentación: desde los detalles puedes generar una carta dirigida al recruiter si su info está visible en LinkedIn.",
+      "actions": "El coach puede preparar una búsqueda, guardar puestos que buscar, rellenar un dato del perfil o abrir una oferta: siempre con un botón que pulsas tú, nunca por su cuenta."
     },
     "privacy": {
       "title": "Privacidad",
-      "body": "Todos tus datos (CV, trabajos, chats, claves) se guardan localmente en una base SQLite en tu carpeta de usuario. Solo se envían tus prompts al proveedor AI elegido."
+      "body": "El Modo privacidad está activado por defecto: nombre, email, teléfono y dirección se quitan del CV antes de que llegue a un modelo, y se vuelven a poner en lo que el modelo escribe. No te vuelve anónimo —el cuerpo de un CV te identifica igual—, así que elige en consecuencia el proveedor al que lo envías."
     },
     "version": {
       "title": "Versión",
       "changelog": "Changelog"
+    },
+    "scoring": {
+      "title": "Cómo se puntúa una oferta",
+      "body": "Un modelo lee la oferta junto a tu CV, pero las comprobaciones que deciden si el puesto está fuera de tu alcance son deterministas y van primero: ahí ningún modelo vota.",
+      "blocking": "Bloqueantes: sede fuera de la UE sin visado, nota mínima superior a la tuya, puesto presencial en una ciudad a la que no llegas, plaza reservada a personas con discapacidad, trabajo que exige un carné que has dicho no tener. Hunden la puntuación y el filtro «Aplicables» las oculta.",
+      "weighted": "Ponderados: más años de los que tienes, un título superior, otra materia, un salario declarado por debajo de tu mínimo. Bajan un techo pero siguen visibles: fuera de la propia materia también se contrata.",
+      "unevaluated": "«Sin evaluar» significa que ningún modelo la juzgó: un proveedor estaba caído, o la descripción era demasiado escasa. No significa que la oferta sea mala, y la app nunca inventa una nota para tapar el hueco."
+    },
+    "archive": {
+      "title": "El archivo de ofertas",
+      "body": "Las ofertas se dividen en las que quedan por valorar, aquellas a las que te inscribiste, las descartadas y las archivadas por la ventana de conservación. «Aplicables» viene activado y oculta las ofertas que una comprobación bloqueante ha descartado. La línea bajo los filtros dice siempre cuántas de las ofertas encontradas están en pantalla: un tope de filas que oculta ofertas en silencio es peor que una página larga."
+    },
+    "mail": {
+      "title": "Correo y candidaturas",
+      "body": "Si conectas tu buzón, la app convierte los correos de confirmación en candidaturas. Abre la carpeta en solo lectura, nunca importa un mensaje y ningún modelo ve tu correo: el reconocimiento son expresiones regulares y una comparación del nombre de la empresa.",
+      "guarantee": "Marca una candidatura solo cuando coinciden dos hechos independientes: el asunto parece una confirmación y el remitente es una plataforma de selección conocida. Cuando no puede saber de qué oferta habla un mensaje, te pregunta en vez de adivinar, y toda marca automática se puede deshacer."
+    },
+    "automation": {
+      "title": "Automatizaciones",
+      "body": "El escaneo automático repite la búsqueda que hiciste a mano, con la frecuencia que elijas, y te avisa cuando algo supera tu umbral; si no hay nada tuyo que repetir, se salta el turno en lugar de inventarse una búsqueda. Los recordatorios te avisan de las candidaturas paradas. Las búsquedas guardadas conservan un conjunto entero de filtros, y la lista de empresas busca por nombre: así aparecen las buenas ofertas que nunca entran en la rejilla de palabras clave."
+    },
+    "models": {
+      "title": "Modelos y límites",
+      "body": "Puedes fijar un modelo distinto para la puntuación, el chat y las herramientas de CV, o apuntar la app a un modelo que corre en tu máquina. Los planes gratuitos limitan las peticiones, así que la app cambia de modelo y de proveedor, recuerda cuáles truncan o rechazan y deja de pedírselo durante el resto del escaneo. Un tope diario protege la cuota; si todo falla, la oferta queda sin evaluar en vez de recibir un número inventado."
+    },
+    "egress": {
+      "title": "Qué sale de este ordenador",
+      "body": "Todo lo demás —CV, ofertas, chats, claves— se queda en un archivo de base de datos en tu carpeta de usuario.",
+      "ai": "Tus prompts, y el texto del CV que contienen, van al proveedor de IA que configuraste (redactados antes, salvo que desactives el Modo privacidad).",
+      "mail": "Tu buzón, por IMAP o Microsoft Graph, si conectas uno. En solo lectura, y de ahí no pasa nada a un modelo.",
+      "boards": "LinkedIn e Indeed, para leer las ofertas; la página de una oferta, cuando pides quién es el recruiter.",
+      "updates": "GitHub, para comprobar si existe una versión más reciente.",
+      "models": "Hugging Face, solo cuando pides que te sugiera un modelo que tu máquina pueda ejecutar.",
+      "market": "Una búsqueda web, solo cuando haces al coach una pregunta de mercado que necesita cifras frescas."
     }
   },
   "tutorial": {
@@ -1006,7 +1128,10 @@
       "apply": "Marcar seleccionados como enviados",
       "dismiss": "Ignorar todos",
       "noCandidates": "No queda ninguna oferta correspondiente en el archivo.",
-      "createEntry": "Registrarla como candidatura propia"
+      "createEntry": "Registrarla como candidatura propia",
+      "messageOf": "mensaje {n} de {total}",
+      "dismissOne": "Ignorar este mensaje",
+      "pick": "¿De qué oferta habla?"
     },
     "whereIdFrom": "¿De dónde saco un id de aplicación?",
     "idSource": {
@@ -1024,5 +1149,48 @@
       "fetchOne": "Recuperar el puesto",
       "notFound": "Ningún título reconocible en este mensaje."
     }
+  },
+  "readiness": {
+    "blocking": "Necesario para buscar",
+    "optional": "Mejora los resultados",
+    "allSet": "Aquí no falta nada.",
+    "fix": "Completar",
+    "askAi": "Pregunta a la IA",
+    "scanBlockedTitle": "Dime primero qué buscar",
+    "scanBlockedBody": "Para buscar hacen falta dos cosas tuyas: {items}. Si no, la app buscaría el trabajo de otra persona.",
+    "sourceCv": "de tu CV",
+    "sourceManual": "lo dijiste tú",
+    "sourceLastScan": "de tu última búsqueda",
+    "sourceShortlist": "de tus roles guardados",
+    "sourceProfile": "de tu perfil",
+    "sourceWatchlist": "de las empresas que sigues",
+    "item": {
+      "search_terms": "Qué buscar",
+      "location": "Dónde buscar",
+      "cv": "Tu CV",
+      "goal": "Objetivo de búsqueda",
+      "ral_min": "Salario mínimo",
+      "years_experience": "Años de experiencia",
+      "education_level": "Nivel de estudios",
+      "grade": "Nota de la carrera",
+      "degree_fields": "Materia de la carrera",
+      "driving_licence": "Carné de conducir",
+      "protected_category": "Registro de discapacidad",
+      "work_rule": "Dónde puedes trabajar",
+      "remote_mode": "Modalidad de trabajo",
+      "prefer_role_qa": "Interés por puestos de QA",
+      "prefer_role_cyber": "Interés por puestos de ciberseguridad",
+      "prefer_role_data": "Interés por puestos de datos"
+    }
+  },
+  "chatAction": {
+    "apply": "Aplicar",
+    "dismiss": "Ahora no",
+    "done": "Hecho.",
+    "failed": "No se pudo aplicar",
+    "fillScan": "¿Preparo una búsqueda de {terms} en {places}?",
+    "addRoles": "¿Guardo estos roles para buscar: {roles}?",
+    "setField": "¿Pongo {field} en {value}?",
+    "openJob": "¿Abro esta oferta?"
   }
 }

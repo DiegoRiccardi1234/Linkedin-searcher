@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from app import rate_limit
 from app.models import ScanRequest
 from app.services.scanner_service import run_scan
+from app.services.search_intent import ScanRefused
 
 if TYPE_CHECKING:
     from app.container import AppContainer
@@ -75,6 +76,15 @@ def build_router(container: AppContainer) -> APIRouter:
                     cancel_check=container.scan_control.is_cancelled,
                 ):
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except ScanRefused as refused:
+                # Not a failure: a question. The app has nothing of this user's
+                # to search with, and the one thing it must not do is fall back
+                # to somebody else's terms and city.
+                yield (
+                    "data: "
+                    + json.dumps({"error": "missing_essentials", "missing": refused.missing})
+                    + "\n\n"
+                )
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
             finally:

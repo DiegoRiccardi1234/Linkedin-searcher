@@ -78,9 +78,13 @@ test("opening a posting still opens a tab, and starts the wait", async ({ page, 
   expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
 });
 
-test("settings exposes the mailbox card and its status contract", async ({ page }) => {
+test("the mail tab exposes the mailbox card and its status contract", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".topnav .nav-link[data-view='settings']").click();
+  // The mailbox has its own tab since 2.0.0: deciding what you applied to is
+  // not a setting, and the review queue was nine lines at the bottom of a
+  // 116-line card, three cards down a seven-screen page.
+  await page.locator(".topnav .nav-link[data-view='mail']").click();
+  await expect(page.locator("#view-mail")).toHaveClass(/is-active/);
   await expect(page.locator("#mailboxCard")).toHaveCount(1);
   // Disconnected is the only honest default: nothing is read until connected.
   await expect(page.locator("#mailboxCard")).toHaveAttribute("data-state", "empty");

@@ -37,6 +37,12 @@ CURRENT_ANALYSIS_VERSION = 2
 #: Key holding :data:`CURRENT_ANALYSIS_VERSION` inside a stored analysis dict.
 ANALYSIS_VERSION_KEY = "scoring_v"
 
+#: Key holding ``provider/model`` — who actually answered. Stamped by the
+#: provider factory on every dict reply, because that is the only place that
+#: knows which candidate the failover chain landed on. Two scores are only
+#: comparable if you know whether the same model wrote them.
+ANSWERED_BY_KEY = "answered_by"
+
 #: Value of ``fonte_analisi`` marking an analysis the app computed itself,
 #: deterministically, without asking a model — today only the hard-blocker path
 #: (outside the EU, degree grade below the stated minimum), whose score is

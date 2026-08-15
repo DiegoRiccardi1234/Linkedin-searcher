@@ -53,7 +53,7 @@ def _seed_job(tmp_path: Path, **overrides) -> int:
 
 
 def test_list_jobs_empty(client: TestClient) -> None:
-    assert client.get("/api/jobs").json() == {"jobs": []}
+    assert client.get("/api/jobs").json() == {"jobs": [], "shown": 0, "total": 0}
 
 
 def test_list_jobs_filters(client: TestClient, tmp_path: Path) -> None:
@@ -181,7 +181,7 @@ def test_delete_all_jobs_reports_count(client: TestClient, tmp_path: Path) -> No
     _seed_job(tmp_path)
     _seed_job(tmp_path, titolo="Altro", azienda="Beta", link="https://example.com/job/2")
     assert client.delete("/api/jobs").json() == {"ok": True, "deleted": 2}
-    assert client.get("/api/jobs").json() == {"jobs": []}
+    assert client.get("/api/jobs").json() == {"jobs": [], "shown": 0, "total": 0}
 
 
 # --- manual add --------------------------------------------------------------

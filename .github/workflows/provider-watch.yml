@@ -1,0 +1,72 @@
+# A free tier is not a fact, it is a decision someone else can revise.
+#
+# Cerebras announced the end of its free tier days before this app was told to
+# prefer it, and Google stopped publishing per-model numbers outside a logged-in
+# console. Nobody is going to re-read five pricing pages every month, so this job
+# does: once a week it fingerprints them and diffs the list of OpenRouter free
+# models. It cannot read a rate limit — those are per project and per key, which
+# is why the app measures its own — but it can notice that a page moved and open
+# an issue asking a human to look.
+name: provider-watch
+
+on:
+  schedule:
+    # Monday morning, off the hour: a weekly job that runs at :00 queues behind
+    # everyone else's weekly job.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Look for movement
+        id: watch
+        run: |
+          # Exit 1 means "something changed", not "the job failed".
+          if python scripts/watch_provider_limits.py > watch-output.txt 2>&1; then
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=1" >> "$GITHUB_OUTPUT"
+          fi
+          cat watch-output.txt
+
+      - name: Record the new snapshot
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(providers): refresh the provider watch snapshot [skip ci]"
+          file_pattern: app/data/provider_watch.json
+
+      - name: Ask a human to look
+        if: steps.watch.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "The weekly provider watch saw something move. The numbers in"
+            echo '`app/data/provider_limits.json` are hand-written on purpose, so'
+            echo "they need a person to read the page and decide."
+            echo
+            echo '```'
+            cat watch-output.txt
+            echo '```'
+            echo
+            echo "Run: \`python scripts/watch_provider_limits.py\`"
+          } > issue-body.md
+          gh issue create \
+            --title "Provider limits: something moved ($(date -u +%Y-%m-%d))" \
+            --body-file issue-body.md \
+            --label "providers" || \
+          gh issue create \
+            --title "Provider limits: something moved ($(date -u +%Y-%m-%d))" \
+            --body-file issue-body.md

@@ -1,0 +1,2 @@
+WHERE THE USER IS: the dashboard — the summary of their hunt (application funnel, score distribution, top companies, reminders, best matches, missing skills).
+Read the numbers in front of them before advising: how many applications are sitting unanswered, what the score distribution says about the last scan, which reminders are due. Prefer "here is what your data says" over generic career advice. If a chart contradicts what they believe about their search, say so plainly.

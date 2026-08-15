@@ -6,7 +6,8 @@
     "settings": "Einstellungen",
     "info": "Info",
     "quit": "Beenden",
-    "jobs": "Jobs"
+    "jobs": "Jobs",
+    "mail": "E-Mail"
   },
   "profile": {
     "title": "Dein Profil",
@@ -118,7 +119,14 @@
       "fromCv": "aus dem CV",
       "fromYou": "von dir eingegeben",
       "missing": "fehlt",
-      "saved": "Daten aktualisiert"
+      "saved": "Daten aktualisiert",
+      "citiesPlaceholder": "Stadt, Stadt"
+    },
+    "tabs": {
+      "about": "Über mich",
+      "target": "Was ich suche",
+      "constraints": "Einschränkungen",
+      "tools": "KI-Werkzeuge"
     }
   },
   "jobSearch": {
@@ -191,11 +199,6 @@
     "favorites": "Favoriten",
     "new": "Neue",
     "remote": "Remote",
-    "allStatuses": "Alle Status",
-    "open": "Offen",
-    "applied": "Beworben",
-    "interviewing": "Vorstellungsgespräch",
-    "rejected": "Abgelehnt",
     "csv": "CSV",
     "score": "Score",
     "title": "Titel",
@@ -287,7 +290,22 @@
     "applyPending": "Warte auf Bestätigung",
     "notApplied": "Ich habe mich nicht beworben",
     "csvApplications": "Bewerbungen als CSV",
-    "undoMail": "Postfach-Markierung rückgängig machen"
+    "undoMail": "Postfach-Markierung rückgängig machen",
+    "bucket": {
+      "toReview": "Zu prüfen",
+      "applied": "Beworben",
+      "rejected": "Verworfen",
+      "archived": "Archiviert",
+      "all": "Alle"
+    },
+    "bucketHint": "Was noch zu entscheiden ist: weder beworben noch verworfen.",
+    "shownOf": "{shown} von {total} angezeigt",
+    "showAll": "Alle anzeigen",
+    "emptyBucket": "Nichts in diesem Tab.",
+    "minScore4": "Note 4+",
+    "fromMail": "Aus der Mail",
+    "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen",
+    "scoredBy": "Bewertet von {model}"
   },
   "kanbanCols": {
     "open": "Offen",
@@ -420,13 +438,72 @@
       "densityCompact": "Kompakt",
       "densitySaved": "Dichte aktualisiert",
       "densityComfortable": "Komfortabel",
-      "densityLarge": "Groß"
+      "densityLarge": "Groß",
+      "densityXCompact": "Sehr kompakt",
+      "densityXLarge": "Sehr groß"
     },
     "usage": {
       "limitLabel": "Tägliches Anfragelimit (0 = kein Limit)",
       "limitSaved": "Tägliches Limit aktualisiert."
     },
-    "keysDiagnostics": "Schlüssel-Diagnose"
+    "keysDiagnostics": "Schlüssel-Diagnose",
+    "tabs": {
+      "ai": "KI",
+      "search": "Suche",
+      "appearance": "Darstellung",
+      "system": "System"
+    },
+    "limits": {
+      "title": "Frequenzlimits",
+      "subtitle": "Wie schnell die App fragen darf. Sie startet mit dem, was wir wissen, korrigiert sich an dem, was dein Schlüssel wirklich erlaubt, und du kannst beides überstimmen.",
+      "model": "Modell",
+      "default": "Ab Werk",
+      "observed": "Gemessen",
+      "yours": "Deins",
+      "today": "Heute genutzt",
+      "rpm": "Anfr./Min",
+      "rpd": "Anfr./Tag",
+      "save": "Speichern",
+      "saved": "Limit gespeichert",
+      "empty": "Nichts zu zeigen: Die App hat noch keine Aufrufe gemacht und kennt für diese Modelle keine Limits.",
+      "exhausted": "Heutiges Kontingent aufgebraucht — die App überspringt dieses Modell bis morgen.",
+      "hint": "Die echten Zahlen stehen in der Konsole deines Anbieters. Trag sie hier ein, sie schlagen alles andere.",
+      "perMin": "/Min.",
+      "perDay": "/Tag"
+    },
+    "advice": {
+      "title": "Welchen Anbieter nutzen",
+      "subtitle": "Aus dem, was die App mit Ihrem Schlüssel gemessen hat, und dem, was jeder Anbieter veröffentlicht.",
+      "best": "Empfohlen",
+      "why": "Warum",
+      "alternatives": "Auch geeignet",
+      "getKey": "Schlüssel holen",
+      "terms": "Ihre Datenbedingungen",
+      "none": "Noch nichts zu empfehlen.",
+      "measuredOn": "Gemessen über die letzten {days} Tage",
+      "reason": {
+        "free": "kostenlose Stufe",
+        "no_card": "ohne Kreditkarte",
+        "configured": "Schlüssel bereits eingerichtet",
+        "allowance": "{n} Anfragen pro Tag",
+        "eu_hosted": "in der EU gehostet",
+        "stays_on_this_machine": "läuft auf diesem Rechner",
+        "needs_a_model_installed_first": "zuerst muss ein Modell installiert werden",
+        "trains_on_prompts": "trainiert mit Ihren Prompts",
+        "training_depends_on_model": "Training hängt vom Modell ab",
+        "measured_success": "{n} Ihrer Aufrufe waren erfolgreich",
+        "measured_median_ms": "{n} ms Median",
+        "closes_in_days": "schließt in {n} Tagen"
+      },
+      "warn": {
+        "free_tier_closed": "{provider}: Die kostenlose Stufe endete am {on}.",
+        "free_tier_closing": "{provider}: Die kostenlose Stufe endet am {on}.",
+        "trains_on_prompts": "{provider} nutzt Prompts der kostenlosen Stufe — die Ihren Lebenslauf enthalten — zur Produktverbesserung.",
+        "training_unverified": "Ob {provider} mit Ihren Prompts trainiert, ist hier nicht geprüft. Lesen Sie die Bedingungen, bevor Sie einen Lebenslauf senden.",
+        "no_key_configured": "Noch kein Schlüssel vorhanden, also kann nichts bewertet werden.",
+        "key_rejected": "{provider} lehnt den gespeicherten Schlüssel ab."
+      }
+    }
   },
   "coach": {
     "title": "Career Coach",
@@ -547,8 +624,9 @@
     "postScanRenderFailed": "Scan fertig (Zusammenfassung nicht darstellbar).",
     "volumeWarning": "Großer Scan ({n} Suchen) — kann dauern.",
     "quotaReached": "Das heutige Anfragebudget ist aufgebraucht — der Scan würde auf halbem Weg stoppen. Es setzt um Mitternacht UTC zurück, oder erhöhe das Limit in den Einstellungen.",
-    "vagueTermWarning": "„{terms}“: Ein bloßes Rollenwort trifft auf alles zu (Payroll, Vertrieb, Partnerschaften). Ergänze ein Fachwort, z. B. „AI QA“.",
-    "unscoredWarning": "{count} Angebote bisher nicht bewertet."
+    "vagueTermWarning": "„{terms}“: eine bloße Rollenbezeichnung trifft alles (Lohnbuchhaltung, Vertrieb, Partnerschaften). Ergänze ein Wort, das den Beruf benennt, z. B. „{example}“.",
+    "unscoredWarning": "{count} Angebote bisher nicht bewertet.",
+    "vagueTermWarningPlain": "„{terms}“: eine bloße Rollenbezeichnung trifft alles (Lohnbuchhaltung, Vertrieb, Partnerschaften). Ergänze ein Wort, das den gesuchten Beruf benennt."
   },
   "toast": {
     "enterKeyOrProvider": "Gib mindestens einen Schlüssel ein oder wähle einen primären Anbieter.",
@@ -726,17 +804,17 @@
   "info": {
     "title": "So funktioniert Job",
     "titleEm": "Finder",
-    "subtitle": "Ein kurzer Rundgang durch alle Funktionen.",
+    "subtitle": "Was die App tut, was sie für dich entscheidet und was diesen Rechner verlässt.",
     "what": {
       "title": "Was ist Job Finder?",
-      "body": "Job Finder ist ein lokaler KI-Assistent für die Jobsuche. Er liest deinen Lebenslauf, scannt LinkedIn und Indeed, bewertet Stellen und hilft beim Anschreiben."
+      "body": "Job Finder liest deinen Lebenslauf, sucht auf LinkedIn und Indeed nach den Rollen, die dich interessieren, bewertet jede Anzeige gegen dein Profil und behält im Blick, wo du dich beworben hast. Alles liegt in einer Datenbankdatei auf diesem Rechner: Nach außen geht nur, was du an den konfigurierten KI-Anbieter schickst, plus die unten aufgeführten Verbindungen."
     },
     "start": {
       "title": "Erste Schritte",
-      "step1": "Lade deinen Lebenslauf im Tab Profil hoch — Job Finder extrahiert Skills, Erfahrung und Zielrollen.",
-      "step2": "Hinterlege mindestens einen AI-Provider-Schlüssel in den Einstellungen (Groq ist kostenlos und einfach).",
-      "step3": "Öffne Job Search, wähle Filter und Stichworte und starte den Scan.",
-      "step4": "Sieh dir die Ergebnisse im Dashboard an und chatte mit dem AI Coach über konkrete Jobs."
+      "step1": "Trag einen KI-Anbieter-Schlüssel unter Einstellungen → KI ein. Einen Lebenslauf zu lesen ist bereits ein Modellaufruf, also kommt das zuerst.",
+      "step2": "Lade deinen Lebenslauf unter Profil → Über mich hoch. Die App liest daraus Fähigkeiten, Rollen und — wenn er es hergibt — deine Stadt.",
+      "step3": "Sag, wonach und wo du suchst, unter Profil → Was ich suche oder direkt im Suchformular. Ohne diese zwei Angaben bricht der Scan ab und fragt nach: Er sucht nicht die Arbeit von jemand anderem.",
+      "step4": "Starte einen Scan unter Jobsuche, arbeite das Archiv unter Angebote durch und frag den Coach alles, was unklar ist."
     },
     "providers": {
       "title": "AI-Provider",
@@ -752,25 +830,69 @@
         "name": "Anbieter",
         "cost": "Kosten",
         "notes": "Hinweise"
-      }
+      },
+      "custom": "Jeder OpenAI-kompatible Endpunkt: ein Modell auf deinem Rechner (Ollama, LM Studio, vLLM) oder ein Gateway.",
+      "cost": {
+        "free": "Kostenlos",
+        "mixed": "Gemischt",
+        "paid": "Kostenpflichtig"
+      },
+      "cloudflare": "10.000 Neurons pro Tag kostenlos — etwa fünfzig bewertete Angebote mit einem 70B-Modell. Ein Token, keine Karte.",
+      "ovh": "Modelle in der EU gehostet — als einziges hier bleibt Ihr Lebenslauf in Europa. Die kostenlose geteilte Stufe ist langsam (2 Anfragen pro Minute); mit Schlüssel zahlt man pro Token.",
+      "google": "Schnell und kostenlos zum Einstieg. In der kostenlosen Stufe nutzt Google Ihre Prompts — die Ihren Lebenslauf enthalten — zur Produktverbesserung, und menschliche Prüfer können sie lesen."
     },
     "scan": {
       "title": "Scan & Filter",
-      "body": "In Job Search wählst du Erfahrungslevel (Praktikum → Senior), Vertragsart und Arbeitsmodell. Der Scan zeigt Live-Fortschritt mit Prozent und Restzeit."
+      "body": "Ein Scan sucht jeden Begriff einzeln, an jedem angegebenen Ort — Stadt, Region oder Land — zwei Begriffe und zwei Städte sind also vier Suchen. Du kannst nach Erfahrungsstufe, Vertragsart, Arbeitsmodell, Mindestgehalt und Portalen filtern, einen ganzen Filtersatz als gespeicherte Suche sichern und Arbeitgeber beim Namen verfolgen, damit ihre Stellen auftauchen, auch wenn deine Stichwörter sie verpasst hätten. Aus Europa antworten zuverlässig nur LinkedIn und Indeed."
     },
     "chat": {
       "title": "Chat mit dem AI Coach",
       "multi": "Mehrere Chats: Über das Menü neben dem Coach wechselst du oder startest eine neue Unterhaltung.",
       "pin": "Jobs an den Chat anheften: Öffne die Details und klicke \"An Chat anheften\", um dem Coach die Beschreibung zu geben.",
-      "cover": "Anschreiben: Aus den Job-Details kannst du ein an den Recruiter gerichtetes Anschreiben generieren, wenn dessen Daten auf LinkedIn sichtbar sind."
+      "cover": "Anschreiben: Aus den Job-Details kannst du ein an den Recruiter gerichtetes Anschreiben generieren, wenn dessen Daten auf LinkedIn sichtbar sind.",
+      "actions": "Der Coach kann eine Suche vorbereiten, Rollen zum Suchen merken, ein Profilfeld ausfüllen oder ein Angebot öffnen — immer über einen Knopf, den du drückst, nie von selbst."
     },
     "privacy": {
       "title": "Datenschutz",
-      "body": "Alle Daten (CV, Jobs, Chats, Schlüssel) werden lokal in einer SQLite-DB im Benutzerordner gespeichert. Nur deine Prompts gehen an den gewählten AI-Provider."
+      "body": "Der Privatsphäre-Modus ist standardmäßig an: Name, E-Mail, Telefon und Adresse werden aus dem Lebenslauf entfernt, bevor er ein Modell erreicht, und in das, was das Modell schreibt, zurückgesetzt. Anonym macht dich das nicht — der Fließtext eines Lebenslaufs identifiziert dich von allein — also wähle den Anbieter entsprechend."
     },
     "version": {
       "title": "Version",
       "changelog": "Changelog"
+    },
+    "scoring": {
+      "title": "Wie ein Angebot bewertet wird",
+      "body": "Ein Modell liest die Anzeige zusammen mit deinem Lebenslauf, aber die Prüfungen, die entscheiden, ob die Stelle überhaupt erreichbar ist, sind deterministisch und laufen zuerst — da hat kein Modell eine Stimme.",
+      "blocking": "Blockierend: Standort außerhalb der EU ohne Visum, geforderte Note über deiner, Präsenzrolle in einer Stadt, die du nicht erreichst, Stelle für Schwerbehinderte reserviert, Job mit Führerschein, den du nicht hast. Sie deckeln die Note, und der Filter „Bewerbbar“ blendet sie aus.",
+      "weighted": "Gewichtet: mehr Jahre als du hast, ein höherer Abschluss, ein anderes Studienfach, ein genanntes Gehalt unter deinem Minimum. Sie senken eine Obergrenze, bleiben aber sichtbar — man wird auch fachfremd eingestellt.",
+      "unevaluated": "„Unbewertet“ heißt, dass kein Modell geurteilt hat: ein Anbieter war down oder die Beschreibung zu dünn. Es heißt nicht, dass das Angebot schlecht ist, und die App erfindet nie eine Note, um die Lücke zu füllen."
+    },
+    "archive": {
+      "title": "Das Angebotsarchiv",
+      "body": "Angebote werden aufgeteilt in das, was noch zu entscheiden ist, worauf du dich beworben hast, was du verworfen hast und was die Aufbewahrungsfrist archiviert hat. „Bewerbbar“ ist standardmäßig an und blendet aus, was eine blockierende Prüfung ausgeschlossen hat. Die Zeile unter den Filtern sagt immer, wie viele der gefundenen Angebote auf dem Schirm sind: eine Zeilengrenze, die Angebote still verbirgt, ist schlimmer als eine lange Seite."
+    },
+    "mail": {
+      "title": "Postfach und Bewerbungen",
+      "body": "Verbindest du dein Postfach, macht die App aus Bestätigungsmails Bewerbungen. Sie öffnet den Ordner nur lesend, importiert nie eine Nachricht, und kein Modell sieht deine Mail: Die Erkennung sind reguläre Ausdrücke plus ein Vergleich des Firmennamens.",
+      "guarantee": "Sie verbucht eine Bewerbung nur, wenn zwei unabhängige Fakten übereinstimmen: Der Betreff liest sich wie eine Bestätigung und der Absender ist eine bekannte Bewerbungsplattform. Wenn sie nicht erkennen kann, um welches Angebot es geht, fragt sie nach statt zu raten, und jede automatische Markierung lässt sich rückgängig machen."
+    },
+    "automation": {
+      "title": "Automatisierungen",
+      "body": "Der automatische Scan wiederholt die Suche, die du von Hand gestartet hast, im gewählten Takt, und meldet sich, wenn etwas deine Schwelle überschreitet — gibt es nichts von dir zu wiederholen, setzt er aus, statt eine Suche zu erfinden. Erinnerungen weisen auf stillstehende Bewerbungen hin. Gespeicherte Suchen halten einen ganzen Filtersatz fest, und die Firmenliste sucht Arbeitgeber beim Namen: So tauchen die guten Stellen auf, die es nie ins Stichwortraster schaffen."
+    },
+    "models": {
+      "title": "Modelle und Limits",
+      "body": "Du kannst für Bewertung, Chat und Lebenslauf-Werkzeuge je ein eigenes Modell festlegen oder die App auf ein Modell auf deinem Rechner richten. Kostenlose Kontingente drosseln, also wechselt die App zwischen Modellen und Anbietern, merkt sich, wer abschneidet oder ablehnt, und fragt die für den Rest des Scans nicht mehr. Ein Tageslimit schützt das Kontingent; scheitert alles, bleibt das Angebot unbewertet statt geraten."
+    },
+    "egress": {
+      "title": "Was diesen Rechner verlässt",
+      "body": "Alles andere — Lebenslauf, Angebote, Chats, Schlüssel — bleibt in einer Datenbankdatei in deinem Benutzerordner.",
+      "ai": "Deine Prompts und der darin enthaltene Lebenslauf gehen an den konfigurierten KI-Anbieter (vorher geschwärzt, außer du schaltest den Privatsphäre-Modus ab).",
+      "mail": "Dein Postfach, über IMAP oder Microsoft Graph, wenn du eines verbindest. Nur lesend, und nichts davon geht an ein Modell.",
+      "boards": "LinkedIn und Indeed, um Anzeigen zu lesen; die Seite einer Anzeige, wenn du nach dem Recruiter fragst.",
+      "updates": "GitHub, um zu prüfen, ob es eine neuere Version gibt.",
+      "models": "Hugging Face, nur wenn du nach einem Modell fragst, das dein Rechner ausführen könnte.",
+      "market": "Eine Websuche, nur wenn du dem Coach eine Marktfrage stellst, die frische Zahlen braucht."
     }
   },
   "tutorial": {
@@ -1006,7 +1128,10 @@
       "apply": "Ausgewählte als beworben markieren",
       "dismiss": "Alle ignorieren",
       "noCandidates": "Kein passendes Angebot mehr im Archiv.",
-      "createEntry": "Als eigene Bewerbung erfassen"
+      "createEntry": "Als eigene Bewerbung erfassen",
+      "messageOf": "Nachricht {n} von {total}",
+      "dismissOne": "Diese Nachricht ignorieren",
+      "pick": "Um welches Angebot geht es?"
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {
@@ -1024,5 +1149,48 @@
       "fetchOne": "Stellenbezeichnung holen",
       "notFound": "Keine erkennbare Stellenbezeichnung in dieser Nachricht."
     }
+  },
+  "readiness": {
+    "blocking": "Zum Suchen nötig",
+    "optional": "Verbessert die Ergebnisse",
+    "allSet": "Hier fehlt nichts.",
+    "fix": "Ausfüllen",
+    "askAi": "KI fragen",
+    "scanBlockedTitle": "Sag mir zuerst, wonach ich suchen soll",
+    "scanBlockedBody": "Eine Suche braucht zwei Angaben von dir: {items}. Sonst würde die App die Arbeit von jemand anderem suchen.",
+    "sourceCv": "aus deinem Lebenslauf",
+    "sourceManual": "hast du gesagt",
+    "sourceLastScan": "aus deiner letzten Suche",
+    "sourceShortlist": "aus deinen gemerkten Rollen",
+    "sourceProfile": "aus deinem Profil",
+    "sourceWatchlist": "aus den gefolgten Firmen",
+    "item": {
+      "search_terms": "Wonach suchen",
+      "location": "Wo suchen",
+      "cv": "Dein Lebenslauf",
+      "goal": "Suchziel",
+      "ral_min": "Mindestgehalt",
+      "years_experience": "Berufsjahre",
+      "education_level": "Abschluss",
+      "grade": "Abschlussnote",
+      "degree_fields": "Studienfach",
+      "driving_licence": "Führerschein",
+      "protected_category": "Schwerbehindertenstatus",
+      "work_rule": "Wo du arbeiten kannst",
+      "remote_mode": "Arbeitsmodell",
+      "prefer_role_qa": "Interesse an QA-Rollen",
+      "prefer_role_cyber": "Interesse an Cybersecurity-Rollen",
+      "prefer_role_data": "Interesse an Daten-Rollen"
+    }
+  },
+  "chatAction": {
+    "apply": "Übernehmen",
+    "dismiss": "Jetzt nicht",
+    "done": "Erledigt.",
+    "failed": "Konnte nicht übernommen werden",
+    "fillScan": "Soll ich eine Suche nach {terms} in {places} vorbereiten?",
+    "addRoles": "Diese Rollen zum Suchen merken: {roles}?",
+    "setField": "{field} auf {value} setzen?",
+    "openJob": "Dieses Angebot öffnen?"
   }
 }

@@ -175,13 +175,13 @@ def test_run_scan_rescored_legacy_job(tmp_path: Path, monkeypatch: pytest.Monkey
     db = Database(tmp_path / "s.db")
     try:
         # First scan seeds the job, then simulate a legacy analysis on it.
-        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"])))
+        list(ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano")))
         job = db.list_jobs(limit=10)[0]
         db.update_job_analysis(job["id"], {"punteggio": 9})  # legacy shape, inflated
         db.mark_jobs_not_new() if hasattr(db, "mark_jobs_not_new") else None
 
         events = list(
-            ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"]))
+            ss.run_scan(db, settings, _PM(), ScanRequest(search_terms=["x"], sites=["linkedin"], location="Milano"))
         )
         analyzed = [e for e in events if e.get("status") == "analyzed"]
         assert len(analyzed) == 1  # legacy analysis -> re-scored, not skipped

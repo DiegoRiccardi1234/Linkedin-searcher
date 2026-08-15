@@ -5,19 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-# Two domain tokens each, never a bare role word. Measured on a real scan:
-# "AI Specialist" alone returned 27 of 47 postings and nearly all the noise —
-# job boards match "Specialist" against payroll, sales and partnership roles —
-# while "AI QA" returned 15 with one strong hit and "LLM Evaluation" 5 with two.
-# A narrow term fishes less and better, and it costs nothing to fix here.
-DEFAULT_SEARCH_TERMS = [
-    "AI QA",
-    "LLM Evaluation",
-    "AI Automation",
-    "Prompt Engineering",
-    "Data Annotation",
-    "QA Engineer",
-]
+# There is deliberately no built-in list of search terms and no default city.
+# Both used to exist, taken from the person who wrote this app, and an empty
+# search form silently resolved to them — then stored them as the user's own
+# last search, which the scheduler replayed and the work-rule inference read as
+# evidence of where they lived. What to search for now comes from the user
+# (app/services/search_intent.py) and, when there is nothing to go on, the scan
+# refuses and the app asks. `settings.json` can still set both for a deployment
+# that wants them.
 
 LOCAL_SECRETS_FILE = "local_secrets.json"
 SUPPORTED_PROVIDERS = [
@@ -31,6 +26,12 @@ SUPPORTED_PROVIDERS = [
     "xai",
     "glm",
     "mistral",
+    # Free tier on one token: 10.000 Neurons a day, about fifty scored offers
+    # on a 70B. The endpoint carries the account id, discovered from the token.
+    "cloudflare",
+    # The only catalog here served from the EU, which is what makes it worth a
+    # class of its own: the prompt carries a CV. Optional key (anonymous tier).
+    "ovh",
     # Any OpenAI-compatible endpoint the user points at: a model running on
     # their own machine (Ollama, LM Studio, vLLM, llama.cpp) or a gateway.
     # Configured by base URL; the key is optional because a local server has
@@ -61,12 +62,9 @@ class AppSettings:
     hours_old: int
     max_annunci: int
     delay_tra_ricerche: float
-    location_default: str
-    location_remote_default: str
     # Default Indeed/Glassdoor country (a jobspy Country name/alias, e.g. "italy",
     # "usa"). Overridable per-scan by the country selector.
     country_default: str
-    default_search_terms: list[str]
     cerebras_api_key: str | None
     groq_api_key: str | None
     openai_api_key: str | None
@@ -80,6 +78,13 @@ class AppSettings:
     # Optional GLM/Zhipu endpoint override (env GLM_BASE_URL). Default is the
     # international host; the China console uses open.bigmodel.cn.
     glm_base_url: str | None
+    # Cloudflare Workers AI. The OpenAI-compatible endpoint embeds the account
+    # id, so the base URL is derived from the token once, when it is saved.
+    cloudflare_api_key: str | None
+    cloudflare_base_url: str | None
+    # OVHcloud AI Endpoints. The key is optional: the literal "anonymous" opts
+    # into the free shared tier, which answers only without a credentials header.
+    ovh_api_key: str | None
     # "custom" provider: the endpoint IS the configuration. Empty base URL =
     # not configured. The key is optional (local servers don't have one).
     custom_api_key: str | None
@@ -148,6 +153,9 @@ def save_local_provider_keys(
     xai_api_key: str | None = None,
     glm_api_key: str | None = None,
     mistral_api_key: str | None = None,
+    cloudflare_api_key: str | None = None,
+    cloudflare_base_url: str | None = None,
+    ovh_api_key: str | None = None,
     custom_api_key: str | None = None,
     custom_base_url: str | None = None,
     primary_provider: str | None = None,
@@ -176,6 +184,11 @@ def save_local_provider_keys(
         "xai_api_key": xai_api_key,
         "glm_api_key": glm_api_key,
         "mistral_api_key": mistral_api_key,
+        "cloudflare_api_key": cloudflare_api_key,
+        # Derived from the token, not typed: stored like a key so that clearing
+        # the key clears the endpoint with it.
+        "cloudflare_base_url": cloudflare_base_url,
+        "ovh_api_key": ovh_api_key,
         "custom_api_key": custom_api_key,
         # The endpoint is what configures the custom provider, so it is stored
         # the same way a key is (and cleared the same way).
@@ -285,6 +298,11 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     glm_api_key = local_secrets.get("glm_api_key") or os.getenv("GLM_API_KEY")
     glm_base_url = local_secrets.get("glm_base_url") or os.getenv("GLM_BASE_URL")
     mistral_api_key = local_secrets.get("mistral_api_key") or os.getenv("MISTRAL_API_KEY")
+    cloudflare_api_key = local_secrets.get("cloudflare_api_key") or os.getenv("CLOUDFLARE_API_KEY")
+    cloudflare_base_url = local_secrets.get("cloudflare_base_url") or os.getenv(
+        "CLOUDFLARE_BASE_URL"
+    )
+    ovh_api_key = local_secrets.get("ovh_api_key") or os.getenv("OVH_API_KEY")
     custom_api_key = local_secrets.get("custom_api_key") or os.getenv("CUSTOM_API_KEY")
     custom_base_url = local_secrets.get("custom_base_url") or os.getenv("CUSTOM_BASE_URL")
 
@@ -311,10 +329,6 @@ def load_settings(workspace_dir: Path) -> AppSettings:
     )
     if primary_provider in SUPPORTED_PROVIDERS:
         sanitized_order = [primary_provider] + [p for p in sanitized_order if p != primary_provider]
-
-    terms = cfg.get("default_search_terms", DEFAULT_SEARCH_TERMS)
-    if not isinstance(terms, list) or not terms:
-        terms = DEFAULT_SEARCH_TERMS
 
     model_policy = cfg.get("model_selection_policy", {})
     if not isinstance(model_policy, dict):
@@ -365,10 +379,9 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         hours_old=_as_int(cfg, "hours_old", 336),
         max_annunci=_as_int(cfg, "max_annunci", 20),
         delay_tra_ricerche=_as_float(cfg, "delay_tra_ricerche", 4.0),
-        location_default=str(cfg.get("location_default", "Torino, Italy")),
-        location_remote_default=str(cfg.get("location_remote_default", "Italy")),
-        country_default=str(cfg.get("country_default", "italy")),
-        default_search_terms=[str(x) for x in terms],
+        country_default=str(
+            cfg.get("country_default", "italy")
+        ),  # jobspy needs one; the selector overrides it
         cerebras_api_key=cerebras_api_key,
         groq_api_key=groq_api_key,
         openai_api_key=openai_api_key,
@@ -380,6 +393,9 @@ def load_settings(workspace_dir: Path) -> AppSettings:
         glm_api_key=glm_api_key,
         mistral_api_key=mistral_api_key,
         glm_base_url=glm_base_url,
+        cloudflare_api_key=cloudflare_api_key,
+        cloudflare_base_url=cloudflare_base_url,
+        ovh_api_key=ovh_api_key,
         custom_api_key=custom_api_key,
         custom_base_url=custom_base_url,
         model_selection_policy=merged_policy,

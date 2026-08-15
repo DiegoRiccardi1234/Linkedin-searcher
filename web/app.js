@@ -43,6 +43,7 @@ import {
   populateChatProviderSelector,
   maybeOfferPersistChatOverride,
   loadProviderHealth,
+  loadProviderAdvice,
   setProviderDeps,
 } from "./modules/providers.js";
 import { initModelPicker, refreshModelPickerLabel } from "./modules/model_picker.js";
@@ -55,7 +56,23 @@ import {
 import { initSavedSearches, loadSavedSearches } from "./modules/saved_searches.js";
 import { initLocalModels, loadLocalModels } from "./modules/local_models.js";
 import { initWatchlist, loadWatchlist } from "./modules/watchlist.js";
-import { initJobList, initJobSorting, loadJobs } from "./modules/job_list.js";
+import {
+  initJobBuckets,
+  initJobList,
+  initJobSorting,
+  loadJobs,
+  setJobsBucket,
+} from "./modules/job_list.js";
+import { initSubtabs, panelOf, setSubtabBadge, showSubtab } from "./modules/subtabs.js";
+import { initRateLimits, loadRateLimits } from "./modules/limits.js";
+import { initChatActions, renderChatAction } from "./modules/chat_actions.js";
+import {
+  ensureProfileReady,
+  fetchReadiness,
+  initReadiness,
+  invalidateReadiness,
+  renderReadinessStrips,
+} from "./modules/readiness.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
@@ -114,12 +131,23 @@ if (quitBtn) {
 }
 
 
-function activateView(viewName) {
+// Which view is on screen. It used to live only in a CSS class, which is fine
+// for painting and useless for anything that needs to KNOW — the chat asking
+// what the user is looking at, or a deep link that has to open a sub-tab.
+let _currentView = "dashboard";
+
+export function getCurrentView() {
+  return _currentView;
+}
+
+function activateView(viewName, { tab = null } = {}) {
   // v1.3.0: navigation is no longer gated by provider configuration. The
   // warning banner + onboarding placeholder guide the user instead.
+  _currentView = viewName;
   document.querySelectorAll(".view").forEach((section) => {
     section.classList.toggle("is-active", section.id === `view-${viewName}`);
   });
+  if (tab) showSubtab(viewName, tab);
 
   document.querySelectorAll(".nav-link").forEach((btn) => {
     const target = btn.dataset.view;
@@ -149,10 +177,38 @@ function activateView(viewName) {
   document.getElementById("navToggle")?.setAttribute("aria-expanded", "false");
   const overlay = document.getElementById("mobileOverlay");
   if (overlay) { overlay.classList.remove("active"); overlay.hidden = true; }
+  // The rail stays out of the archive's way — a nine-column table and a
+  // four-column board cannot share a 1366px row with a 300px panel — but the
+  // coach is exactly who you want to ask "which of these do I send first", so
+  // the button that opens it as a drawer stays. Only the Info page, which is
+  // documentation, has neither.
   const fab = document.getElementById("chatFab");
-  if (fab) fab.classList.toggle("hidden", railless);
+  if (fab) fab.classList.toggle("hidden", viewName === "info");
   syncStickyOffset();
 }
+
+/**
+ * Bring an element into view wherever it is hiding — wrong view, closed
+ * sub-tab, or just below the fold.
+ *
+ * Every "go to Settings and scroll to the provider cards" in this file used to
+ * be activateView() + scrollIntoView(), which stops working the moment the
+ * target sits in a sub-tab that is not open: no error, no scroll, nothing.
+ */
+export function revealElement(target, opts = {}) {
+  const el = typeof target === "string" ? document.getElementById(target) : target;
+  if (!el) return false;
+  const view = el.closest(".view");
+  if (view) activateView(view.id.replace(/^view-/, ""));
+  const panel = panelOf(el);
+  if (panel) showSubtab(panel.group, panel.id);
+  if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center", ...opts });
+  return true;
+}
+
+// Exposed like ChatSessions is: the whole point of this function is that it
+// works from anywhere, and "anywhere" includes a test driving the page.
+window.revealElement = revealElement;
 
 function roleLabel(role) {
   if (role === "assistant") return "Coach";
@@ -269,9 +325,7 @@ function ensureNoKeyBanner(show, message) {
   `;
   banner.querySelector("#noApiKeyBannerLink").addEventListener("click", (e) => {
     e.preventDefault();
-    activateView("settings");
-    const keys = document.getElementById("providerCards");
-    if (keys && keys.scrollIntoView) keys.scrollIntoView({ behavior: "smooth", block: "center" });
+    revealElement("providerCards");
   });
 }
 
@@ -312,6 +366,7 @@ async function loadHealth() {
   updateProvidersMetadata(health.provider || {}, keys.preferred_model || "");
   renderProviderCards(keys, health.provider || {});
   loadProviderHealth();
+  loadProviderAdvice();
   showKeysStatus(status);
 }
 
@@ -324,6 +379,7 @@ async function loadKeysStatus() {
   updateProvidersMetadata(provider, keys.preferred_model || "");
   renderProviderCards(keys, provider);
   loadProviderHealth();
+  loadProviderAdvice();
   showKeysStatus(status);
 }
 
@@ -378,9 +434,15 @@ async function loadChatPrompts() {
 
   wrap.innerHTML = "";
   try {
-    const payload = await api(`/api/chat/prompts?lang=${encodeURIComponent(getCurrentLang() || "en")}`);
-    // Cap to 2 — even if the backend ever returns more, the UI stays tidy.
-    const prompts = (payload.prompts || []).slice(0, 2);
+    // The page the user is on decides what they are most likely to ask next:
+    // a question typed on the settings page is about settings, whatever their
+    // CV says. The suggestions used to be picked from the CV alone.
+    const query = new URLSearchParams({
+      lang: getCurrentLang() || "en",
+      view: getCurrentView(),
+    });
+    const payload = await api(`/api/chat/prompts?${query.toString()}`);
+    const prompts = (payload.prompts || []).slice(0, 4);
     for (const prompt of prompts) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -427,7 +489,7 @@ async function sendChatMessage(message) {
 
     const result = await api("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: text, session_id: (window.ChatSessions?.active || ChatSessions.active || "default"), provider: providerVal, model: modelVal }),
+      body: JSON.stringify({ message: text, session_id: (window.ChatSessions?.active || ChatSessions.active || "default"), provider: providerVal, model: modelVal, view: getCurrentView() }),
     });
 
     maybeOfferPersistChatOverride(providerVal, modelVal);
@@ -437,27 +499,16 @@ async function sendChatMessage(message) {
       refreshChatSessions().then(renderChatSessionDropdown).catch(() => {});
     }
 
-    if (result.action && result.action.type === "FILL_SCAN_FORM") {
-      // populate tags
-      if (!getKeywords?.addMultiple || !getLocations?.addMultiple) {
-          console.warn("Tag setups not ready");
-      } else {
-         const kwTags = getKeywords.addMultiple(result.action.keywords || []);
-         const locTags = getLocations.addMultiple(result.action.locations || []);
-         // Coach can also set the Indeed country (e.g. "cerca lavoro in Germania").
-         const countrySel = document.getElementById("scanCountry");
-         if (countrySel && result.action.country) {
-           const cv = String(result.action.country).toLowerCase();
-           if ([...countrySel.options].some((o) => o.value === cv)) {
-             countrySel.value = cv;
-             localStorage.setItem("scanCountry", cv);
-           }
-         }
-         if (kwTags || locTags || result.action.country) {
-           showToast(t("toast.formFilled"), "info");
-           activateView("job-search");
-         }
-      }
+    // The coach proposes; the user decides. This used to rewrite the search
+    // form and jump views on its own — helpful when the model was right, and
+    // startling when it was not.
+    if (result.action) {
+      renderChatAction(document.getElementById("chatBox"), result.action);
+    }
+    // Preferences the message stated in passing. They used to be written on
+    // the spot; now they are offered, one card each.
+    for (const proposal of result.proposals || []) {
+      renderChatAction(document.getElementById("chatBox"), proposal);
     }
   } catch (error) {
     if (pendingEl && pendingEl.parentNode) pendingEl.parentNode.removeChild(pendingEl);
@@ -465,9 +516,7 @@ async function sendChatMessage(message) {
     if (isNoProvider) {
       appendChat("assistant", t("errors.noProviderToast") || "Configure an AI provider key first to use the chat.");
       try {
-        activateView("settings");
-        const cards = document.getElementById("providerCards");
-        if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
+        revealElement("providerCards");
       } catch (_) {}
     } else {
       appendChat("assistant", `${t("toast.chatError")}: ${error.message}`);
@@ -792,8 +841,7 @@ if (_refreshRecommendationsBtn) _refreshRecommendationsBtn.addEventListener("cli
 
 const _focusOpenBtn = document.getElementById("focusOpenBtn");
 if (_focusOpenBtn) _focusOpenBtn.addEventListener("click", async () => {
-  const status = document.getElementById("statusFilter");
-  status.value = "open";
+  setJobsBucket("to_review");
   activateView("jobs");
   await loadJobs();
 });
@@ -804,14 +852,46 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
     activateView(view);
     if (view === "profile") {
       loadProfileView().catch(() => {});
+      renderReadinessStrips();
     }
     if (view === "jobs") {
       loadJobs().catch(() => {});
     }
+    loadChatPrompts().catch(() => {});
+    if (view === "mail") {
+      // At boot only the status is fetched, for the badge; the queue itself
+      // is worth a request when someone actually opens the tab.
+      loadMailboxStatus().catch(() => {});
+    }
+    if (view === "settings") {
+      // Same reasoning as the mailbox queue, with a sharper edge: the limits
+      // endpoint walks a week of usage per model, so it is worth exactly one
+      // request — when somebody opens the tab that shows it.
+      loadRateLimits().catch(() => {});
+    }
   });
 });
 
+// A delegated listener, bound once. It must live outside bootstrap(): bootstrap
+// awaits a dozen requests, and a click landing in that window would hit nothing.
+initRateLimits();
+
 bindProfileEvents();
+
+// The keyword box read the shortlist while the CV wrote `preferred_roles`, so
+// after uploading a CV it stayed empty — and an empty box used to mean "search
+// for whatever this app was written for". Both boxes are now filled from the
+// same chain the scan would follow, visibly and editable.
+async function prefillSearchForm() {
+  const report = await fetchReadiness();
+  if (!report) return;
+  if (window.getKeywords && !window.getKeywords.getTags().length) {
+    window.getKeywords.addMultiple(report.suggested_terms || []);
+  }
+  if (window.getLocations && !window.getLocations.getTags().length) {
+    window.getLocations.addMultiple(report.suggested_locations || []);
+  }
+}
 
 const _primaryProviderEl = document.getElementById("primaryProvider");
 if (_primaryProviderEl) {
@@ -999,10 +1079,28 @@ document.getElementById("onlyFavorites").addEventListener("change", loadJobs);
 document.getElementById("searchText").addEventListener("change", loadJobs);
 document.getElementById("minScore").addEventListener("change", loadJobs);
 document.getElementById("maxAgeDays").addEventListener("change", loadJobs);
-document.getElementById("statusFilter").addEventListener("change", loadJobs);
 document.getElementById("remoteOnly").addEventListener("change", loadJobs);
 document.getElementById("applicableOnly")?.addEventListener("change", loadJobs);
+document.getElementById("fromMail")?.addEventListener("change", loadJobs);
 initJobSorting();
+initJobBuckets();
+// Wired here rather than at the end of bootstrap(): a tab strip needs no
+// data, and bootstrap awaits a dozen requests first — long enough for a
+// click on Settings to land on a strip that was not listening yet.
+// Both panels are already loaded once at boot below; the tabs only decide
+// what is on screen, so there is nothing to re-fetch on a switch.
+initSubtabs("settings", { defaultTab: "ai" });
+initReadiness({ revealElement });
+initSubtabs("profile", {
+  defaultTab: "about",
+  // The matching facts and the goals were fetched once at boot and never
+  // again, so reopening the tab showed whatever was true when the app
+  // started — including values a scan had changed since.
+  onChange: (tab) => {
+    if (tab === "constraints") loadMatchingFacts().catch(() => {});
+    renderReadinessStrips();
+  },
+});
 {
   const usageRangeSel = document.getElementById("usageRange");
   if (usageRangeSel) usageRangeSel.addEventListener("change", () => loadUsage());
@@ -1258,7 +1356,21 @@ async function bootstrap() {
     toggleCompare,
   });
   initCompare();
-  initScan({ getKeywords, getLocations, ensureProviderConfigured });
+  initScan({
+    getKeywords,
+    getLocations,
+    ensureProviderConfigured,
+    // Two gates now: a key to score with, and something of the user's to
+    // search for. The second one used to be covered by a built-in default.
+    ensureProfileReady: () =>
+      ensureProfileReady({
+        showToast,
+        revealElement,
+        terms: getKeywords.getTags(),
+        locations: getLocations.getTags(),
+        isRemote: document.getElementById("remoteToggle")?.checked || false,
+      }),
+  });
   setupSharedLayout();
   activateView("dashboard");
   await loadHealth();
@@ -1299,11 +1411,20 @@ if (closeDetailBtn) {
 }
 
 
+// The kanban's columns ARE the buckets, so the tab strip has nothing to say
+// there and the board always asks for the whole archive.
+function _syncBucketStrip(kanban) {
+  document.getElementById("jobBuckets")?.classList.toggle("hidden", kanban);
+  document.querySelector(".jobs-count-line")?.classList.toggle("hidden", kanban);
+}
+
 document.getElementById("viewTableBtn")?.addEventListener("click", e => {
     document.getElementById("tableView").classList.add("is-active");
     document.getElementById("kanbanView").classList.remove("is-active");
   e.currentTarget.classList.add("is-active");
     document.getElementById("viewKanbanBtn").classList.remove("is-active");
+  _syncBucketStrip(false);
+  loadJobs();
 });
 
 document.getElementById("viewKanbanBtn")?.addEventListener("click", e => {
@@ -1311,6 +1432,7 @@ document.getElementById("viewKanbanBtn")?.addEventListener("click", e => {
     document.getElementById("tableView").classList.remove("is-active");
   e.currentTarget.classList.add("is-active");
     document.getElementById("viewTableBtn").classList.remove("is-active");
+  _syncBucketStrip(true);
   loadJobs();
 });
 
@@ -1377,12 +1499,36 @@ function setupTagInput(containerId, inputId, onRemove) {
 const getKeywords = setupTagInput('keywordsContainer', 'keywordsInput', (term) => { _removeFromShortlistApi(term); });
 const getLocations = setupTagInput('locationsContainer', 'locationsInput');
 window.getKeywords = getKeywords;
+// The locations box had no loader at all, which is why it was always empty and
+// the app filled the gap with a city of its own.
+window.getLocations = getLocations;
+
+initChatActions({
+  getKeywords,
+  getLocations,
+  activateView,
+  showJobDetail,
+  addRoles: async (roles, keywords) => {
+    await addRolesToProfile(roles);
+    window.getKeywords?.addMultiple(keywords);
+    await _addToShortlistApi(keywords);
+  },
+  patchProfile: (body) =>
+    api("/api/profile", { method: "PATCH", body: JSON.stringify(body) }),
+  savePreference: (key, value) =>
+    api("/api/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+  invalidateReadiness,
+  renderReadinessStrips,
+});
 
 async function loadRoleShortlist() {
   const roles = await _loadShortlistApi();
   if (roles.length && getKeywords && typeof getKeywords.addMultiple === "function") {
     getKeywords.addMultiple(roles);
   }
+  // Whatever the shortlist did not cover — the roles read off the CV, the last
+  // search actually run — comes from the same chain the scan follows.
+  await prefillSearchForm();
 }
 loadRoleShortlist();
 
@@ -1515,11 +1661,8 @@ async function showFirstTimeTutorial() {
     if (back) back.addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); render(); });
     overlay.querySelector('#wizCta').addEventListener('click', () => {
       try {
-        activateView(step.ctaTarget);
-        if (step.ctaScroll) {
-          const el = document.getElementById(step.ctaScroll);
-          if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        if (step.ctaScroll) revealElement(step.ctaScroll);
+        else activateView(step.ctaTarget);
       } catch (_) {}
     });
     overlay.querySelector('#wizNext').addEventListener('click', () => {
@@ -1822,9 +1965,7 @@ async function ensureProviderConfigured() {
   }
   showToast(t("errors.noProviderToast") || "Configure an AI provider key first", "error");
   try {
-    activateView("settings");
-    const cards = document.getElementById("providerCards");
-    if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
+    revealElement("providerCards");
   } catch (_) {}
   return false;
 }
@@ -1834,15 +1975,8 @@ function wireOnboardingPlaceholder() {
     btn.addEventListener("click", () => {
       const target = btn.getAttribute("data-onb-action");
       try {
-        if (target === "settings") {
-          activateView("settings");
-          const cards = document.getElementById("providerCards");
-          if (cards && cards.scrollIntoView) cards.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else if (target === "profile") {
-          activateView("profile");
-          const cv = document.getElementById("cvFile");
-          if (cv && cv.scrollIntoView) cv.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+        if (target === "settings") revealElement("providerCards");
+        else if (target === "profile") revealElement("cvFile");
       } catch (_) {}
     });
   });

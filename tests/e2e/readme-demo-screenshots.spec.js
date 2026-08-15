@@ -1,10 +1,15 @@
 // Screenshot capture against a pre-seeded demo database.
 //
-// Prereq: run `python scripts/seed_demo.py --db data/demo.db --force` first,
-// then launch the webapp with `SEARCHER_DB_PATH=data/demo.db`.
+// Prereq, and it matters: seed with `python scripts/seed_demo.py --force`
+// (which now defaults to data/demo.db, not the real archive), then start the app
+// yourself on PORT 8123 with SEARCHER_DB_PATH=data/demo.db. Playwright's config
+// reuses an existing server on that port; if you let it start its own, these
+// shots are taken against the development database instead of the demo one.
 //
-// Produces the 4 README screenshots:
-// dashboard, job-search wizard, chat view, scan progress.
+// Produces every image the README embeds. The v2.0.0 surfaces — the archive
+// buckets, the Mail tab and its review queue, the provider panels, the readiness
+// strips — were added because the README was still showing v1.7 with no way to
+// regenerate half of what it embedded.
 
 const { test, expect } = require("@playwright/test");
 const fs = require("fs");
@@ -171,7 +176,51 @@ test("demo screenshots (pre-seeded DB)", async ({ page }) => {
   });
   await page.waitForTimeout(250);
 
-  // 8. Dark-mode dashboard (v1.5.3 theme overhaul)
+  // 8. The archive (v2.0.0): five buckets with counts, and "showing X of Y".
+  // Nothing used to visit this view, so the README showed a table that no
+  // longer exists.
+  await page.locator(".topnav .nav-link[data-view='jobs']").click();
+  await page.waitForTimeout(900);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, "archive-buckets-en.png");
+
+  // 9. Mail (v1.8.x–v2.0.0): the tab, its badge, and the review queue — the
+  // whole feature was invisible in the README.
+  await page.locator(".topnav .nav-link[data-view='mail']").click();
+  await page.waitForTimeout(1400);
+  // The queue is the point of this shot, and it sits below the connection form:
+  // scrolling to the top framed the settings and cut off the three proposals.
+  await page.evaluate(() => {
+    const box =
+      document.getElementById("mailReviewBox") ||
+      document.querySelector("#view-mail .card-block:last-of-type");
+    if (box) box.scrollIntoView({ block: "center" });
+  });
+  await page.waitForTimeout(500);
+  await shot(page, "mail-review-en.png");
+
+  // 10. Settings → AI: providers, their track record, and which one to use.
+  // Also the file the README embeds and no spec produced (settings-providers).
+  await page.locator(".topnav .nav-link[data-view='settings']").click();
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, "settings-providers-en.png");
+
+  // 11. Settings → AI, further down: the rate-limit panel (v2.0.0).
+  const limitsCard = page.locator("#rateLimitsCard");
+  if (await limitsCard.count()) {
+    await limitsCard.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    await shot(page, "provider-limits-en.png");
+  }
+
+  // 12. Profile: the readiness strips that say what the app still needs.
+  await page.locator(".topnav .nav-link[data-view='profile']").click();
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, "profile-readiness-en.png");
+
+  // 13. Dark-mode dashboard (v1.5.3 theme overhaul)
   await page.locator(".topnav .nav-link[data-view='dashboard']").click();
   await setTheme(page, "dark");
   await page.evaluate(() => window.scrollTo(0, 0));

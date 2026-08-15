@@ -167,6 +167,13 @@ class ProfileUpdate(BaseModel):
     #: A category B licence, which no CV states and which decides whether a field
     #: role is reachable at all. None leaves it unsaid, and unsaid blocks nothing.
     driving_licence: bool | None = None
+    #: On the L. 68/99 register. Like the licence, no CV says so and it is the
+    #: difference between an offer reserved to that register being takeable or
+    #: not. It had a preference and a check and no way to answer.
+    protected_category: bool | None = None
+    #: Which subject the degree is in. The check reads it, the CV usually
+    #: provides it, and until now a wrong reading could not be corrected.
+    degree_fields: list[str] | None = None
 
 
 class ProfileFromTextRequest(BaseModel):
@@ -174,11 +181,27 @@ class ProfileFromTextRequest(BaseModel):
     source_name: str | None = None
 
 
+class ProviderLimitRequest(BaseModel):
+    """The user's own rate limits for one model, read off their console.
+
+    Zero or missing clears the override and hands the model back to the shipped
+    default and to what the app measures.
+    """
+
+    provider: str
+    model: str
+    rpm: int | None = Field(default=None, ge=0, le=100000)
+    rpd: int | None = Field(default=None, ge=0, le=10000000)
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     provider: str | None = None
     model: str | None = None
+    #: Which page the user is looking at. The coach used to answer every
+    #: question from the same place regardless of what was on screen.
+    view: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -186,6 +209,9 @@ class ChatResponse(BaseModel):
     answer: str
     updated_preferences: dict[str, Any] = Field(default_factory=dict)
     action: dict[str, Any] | None = None
+    #: Preferences the message seemed to state, offered back as actions to
+    #: accept. They used to be written to the database on the spot.
+    proposals: list[dict[str, Any]] = Field(default_factory=list)
     suggested_roles: list[dict[str, Any]] = Field(default_factory=list)
     # ``chat_state`` (str from get_chat_state) and ``degraded`` (True when the
     # answer is the rule-based fallback, not a real LLM reply) are returned by
@@ -273,6 +299,11 @@ class ProviderKeysRequest(BaseModel):
     xai_api_key: str | None = None
     glm_api_key: str | None = None
     mistral_api_key: str | None = None
+    # Cloudflare's endpoint carries the account id; the app reads it from the
+    # token when the key is saved, so the user never has to find it.
+    cloudflare_api_key: str | None = None
+    # OVH's key is optional: the literal "anonymous" opts into the free tier.
+    ovh_api_key: str | None = None
     # "custom" = any OpenAI-compatible endpoint (local model server or gateway).
     # The base URL is the configuration; the key is optional.
     custom_api_key: str | None = None

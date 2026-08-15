@@ -69,8 +69,9 @@ def test_on_topic_titles_are_kept(titolo: str) -> None:
 def test_two_letter_trades_are_visible() -> None:
     """``_tokenize`` needs three characters, so a gate built on it would have
     missed "AI", "QA" and "ML" — the very words that matter here."""
+    vocab = ss.title_vocabulary(search_terms=["AI QA", "ML Engineer"])
     for titolo in ("AI Specialist", "QA Engineer", "ML Ops"):
-        assert ss.title_off_topic(titolo, ss.default_title_vocabulary()) is False
+        assert ss.title_off_topic(titolo, vocab) is False
 
 
 def test_entry_routes_survive_without_naming_the_trade() -> None:
@@ -81,17 +82,23 @@ def test_entry_routes_survive_without_naming_the_trade() -> None:
 
 
 def test_candidate_skills_widen_the_gate() -> None:
-    assert ss.title_off_topic("Quarkus Consultant", ss.default_title_vocabulary()) is True
+    narrow = ss.title_vocabulary(search_terms=["AI QA"])
+    assert ss.title_off_topic("Quarkus Consultant", narrow) is True
     assert ss.title_off_topic("Quarkus Consultant", _VOCAB) is False
 
 
-def test_the_broad_default_never_rescues_a_description() -> None:
-    """It contains "software" and "data", which every corporate ad repeats: used
-    as a rescue it would wave everything through, which is the hole the old gate
-    had. With no profile, the title decides alone."""
+def test_nothing_known_about_the_user_means_nothing_is_filtered() -> None:
+    """There is no built-in vocabulary to fall back on any more.
+
+    There used to be one, and it contained "software" and "data" — words every
+    corporate ad repeats — so as a rescue it waved everything through, and as a
+    gate it dropped every trade it had never heard of. With nothing to go on,
+    both checks now stand down: the scan refuses long before this point unless
+    the user has said what they are looking for.
+    """
     boilerplate = "Gestione dei dati e dei software aziendali. " * 5
-    assert ss.description_on_topic(boilerplate, ss.default_title_vocabulary()) is True
-    assert ss.description_on_topic(boilerplate, set()) is False  # no profile, no rescue
+    assert ss.description_on_topic(boilerplate, set()) is False
+    assert ss.title_off_topic("Qualsiasi titolo", set()) is False
 
 
 # --- the vocabulary belongs to the user, not to this app ---------------------
@@ -252,8 +259,15 @@ def test_scan_drops_off_topic_titles_before_spending_a_call(
     pm = _PM()
     db = Database(tmp_path / "t.db")
     try:
+        # A real term, because the vocabulary IS the user's terms now: with
+        # nothing recognisable to gate on, the gate correctly stands down.
         events = list(
-            ss.run_scan(db, settings, pm, ScanRequest(search_terms=["x"], sites=["linkedin"]))
+            ss.run_scan(
+                db,
+                settings,
+                pm,
+                ScanRequest(search_terms=["AI QA"], sites=["linkedin"], location="Milano"),
+            )
         )
     finally:
         db.close()

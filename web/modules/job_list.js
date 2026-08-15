@@ -186,25 +186,119 @@ export function initJobSorting() {
   });
 }
 
-export async function loadJobs() {
+//: The five slices of the archive, mirroring JOB_BUCKETS in app/db.py.
+const BUCKETS = ["to_review", "applied", "rejected", "archived", "all"];
+const BUCKET_KEY = "jobsBucket";
+const PAGE_LIMIT = 250;
+
+function _kanbanActive() {
+  return document.getElementById("kanbanView")?.classList.contains("is-active") || false;
+}
+
+export function activeBucket() {
+  const el = document.querySelector("#jobBuckets .bucket-tab.is-active");
+  return el?.dataset.bucket || "to_review";
+}
+
+export function setJobsBucket(name) {
+  const target = BUCKETS.includes(name) ? name : "to_review";
+  document.querySelectorAll("#jobBuckets .bucket-tab").forEach((btn) => {
+    const on = btn.dataset.bucket === target;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  try {
+    localStorage.setItem(BUCKET_KEY, target);
+  } catch {
+    /* private mode: the tab still works, it just won't be remembered */
+  }
+}
+
+export function initJobBuckets() {
+  const strip = document.getElementById("jobBuckets");
+  if (!strip) return;
+  let saved = null;
+  try {
+    saved = localStorage.getItem(BUCKET_KEY);
+  } catch {
+    saved = null;
+  }
+  if (saved) setJobsBucket(saved);
+  strip.addEventListener("click", (event) => {
+    const btn = event.target.closest(".bucket-tab");
+    if (!btn) return;
+    setJobsBucket(btn.dataset.bucket);
+    loadJobs();
+  });
+  // "Show all" asks for the whole slice instead of the first page. The cap is
+  // there to keep a huge archive rendering fast, not to decide what exists.
+  document
+    .getElementById("jobsShowAllBtn")
+    ?.addEventListener("click", () => loadJobs({ limit: 2000 }));
+  // One source of truth for the threshold: the checkbox writes into the same
+  // number field, so the two can never disagree about what is being filtered.
+  document.getElementById("minScore4")?.addEventListener("change", (event) => {
+    const minScore = document.getElementById("minScore");
+    if (event.currentTarget.checked) minScore.value = "4";
+    else if (minScore.value.trim() === "4") minScore.value = "";
+    loadJobs();
+  });
+}
+
+function _paintCountLine(shown, total, limit) {
+  const label = document.getElementById("jobsShownOf");
+  const showAll = document.getElementById("jobsShowAllBtn");
+  if (label) label.textContent = total ? t("jobs.shownOf", { shown, total }) : "";
+  // The button only means something while a cap is actually in the way.
+  if (showAll) showAll.classList.toggle("hidden", !(total > shown && limit < 2000));
+}
+
+async function _refreshBucketCounts(query) {
+  const counts = document.querySelectorAll("#jobBuckets .bucket-count");
+  if (!counts.length) return;
+  const params = new URLSearchParams(query);
+  params.delete("bucket");
+  params.delete("limit");
+  try {
+    const { counts: data } = await api(`/api/jobs/counts?${params.toString()}`);
+    counts.forEach((el) => {
+      const n = data?.[el.dataset.bucketCount];
+      el.textContent = n === undefined ? "" : String(n);
+    });
+  } catch {
+    // A count is a nicety; failing to fetch it must not blank the list.
+    counts.forEach((el) => (el.textContent = ""));
+  }
+}
+
+export async function loadJobs(opts) {
+  // The board is a set of columns whose sizes are the point: a truncated
+  // kanban does not show fewer cards, it shows wrong numbers.
+  const defaultLimit = _kanbanActive() ? 2000 : PAGE_LIMIT;
+  const limit = opts && typeof opts.limit === "number" ? opts.limit : defaultLimit;
   const onlyNew = document.getElementById("onlyNew").checked;
   const onlyFavorites = document.getElementById("onlyFavorites").checked;
   const remoteOnly = document.getElementById("remoteOnly").checked;
   const applicableOnly = document.getElementById("applicableOnly")?.checked || false;
+  // An origin, not a state: it composes with whichever tab is open.
+  const fromMail = document.getElementById("fromMail")?.checked || false;
   const searchText = document.getElementById("searchText").value.trim();
-  const status = document.getElementById("statusFilter").value;
+  // The kanban draws one column per status, so a single slice would empty most
+  // of the board: there the buckets are the columns.
+  const bucket = _kanbanActive() ? "all" : activeBucket();
   const minScoreRaw = document.getElementById("minScore").value.trim();
   const maxAgeRaw = document.getElementById("maxAgeDays").value.trim();
 
   const query = new URLSearchParams({
     only_new: onlyNew ? "true" : "false",
     only_favorites: onlyFavorites ? "true" : "false",
-    limit: "250",
+    limit: String(limit),
   });
   if (remoteOnly) query.set("remote_only", "true");
   if (applicableOnly) query.set("applicable_only", "true");
+  if (fromMail) query.set("from_mail", "true");
   if (searchText) query.set("search_text", searchText);
-  if (status) query.set("status", status);
+  if (bucket) query.set("bucket", bucket);
   if (minScoreRaw) query.set("min_score", minScoreRaw);
   if (maxAgeRaw) query.set("max_age_days", maxAgeRaw);
 
@@ -224,14 +318,19 @@ export async function loadJobs() {
   body.innerHTML = fullRow("table-empty", "…");
 
   let jobs;
+  let shown = 0;
+  let total = 0;
   try {
-    ({ jobs } = await api(`/api/jobs?${query.toString()}`));
+    ({ jobs, shown, total } = await api(`/api/jobs?${query.toString()}`));
   } catch (err) {
     console.error("loadJobs failed", err);
     body.innerHTML = fullRow("table-empty table-error", t("jobs.loadError") || "Couldn't load jobs.");
     restoreScroll();
     return;
   }
+
+  _paintCountLine(shown ?? jobs.length, total ?? jobs.length, limit);
+  _refreshBucketCounts(query);
 
   jobs = _sortJobs(jobs);
   body.innerHTML = "";
@@ -241,15 +340,19 @@ export async function loadJobs() {
       onlyFavorites ||
       remoteOnly ||
       applicableOnly ||
+      fromMail ||
       searchText ||
-      status ||
       minScoreRaw ||
       maxAgeRaw;
-    body.innerHTML = fullRow(
-      "table-empty",
-      filtered ? t("jobs.emptyFiltered") || "No jobs match these filters."
-               : t("jobs.emptyNoJobs") || "No jobs yet — run your first scan.",
-    );
+    // Three different empty states, because they mean three different things:
+    // the archive is empty, the filters exclude everything, or this slice is
+    // simply done — and telling someone to "run your first scan" when they
+    // have 400 offers and an empty Discarded tab is nonsense.
+    let message = t("jobs.emptyNoJobs") || "No jobs yet — run your first scan.";
+    if (filtered) message = t("jobs.emptyFiltered") || "No jobs match these filters.";
+    else if (bucket !== "all" && bucket !== "to_review")
+      message = t("jobs.emptyBucket") || "Nothing in this tab.";
+    body.innerHTML = fullRow("table-empty", message);
     renderKanban(jobs);
     restoreScroll();
     return;
@@ -424,7 +527,13 @@ export function renderKanban(jobs) {
     card.dataset.id = String(job.id);
     card.dataset.status = status;
     const opts = statusOptions
-      .map((s) => `<option value="${s}"${s === status ? " selected" : ""}>${t("jobs." + s)}</option>`)
+      // ``jobs.status.*`` is the one place a status is named — the parallel
+      // ``jobs.open``/``jobs.applied`` set existed only for the dropdown that
+      // the bucket tabs replaced, and said the same thing in different words.
+      .map(
+        (s) =>
+          `<option value="${s}"${s === status ? " selected" : ""}>${t("jobs.status." + s)}</option>`,
+      )
       .join("");
     card.innerHTML = `
       <strong>${escapeHtml(job.titolo || t("jobs.titleUnavailable"))}</strong>
