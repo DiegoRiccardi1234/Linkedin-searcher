@@ -1191,11 +1191,22 @@ class Database:
             query += " AND julianday('now') - julianday(last_seen_at) <= ?"
             params.append(max_age_days)
 
-        query += " ORDER BY punteggio_ai DESC, last_seen_at DESC LIMIT ?"
-        params.append(limit)
+        ordered = query + " ORDER BY punteggio_ai DESC, last_seen_at DESC LIMIT ?"
         cur = self.conn.cursor()
-        cur.execute(query, params)
+        cur.execute(ordered, [*params, limit])
         rows = cur.fetchall()
+
+        # The row cap is about how many OFFERS to show. It must never decide how
+        # much of your own history you get to see — and it silently did: the
+        # ordering puts unscored rows last, applications recovered from the
+        # mailbox carry no score by design (there is no posting to judge), and on
+        # a real archive 73 of 97 applications fell past the 250-row cap. The
+        # kanban's "Applied" column read 23. They are fetched separately and
+        # appended, which is where they sorted anyway, so nothing moves.
+        if len(rows) >= limit:
+            seen = {row["id"] for row in rows}
+            cur.execute(query + " AND applied_at IS NOT NULL ORDER BY applied_at DESC", params)
+            rows = list(rows) + [row for row in cur.fetchall() if row["id"] not in seen]
 
         output: list[dict[str, Any]] = []
         for row in rows:

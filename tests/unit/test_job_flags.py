@@ -160,3 +160,38 @@ def test_job_list_does_not_ship_the_whole_posting(client: TestClient, tmp_path: 
     # …but the detail endpoint still serves everything.
     detail = client.get(f"/api/jobs/{job['id']}").json()["job"]
     assert "analysis" in detail
+
+
+def test_the_row_cap_never_drops_an_application(tmp_path) -> None:
+    """The cap is about how many OFFERS to show, not how much of your history.
+
+    Unscored rows sort last, and an application recovered from the mailbox
+    carries no score by design — there is no posting to judge. On the real
+    archive that put 73 of 97 applications past the 250-row cap and the kanban's
+    "Applied" column read 23.
+    """
+    from app.db import Database
+
+    db = Database(tmp_path / "cap.db")
+    try:
+        # More scored offers than the cap, so the applications sort past it.
+        for n in range(6):
+            jid, _, _ = db.upsert_job(
+                {"titolo": f"Offerta {n}", "azienda": "ACME", "link": f"https://x/{n}"}
+            )
+            db.update_job_analysis(jid, {"punteggio": 9, "consiglio": "Candidati subito"})
+        mail_id = db.add_application_from_mail(
+            company="Kirey", applied_at="2026-07-16T09:00:00+00:00",
+            message_id="<a@b>", rule="import", role="GEN AI ENGINEER",
+        )
+        assert mail_id is not None
+
+        capped = db.list_jobs(limit=3)
+        assert len(capped) == 4, "three offers, plus the application the cap would have eaten"
+        assert mail_id in {j["id"] for j in capped}
+        assert capped[-1]["id"] == mail_id, "appended where it sorted anyway"
+        # And no duplicate when it fits inside the cap on its own.
+        roomy = db.list_jobs(limit=200)
+        assert [j["id"] for j in roomy].count(mail_id) == 1
+    finally:
+        db.close()
