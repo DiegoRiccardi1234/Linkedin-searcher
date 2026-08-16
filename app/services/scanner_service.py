@@ -43,7 +43,7 @@ from app.log import get_logger
 from app.models import ScanRequest
 from app.providers.factory import ProviderManager
 from app.providers.model_selector import SCORING_MIN_SIZE_B
-from app.scoring_schema import ANALYSIS_SOURCE_KEY, HEURISTIC_SOURCE
+from app.scoring_schema import ANALYSIS_SOURCE_KEY, ANSWERED_BY_KEY, HEURISTIC_SOURCE
 from app.services import local_models, quota
 from app.services.candidate_facts import candidate_facts
 from app.services.onboarding import linkedin_suffix, onboarding_context, onboarding_ral
@@ -772,6 +772,16 @@ def analyze_offers_batch(
                 )
                 if isinstance(raw, list):
                     parsed = raw
+                    # The factory stamps who answered onto the object it returns,
+                    # which for a batch is the WRAPPER — and the wrapper is what
+                    # gets thrown away here. Without this line every verdict from
+                    # a batched scan reaches the database with no model against
+                    # it, which is the one thing jobs.analysis_model exists for.
+                    stamp = result.get(ANSWERED_BY_KEY)
+                    if stamp:
+                        for item in parsed:
+                            if isinstance(item, dict):
+                                item.setdefault(ANSWERED_BY_KEY, stamp)
         except Exception as exc:
             log.warning(
                 "Batch scoring failed (n=%d): %s; falling back per-offer", len(scorable), exc

@@ -39,3 +39,7 @@ tests/e2e/_demo_frames/
 HANDOFF.md
 APPUNTI.md
 CANDIDATURE.md
+# Knowledge graph: rebuilt locally with `graphify . --update`, and it changes on
+# every build. Anchored to the repo root so it cannot match a `graphify-out` a
+# source folder might one day hold — the same slip that hid app/data/ for months.
+/graphify-out/

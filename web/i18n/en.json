@@ -1131,7 +1131,8 @@
       "createEntry": "Record it as a new application",
       "messageOf": "message {n} of {total}",
       "dismissOne": "Ignore this message",
-      "pick": "Which offer is this about?"
+      "pick": "Which offer is this about?",
+      "suggested": "suggested by the job title"
     },
     "whereIdFrom": "Where do I get an app id?",
     "idSource": {
@@ -1148,6 +1149,12 @@
       "hint": "Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.",
       "fetchOne": "Get the job title",
       "notFound": "No recognisable job title in this message."
+    },
+    "attach": {
+      "label": "When the job title leaves one answer",
+      "auto": "Record it, I can undo it",
+      "known": "Only for LinkedIn, Indeed and known platforms",
+      "ask": "Always ask me, with the answer pre-selected"
     }
   },
   "readiness": {

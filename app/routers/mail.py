@@ -16,6 +16,7 @@ from app import rate_limit
 from app.mail import config as mail_config
 from app.mail.auth import begin_device_code, poll_device_code, scope_for
 from app.mail.errors import MailAuthPending, MailError, safe_error
+from app.mail.matcher import rank_candidates
 from app.models import MailConfigRequest, MailReviewResolveRequest
 
 if TYPE_CHECKING:
@@ -47,6 +48,8 @@ def build_router(container: AppContainer) -> APIRouter:
         # the address field happened to be empty.
         if payload.body_mode in mail_config.BODY_MODES:
             container.db.set_preference(mail_config.PREF_BODY_MODE, payload.body_mode)
+        if payload.attach_mode in mail_config.ATTACH_MODES:
+            container.db.set_preference(mail_config.PREF_ATTACH_MODE, payload.attach_mode)
 
         address = payload.address.strip()
         if "@" not in address:
@@ -209,6 +212,46 @@ def build_router(container: AppContainer) -> APIRouter:
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+    def _review_row(item: dict[str, Any]) -> dict[str, Any]:
+        """One queued proposal, with the answer the title points at.
+
+        The suggestion is computed on every read rather than stored: press "get
+        the job title" a minute after the row was queued and the suggestion
+        appears, with no migration and no stale column. It is the same reason
+        the candidates themselves are resolved at read time.
+        """
+        role = str(item.get("role") or "")
+        titles: list[tuple[int, str]] = [
+            (int(c["id"]), str(c.get("titolo") or "")) for c in item["candidates"]
+        ]
+        ordered, only = rank_candidates(role, titles)
+        position = {job_id: i for i, job_id in enumerate(ordered)}
+        candidates = [
+            {
+                "job_id": int(c["id"]),
+                "titolo": c.get("titolo") or "",
+                "azienda": c.get("azienda") or "",
+            }
+            for c in item["candidates"]
+        ]
+        candidates.sort(key=lambda c: position.get(int(c["job_id"]), len(position)))
+        return {
+            "review_id": int(item["id"]),
+            "kind": item["kind"],
+            "company": item.get("company") or "",
+            "role": role,
+            "sender": item.get("sender") or "",
+            "received_at": item.get("received_at") or "",
+            "rule": item.get("rule") or "",
+            "candidates": candidates,
+            # Set only when the title leaves exactly one answer. With a known
+            # role and no candidate matching it, the honest suggestion is that
+            # this is an application the archive never held: on a real queue
+            # that was 38 of 53.
+            "suggested_job_id": only,
+            "suggestion": "attach" if only else ("create" if role and candidates else ""),
+        }
+
     @router.get("/api/mail/review")
     def mail_review() -> dict[str, Any]:
         """The pending queue. Read from the table, so a restart does not empty it.
@@ -218,26 +261,7 @@ def build_router(container: AppContainer) -> APIRouter:
         """
         items = container.mailwatch.review_items()
         return {
-            "items": [
-                {
-                    "review_id": int(item["id"]),
-                    "kind": item["kind"],
-                    "company": item.get("company") or "",
-                    "role": item.get("role") or "",
-                    "sender": item.get("sender") or "",
-                    "received_at": item.get("received_at") or "",
-                    "rule": item.get("rule") or "",
-                    "candidates": [
-                        {
-                            "job_id": int(c["id"]),
-                            "titolo": c.get("titolo") or "",
-                            "azienda": c.get("azienda") or "",
-                        }
-                        for c in item["candidates"]
-                    ],
-                }
-                for item in items
-            ],
+            "items": [_review_row(item) for item in items],
             "counts": {
                 "attach": sum(1 for i in items if i["kind"] == "attach"),
                 "import": sum(1 for i in items if i["kind"] == "import"),
