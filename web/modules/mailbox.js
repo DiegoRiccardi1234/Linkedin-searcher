@@ -75,6 +75,10 @@ export async function loadMailboxStatus() {
   // made a second earlier — so the next save posted the old value back.
   const bodySelect = $("mailBodyMode");
   if (bodySelect && bodySelect.dataset.touched !== "1") bodySelect.value = _bodyMode;
+  const attachSelect = $("mailAttachMode");
+  if (attachSelect && attachSelect.dataset.touched !== "1") {
+    attachSelect.value = status.attach_mode || "auto";
+  }
   _toggleAuthBlocks();
 
   const key = _STATE_KEYS[status.state] || "mail.state.unconfigured";
@@ -145,13 +149,22 @@ export async function loadMailReview() {
                  data-review="${item.review_id}" value="${value}"${checked ? " checked" : ""} />
           <span>${label}</span>
         </label>`;
+      // The title narrowed it to one. Pre-selected and SAID, never applied
+      // silently: a radio that arrives already chosen with no reason shown is a
+      // decision the app made without telling anyone.
+      const suggested = item.suggested_job_id || null;
       const candidates = (item.candidates || [])
-        .map((c) =>
-          option(
+        .map((c) => {
+          const isPick = suggested && c.job_id === suggested;
+          const why = isPick
+            ? ` <span class="micro mail-review-why" data-i18n="mail.review.suggested">suggested by the job title</span>`
+            : "";
+          return option(
             String(c.job_id),
-            `${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}`,
-          ),
-        )
+            `${escapeHtml(c.titolo || "?")} — ${escapeHtml(c.azienda || "?")}${why}`,
+            Boolean(isPick),
+          );
+        })
         .join("");
       // "Record it on its own" is the honest default when nothing matches: on a
       // real queue 38 of 53 attach proposals turned out to be roles the archive
@@ -159,7 +172,7 @@ export async function loadMailReview() {
       const create = option(
         "create",
         `<span data-i18n="mail.review.createEntry">Record it as a new application</span>`,
-        !candidates,
+        !candidates || item.suggestion === "create",
       );
       // Per message, not just "ignore them all": one unanswerable proposal used
       // to force a choice between attaching it to the wrong offer and clearing
@@ -168,13 +181,18 @@ export async function loadMailReview() {
         "dismiss",
         `<span data-i18n="mail.review.dismissOne">Ignore this message</span>`,
       );
-      // "Ask" mode: the title lives in the body, and the body is only read for
-      // the one message you press this on. On an attach row the title is not a
-      // nicety but the whole decision — "Teoresi" with six offers in the
-      // archive is unanswerable, "Teoresi · AI Engineer" answers itself.
+      // The title lives in the body. On an attach row it is not a nicety but
+      // the whole decision — "Teoresi" with six offers in the archive is
+      // unanswerable, "Teoresi · AI Engineer" answers itself.
+      //
+      // The button used to appear only in "ask" mode. In "always" a row that
+      // still has no role — the body was unreadable, or the budget for the run
+      // ran out — had no way left to get one, which is the one case where
+      // asking by hand is exactly right. Offered whenever reading is allowed
+      // at all; "never" is the only mode that hides it.
       const roleBit = item.role
         ? `<span class="mail-review-role">${escapeHtml(item.role)}</span>`
-        : _bodyMode === "ask"
+        : _bodyMode !== "never"
           ? `<button type="button" class="ghost-btn small mail-review-role-btn"
                      data-review="${item.review_id}" data-i18n="mail.body.fetchOne">Get the job title</button>`
           : "";
@@ -203,6 +221,7 @@ async function _save() {
     enabled: Boolean($("mailEnabled")?.checked),
     interval_minutes: Number($("mailInterval")?.value || 15),
     body_mode: $("mailBodyMode")?.value || "",
+    attach_mode: $("mailAttachMode")?.value || "",
   };
   // Empty means "leave what is stored" here, not "delete it": a user reopening
   // settings must not wipe the password by pressing Save.
@@ -259,6 +278,9 @@ async function _connectMicrosoft() {
 
 export function wireMailbox() {
   $("mailBodyMode")?.addEventListener("change", (event) => {
+    event.currentTarget.dataset.touched = "1";
+  });
+  $("mailAttachMode")?.addEventListener("change", (event) => {
     event.currentTarget.dataset.touched = "1";
   });
   $("mailAuth")?.addEventListener("change", _toggleAuthBlocks);

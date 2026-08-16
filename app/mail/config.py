@@ -108,18 +108,50 @@ DECIDED_VERDICTS = frozenset({"applied", "imported", "dismissed", "already_appli
 #: * ``never``   — no command that fetches a body is ever issued. The original
 #:                 guarantee, unchanged, and still asserted on the literal IMAP
 #:                 command by a test.
-#: * ``ask``     — the default. Nothing is downloaded until you press the button
-#:                 on one specific queued message, and only that message.
-#: * ``always``  — every message that has already passed the confirmation gate
-#:                 gets its body read, so imported applications arrive titled.
+#: * ``ask``     — nothing is downloaded until you press the button on one
+#:                 specific queued message, and only that message.
+#: * ``always``  — the default. Every message that has already passed the
+#:                 confirmation gate gets its body read, so applications arrive
+#:                 with a title and, for the senders that only name the job,
+#:                 with an employer at all.
 #:
 #: In all three the body is parsed in memory and never stored, never logged and
 #: never sent to a model.
+#:
+#: ``ask`` was the default until 2.0.1, on the reasoning that reading a body is
+#: a bigger step than reading a header and should be asked for. What that
+#: produced, measured on a real mailbox: every queued proposal carried an empty
+#: role, so the one question the queue asks — "which of these six offers is it?"
+#: — was unanswerable by construction, and a whole class of sender (Indeed, 151
+#: messages in a year) names the employer ONLY in the body, so under ``ask``
+#: those applications cannot be filed at all. The gate that matters is the
+#: confirmation gate, which is unchanged: bodies are read for the handful of
+#: messages that already look like confirmations, not for the mailbox.
 BODY_MODE_NEVER = "never"
 BODY_MODE_ASK = "ask"
 BODY_MODE_ALWAYS = "always"
 BODY_MODES = (BODY_MODE_NEVER, BODY_MODE_ASK, BODY_MODE_ALWAYS)
-DEFAULT_BODY_MODE = BODY_MODE_ASK
+DEFAULT_BODY_MODE = BODY_MODE_ALWAYS
+
+#: What the app may do when the job title in a confirmation matches exactly ONE
+#: offer in the archive — employer and title, both.
+#:
+#: * ``auto``  — the default. It is recorded as an application, and the undo
+#:                already exists on the offer itself.
+#: * ``known`` — only for senders on the recognised-platform list, whose format
+#:                has actually been measured. Everything else is proposed.
+#: * ``ask``   — nothing is ever recorded without a press; the matching option
+#:                arrives pre-selected and says why.
+#:
+#: The narrowing is the same in all three: only a single match on both facts
+#: counts. Two candidates, or a title that matches in part, is a question — and
+#: a question is what the queue is for.
+ATTACH_MODE_AUTO = "auto"
+ATTACH_MODE_KNOWN = "known"
+ATTACH_MODE_ASK = "ask"
+ATTACH_MODES = (ATTACH_MODE_AUTO, ATTACH_MODE_KNOWN, ATTACH_MODE_ASK)
+DEFAULT_ATTACH_MODE = ATTACH_MODE_AUTO
+PREF_ATTACH_MODE = "mailwatch_attach_mode"
 
 
 def domain_of(address: str) -> str:

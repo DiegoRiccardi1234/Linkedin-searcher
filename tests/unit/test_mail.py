@@ -17,7 +17,17 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.mail.matcher import MailHeader, PendingJob, classify, is_known_sender
+from app.mail.body import facts_from_body
+from app.mail.matcher import (
+    MailHeader,
+    PendingJob,
+    classify,
+    company_from_sender,
+    extract_application,
+    is_confirmation_subject,
+    is_known_sender,
+    subject_facts,
+)
 from app.mail.watcher import MailWatcher
 
 _NOW = datetime(2026, 8, 7, 10, 0, tzinfo=UTC)
@@ -1250,27 +1260,28 @@ def test_the_scheduler_loop_actually_ticks_the_mailbox() -> None:
     assert calls, "the mailbox check is never reached from the scheduler loop"
 
 
-def test_nothing_is_fetched_when_there_is_nothing_to_wait_for(tmp_path: Path) -> None:
-    """The usual state of this feature is "no applications in flight", and in
-    that state it must not touch the network at all."""
+def test_nothing_is_fetched_when_no_mailbox_is_connected(tmp_path: Path) -> None:
+    """What now stops the tick is an unconfigured account, not an empty archive.
+
+    Until 2.0.1 the rule was "no offers with a link you opened from inside the
+    app, no connection". It reads like restraint and behaved like an off
+    switch: the flag is only set by pressing an offer's link inside Job Finder,
+    so anyone applying on LinkedIn kept a mailbox that was never read. What
+    replaces it is narrower and honest — an account has to be connected, and
+    the window is the pending-days setting.
+    """
     from app.db import Database
-    from app.mail import config as mail_config
     from app.services.scan_control import ScanControl
 
     db = Database(tmp_path / "d.db")
     try:
         (tmp_path / "data").mkdir(exist_ok=True)
-        mail_config.save_account(
-            db, tmp_path / "data", address="me@libero.it", auth="password",
-            host="imapmail.libero.it", secret="pw",
-        )
-        db.set_preference(mail_config.PREF_LAST_OK, "99999999999")  # keep-warm not due
 
         def _explode(_account: object) -> object:
-            raise AssertionError("the mailbox was opened with nothing pending")
+            raise AssertionError("the mailbox was opened with no account connected")
 
         watcher = MailWatcher(db, tmp_path / "data", ScanControl(), imap_factory=_explode)
-        assert watcher.run_once()["status"] == "idle"
+        assert watcher.run_once()["status"] == "skipped"
     finally:
         db.close()
 
@@ -1318,3 +1329,612 @@ def _encode_subject(text: str) -> str:
     from email.header import Header
 
     return Header(text, "utf-8").encode()
+
+
+# ── the subject says two different things: who, and what ─────────────────────
+# Every case below is transcribed from a real message in a real mailbox. The
+# census that produced them is in the plan: 1.743 headers over a year, of which
+# 113 were confirmations the gates threw away.
+
+
+def test_an_indeed_subject_names_the_role_and_not_the_employer() -> None:
+    """Indeed puts the job in the subject and the employer only in the body.
+
+    The old third alternative of ``_SUBJECT_COMPANY_RE`` captured this group and
+    called it a company, so "AI SPECIALIST JUNIOR" would have been filed as an
+    employer. It never fired only because the confirm gate rejected the subject
+    first — one bug hidden behind another.
+    """
+    facts = subject_facts("Candidatura per AI SPECIALIST JUNIOR attraverso Indeed")
+    assert facts.role == "AI SPECIALIST JUNIOR"
+    assert facts.company == ""
+
+
+def test_a_linkedin_subject_still_names_the_employer() -> None:
+    facts = subject_facts("Diego, la tua candidatura e' stata inviata a aizoOn Technology Consulting")
+    assert facts.company == "aizoOn Technology Consulting"
+    assert facts.role == ""
+
+
+def test_workday_names_the_employer_in_a_form_of_its_own() -> None:
+    """Seven real messages, all from Accenture, none of them recognised."""
+    assert subject_facts("Grazie per il tuo interesse nei confronti di Accenture!").company == "Accenture"
+
+
+def test_an_ats_names_the_employer_after_a_dash() -> None:
+    """The trailing full stop of "S.p.a." is eaten by the sentence-punctuation
+    strip, which is fine and is not what this checks: what matters is that the
+    name still matches the employer as stored."""
+    from app.services.scan.companies import company_matches
+
+    facts = subject_facts("Conferma ricezione candidatura - Oggi Lavoro S.p.a.")
+    assert facts.role == ""
+    assert company_matches(facts.company, "Oggi Lavoro S.p.a.")
+
+
+@pytest.mark.parametrize(
+    ("subject", "role"),
+    [
+        ("Candidatura eseguita con successo per AI Specialist", "AI Specialist"),
+        ("Candidatura per la posizione di Manutentore software completata!", "Manutentore software"),
+        ("Thank you for completing your application: AI Engineer (65)", "AI Engineer (65)"),
+    ],
+)
+def test_agency_subjects_name_the_role(subject: str, role: str) -> None:
+    assert subject_facts(subject).role == role
+
+
+def test_a_reminder_to_finish_an_application_is_not_a_confirmation() -> None:
+    """Oracle sends both, days apart, about the same job.
+
+    "Complete your application for job: X" is a nudge to go back and finish.
+    "Thank you for completing your application: X" is the confirmation. Reading
+    the first as the second records an application that was never sent.
+    """
+    assert not is_confirmation_subject("Complete your application for job: AI Engineer(65)")
+    assert is_confirmation_subject("Thank you for completing your application: AI Engineer (65)")
+
+
+def test_indeed_is_a_known_sender_but_its_job_alerts_are_not() -> None:
+    """94 of the 151 real Indeed messages are alerts, and none is a confirmation.
+
+    They arrive from ``match.indeed.com``. The suffix rule in ``is_known_sender``
+    would have swept them in along with the real confirmations, and no reject
+    pattern stops a subject like "Data Analyst presso Foo srl".
+    """
+    assert is_known_sender("indeedapply@indeed.com")
+    assert not is_known_sender("alert@match.indeed.com")
+
+
+def test_a_role_bearing_subject_still_refuses_the_rejects() -> None:
+    assert not is_confirmation_subject("Candidatura per Data Analyst visualizzata da Foo")
+
+
+# ── reading the body: three shapes, not one ──────────────────────────────────
+# Each fixture below is transcribed from a real confirmation, blank lines and
+# stray separators included. A body invented to suit the parser would confirm
+# the parser's own assumptions — this project has paid for that once already,
+# with a FakeIMAP4 that passed every test and returned zero headers from the
+# real mailbox.
+
+
+def _body(lines: list[str]) -> bytes:
+    from email.message import EmailMessage
+
+    message = EmailMessage()
+    message["Subject"] = "irrelevant"
+    message.set_content("\n".join(lines))
+    return message.as_bytes()
+
+
+#: Indeed, and LinkedIn, share this shape: an anchor line, then the role, then
+#: the employer. The first line is a decoy anchor — the text/plain preamble
+#: matches the confirmation pattern too, and what follows it is not a job.
+_INDEED_LINES = [
+    "La tua candidatura e' stata inviata. Buona fortuna!",
+    "Se riscontri un errore nella tua candidatura, contatta Indeed",
+    "------",
+    "Indeed - una ricerca. tutti i lavori. | Indeed Ireland Operations Limited",
+    "We'll help you get started",
+    "Candidatura inviata",
+    "Sviluppatore Backend developer Web - Freelance - Piattaforma Legal Tech",
+    "Studio Legale Russo Associati",
+    "- Remote",
+    "I seguenti elementi sono stati inviati a Studio Legale Russo Associati. In bocca al lupo!",
+    "Candidatura",
+    "Curriculum",
+    "Cosa puoi fare ora?",
+    "Visualizza offerte di lavoro simili che potrebbero interessarti",
+    "Junior Data Analyst",
+    "TeamSystem",
+]
+
+#: Experis: the anchor is there, but the line after it is an invitation to
+#: create an account. The title sits in a labelled field further down, which is
+#: exactly the case the positional rule cannot read.
+_EXPERIS_LINES = [
+    "Gentile Diego,",
+    "Grazie per la tua candidatura. Una persona del nostro team di Recruiting la valutera' al piu' presto.",
+    "Non hai ancora un account Experis? Crealo ora e accedi alla tua area personale.",
+    "Job Title : AI Specialist",
+    "Citta': Torino,",
+    "Piemonte",
+    "A presto!",
+    "Il Team Experis",
+]
+
+#: Accenture, through Workday: the role is inside the sentence, and repeated in
+#: a reference field below.
+_ACCENTURE_LINES = [
+    "Ciao Diego,",
+    "Grazie per aver inviato la tua candidatura per la posizione di Junior SAP Analyst - Internship. Iniziera' la valutazione a breve.",
+    "Puoi anche accedere alla tua",
+    "home page",
+    "Reference Role: R00279839 Junior SAP Analyst - Internship",
+    "Grazie ancora per il tuo interesse!",
+]
+
+
+def test_an_indeed_body_names_both_the_role_and_the_employer() -> None:
+    facts = facts_from_body(_body(_INDEED_LINES))
+    assert facts.role == "Sviluppatore Backend developer Web - Freelance - Piattaforma Legal Tech"
+    assert facts.company == "Studio Legale Russo Associati"
+
+
+def test_the_recommendations_below_the_fold_are_not_your_application() -> None:
+    """"Junior Data Analyst at TeamSystem" is an advert two lines further down."""
+    facts = facts_from_body(_body(_INDEED_LINES))
+    assert facts.role != "Junior Data Analyst"
+    assert facts.company != "TeamSystem"
+
+
+def test_a_labelled_field_is_read_when_the_line_after_the_anchor_is_not_a_job() -> None:
+    facts = facts_from_body(_body(_EXPERIS_LINES), company="Experis")
+    assert facts.role == "AI Specialist"
+
+
+def test_a_role_inside_the_sentence_is_read() -> None:
+    facts = facts_from_body(_body(_ACCENTURE_LINES), company="Accenture")
+    assert facts.role == "Junior SAP Analyst - Internship"
+
+
+def test_a_body_that_names_nothing_returns_nothing() -> None:
+    facts = facts_from_body(_body(["Ciao", "Il tuo codice e': 680756", "Grazie"]))
+    assert facts.role == ""
+    assert facts.company == ""
+
+
+def test_the_measured_linkedin_reader_is_left_alone() -> None:
+    """``role_from_body`` is measured at 29 titles out of 30 and stays as it is."""
+    from app.mail.body import role_from_body
+
+    assert role_from_body(_linkedin_message(), "AGM SOLUTIONS") == "AI Developer"
+
+
+# ── the tick, when nothing was opened from inside the app ────────────────────
+
+
+def _tick_with(client: TestClient, raw: bytes, uid: int = 7) -> dict:
+    fake = FakeIMAP4("h", 993)
+    fake.messages[uid] = raw
+    watcher = client.app.state.container.mailwatch  # type: ignore[attr-defined]
+    from app.mail.imap_client import ImapMailbox
+
+    watcher._imap_factory = lambda account: ImapMailbox(
+        account, imap_factory=lambda *a, **k: fake
+    )
+    return watcher.run_once()
+
+
+def _confirmation(sender: str, subject: str, body: str = "") -> bytes:
+    head = (
+        b"From: " + sender.encode() + b"\r\n"
+        b"Subject: " + _encode_subject(subject).encode() + b"\r\n"
+        b"Date: " + _rfc2822_now().encode() + b"\r\n"
+        b"Message-ID: <tick@example.com>\r\n\r\n"
+    )
+    return head + body.encode()
+
+
+def test_the_tick_still_looks_when_nothing_was_opened_from_the_app(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The gate that quietly switched the mailbox off.
+
+    The automatic check used to return ``idle`` without opening a connection
+    unless some offer had ``link_opened_at`` set — which only happens when you
+    press the link inside Job Finder. Someone who applies from LinkedIn never
+    sets it, so confirmations arrived for weeks and nothing looked at them until
+    a historic sweep was run by hand.
+    """
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    out = _tick_with(
+        client,
+        _confirmation(
+            "Indeed <indeedapply@indeed.com>",
+            "Candidatura per AI SPECIALIST JUNIOR attraverso Indeed",
+            "Candidatura inviata\nAI SPECIALIST JUNIOR\nOggi Lavoro S.p.a.\n",
+        ),
+    )
+    assert out["status"] != "idle", "with no pending offers it used to not even connect"
+
+    items = client.get("/api/mail/review").json()["items"]
+    assert len(items) == 1, "the confirmation became a proposal"
+    assert items[0]["role"] == "AI SPECIALIST JUNIOR"
+    assert "Oggi Lavoro" in items[0]["company"], "the employer came out of the body"
+
+
+# ── the role decides which offer the message is about ────────────────────────
+
+
+def test_a_reference_code_does_not_stop_two_titles_from_matching() -> None:
+    """The real pair: LinkedIn's confirmation carries the employer's own ref."""
+    from app.mail.matcher import same_role
+
+    assert same_role("Data Analytics Specialist (Rif. 2026-97)", "Data Analytics Specialist")
+
+
+def test_two_different_jobs_in_the_same_field_do_not_match() -> None:
+    from app.mail.matcher import same_role
+
+    assert not same_role("Data Engineer", "Data Analytics Specialist")
+    assert not same_role("AI Engineer", "Analista Funzionale")
+
+
+def test_a_title_of_nothing_but_vague_words_matches_nothing() -> None:
+    """"Junior Specialist" names no trade: it sits as happily on a payroll job.
+
+    Matching on it would attach a confirmation to whichever offer happened to
+    share the word, which is worse than asking.
+    """
+    from app.mail.matcher import same_role
+
+    assert not same_role("Junior Specialist", "Senior Consultant")
+
+
+def test_the_role_narrows_the_candidates_to_one() -> None:
+    from app.mail.matcher import rank_candidates
+
+    ordered, only = rank_candidates(
+        "AI Engineer",
+        [(1, "Analista Funzionale"), (2, "AI Engineer"), (3, "V&V - Test Automation Engineer")],
+    )
+    assert only == 2
+    assert ordered[0] == 2, "the match is shown first"
+
+
+def test_two_matching_titles_narrow_but_do_not_decide() -> None:
+    from app.mail.matcher import rank_candidates
+
+    ordered, only = rank_candidates("AI Engineer", [(1, "AI Engineer"), (2, "AI Engineer")])
+    assert only is None, "narrowing is not deciding"
+    assert set(ordered[:2]) == {1, 2}
+
+
+def test_no_role_leaves_the_order_alone() -> None:
+    from app.mail.matcher import rank_candidates
+
+    ordered, only = rank_candidates("", [(1, "A"), (2, "B")])
+    assert ordered == [1, 2]
+    assert only is None
+
+
+# ── attaching by itself, when the title leaves one answer ────────────────────
+
+
+def _seed_offers(db_path: Path, rows: list[tuple[str, str]]) -> None:
+    from app.db import Database
+
+    db = Database(db_path)
+    try:
+        for n, (titolo, azienda) in enumerate(rows, start=1):
+            db.upsert_job(
+                {
+                    "job_hash": f"h{n}",
+                    "titolo": titolo,
+                    "azienda": azienda,
+                    "link": f"https://www.linkedin.com/jobs/view/{n}",
+                    "descrizione": "Descrizione dell'offerta.",
+                }
+            )
+    finally:
+        db.close()
+
+
+_LINKEDIN_CONFIRM_BODY = (
+    "La tua candidatura e' stata inviata a Teoresi Group\n"
+    "AI Engineer\n"
+    "Teoresi Group\n"
+    "Torino\n"
+)
+
+
+def test_a_title_that_leaves_one_answer_files_itself(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Six offers at Teoresi, and the message says which one.
+
+    This is the queue's whole reason for existing, answered: "Teoresi" alone is
+    six identical radio buttons, "Teoresi + AI Engineer" is one.
+    """
+    _seed_offers(
+        tmp_path / "data" / "searcher.db",
+        [("AI Engineer", "Teoresi Group"), ("Analista Funzionale", "Teoresi Group")],
+    )
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _tick_with(
+        client,
+        _confirmation(
+            "LinkedIn <jobs-noreply@linkedin.com>",
+            "La tua candidatura e' stata inviata a Teoresi Group",
+            _LINKEDIN_CONFIRM_BODY,
+        ),
+    )
+    assert client.get("/api/mail/review").json()["items"] == [], "nothing left to ask"
+    applied = [
+        j
+        for j in client.get("/api/jobs").json()["jobs"]
+        if j.get("status") == "applied"
+    ]
+    assert [j["titolo"] for j in applied] == ["AI Engineer"], "and it picked the right one"
+
+
+def test_two_offers_the_title_fits_are_still_a_question(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Two postings the same title fits. Narrowing six to two is worth showing
+    and is not an answer, so it stays a question.
+
+    (Two byte-identical rows cannot be built: ``dedup_key`` is title + company
+    + location, so the archive would fold them into one.)
+    """
+    _seed_offers(
+        tmp_path / "data" / "searcher.db",
+        [("AI Engineer", "Teoresi Group"), ("Senior AI Engineer", "Teoresi Group")],
+    )
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    _tick_with(
+        client,
+        _confirmation(
+            "LinkedIn <jobs-noreply@linkedin.com>",
+            "La tua candidatura e' stata inviata a Teoresi Group",
+            _LINKEDIN_CONFIRM_BODY,
+        ),
+    )
+    items = client.get("/api/mail/review").json()["items"]
+    assert len(items) == 1, "narrowing two to two is not deciding"
+
+
+def test_ask_mode_never_files_anything_by_itself(client: TestClient, tmp_path: Path) -> None:
+    from app.mail import config as mail_config
+
+    _seed_offers(
+        tmp_path / "data" / "searcher.db",
+        [("AI Engineer", "Teoresi Group"), ("Analista Funzionale", "Teoresi Group")],
+    )
+    client.post(
+        "/api/mail/config",
+        json={"address": "me@libero.it", "auth": "password", "secret": "pw"},
+    )
+    container = client.app.state.container  # type: ignore[attr-defined]
+    container.db.set_preference(mail_config.PREF_ATTACH_MODE, mail_config.ATTACH_MODE_ASK)
+    _tick_with(
+        client,
+        _confirmation(
+            "LinkedIn <jobs-noreply@linkedin.com>",
+            "La tua candidatura e' stata inviata a Teoresi Group",
+            _LINKEDIN_CONFIRM_BODY,
+        ),
+    )
+    items = client.get("/api/mail/review").json()["items"]
+    assert len(items) == 1
+    assert items[0]["suggested_job_id"], "the answer is pre-selected, not applied"
+
+
+# ── three more shapes, all read off the queue this release was written for ───
+
+
+def test_a_long_spontaneous_application_title_is_not_too_long_to_read() -> None:
+    """105 characters, and the old ceiling was 90.
+
+    LinkedIn confirmations for open applications carry the whole list of degrees
+    in the title. The length cap was quietly dropping them — and this is the row
+    that had six candidate offers and no way to tell them apart.
+    """
+    facts = facts_from_body(
+        _body(
+            [
+                "La tua candidatura e' stata inviata a Teoresi Group",
+                "Candidatura Spontanea - Neolaureati in Ing. Informatica/Elettronica/Meccatronica/Automazione - l. 68/99",
+                "Teoresi Group",
+                "Torino",
+            ]
+        ),
+        company="Teoresi Group",
+    )
+    assert facts.role.startswith("Candidatura Spontanea")
+    assert len(facts.role) > 90
+
+
+def test_an_agency_naming_the_offer_inside_the_sentence() -> None:
+    """Randstad, four times in one real queue."""
+    facts = facts_from_body(
+        _body(
+            [
+                "Ciao",
+                "Diego",
+                "grazie per esserti candidato all'offerta Junior Functional Safety Engineer - settore Automotive/Ferroviario CX570302.",
+                "I nostri colleghi si attiveranno per valutare il tuo profilo.",
+            ]
+        ),
+        company="Randstad Professional Italia",
+    )
+    assert facts.role == "Junior Functional Safety Engineer - settore Automotive/Ferroviario"
+
+
+def test_the_english_apply_for_the_x_job_at_y_shape() -> None:
+    facts = facts_from_body(
+        _body(
+            [
+                "Hi Diego,",
+                "Thanks for taking the time to apply for the Graduate AI software engineer job at Bending Spoons.",
+                "We'll review your application and be in touch as soon as possible.",
+            ]
+        ),
+        company="Bending Spoons",
+    )
+    assert facts.role == "Graduate AI software engineer"
+
+
+def test_a_title_that_shrinks_to_one_generic_word_is_not_a_match() -> None:
+    """Caught on the real queue, one step before it became an auto-attach.
+
+    "IT Specialist (F/M/NB)" loses the bracket and the vague word and is left
+    with {it} — a single token that sits inside almost any technical title. It
+    was being matched against "Junior IT Infrastructure specialist", two
+    different jobs at two different companies, and offered as the answer.
+
+    Two meaningful words is the floor. It costs the odd real match ("Fraud
+    Analyst" reduces to {fraud}) and those stay questions, which is the cheap
+    side of this trade: an unanswered question is a row the user reads, a wrong
+    answer is a false entry in their own history.
+    """
+    from app.mail.matcher import same_role
+
+    assert not same_role("Junior IT Infrastructure specialist", "IT Specialist (F/M/NB)")
+    # And the pair it must keep matching:
+    assert same_role("Data Analytics Specialist (Rif. 2026-97)", "Data Analytics Specialist")
+
+
+# ── the last nine shapes, and the rejection hiding among them ────────────────
+# Read off the same mailbox: 59 messages that read like confirmations and
+# produced no evidence, 34 because the subject named neither party and 25
+# because the sender was not on any list.
+
+
+def test_a_rejection_worded_as_thanks_is_not_a_confirmation() -> None:
+    """Workday: "Grazie per la tua candidatura MA al momento non coincide…".
+
+    It opens with the same four words as a real confirmation and it is a no.
+    Filing it as an application sent would leave the offer waiting for an
+    answer that already came.
+    """
+    assert not is_confirmation_subject(
+        "Grazie per la tua candidatura ma al momento non coincide con le nostre posizioni aperte"
+    )
+
+
+@pytest.mark.parametrize(
+    ("subject", "company"),
+    [
+        ("Grazie per la tua candidatura con Gi Group", "Gi Group"),
+        ("Grazie per la tua candidatura con Wyser", "Wyser"),
+        ("La tua candidatura presso Loacker", "Loacker"),
+        ("Grazie per la candidatura in Business Changers", "Business Changers"),
+        ("Thank you for your application to ION Group", "ION Group"),
+        ("Thank you for applying to Schneider Electric!", "Schneider Electric"),
+        ("Capgemini Group - New Job Application Received", "Capgemini Group"),
+        ("Spindox_Candidatura ricevuta", "Spindox"),
+    ],
+)
+def test_the_employer_shapes_that_were_being_missed(subject: str, company: str) -> None:
+    assert subject_facts(subject).company == company
+
+
+@pytest.mark.parametrize(
+    ("subject", "role"),
+    [
+        ("Conferma candidatura BACK END SOFTWARE DEVELOPER - Orienta", "BACK END SOFTWARE DEVELOPER"),
+        ("Conferma candidatura Help desk CX558653", "Help desk"),
+        ("Application received: Fraud Analyst - View your match score", "Fraud Analyst"),
+    ],
+)
+def test_the_role_shapes_that_were_being_missed(subject: str, role: str) -> None:
+    assert subject_facts(subject).role == role
+
+
+def test_a_subject_naming_both_gives_the_role_and_keeps_the_employer() -> None:
+    """Workday for Dedalus: "Thank you for applying for the role of X at Y"."""
+    facts = subject_facts("Thank you for applying for the role of Delivery Specialist at Dedalus")
+    assert facts.role == "Delivery Specialist"
+    assert facts.company == "Dedalus"
+
+
+def test_a_bare_confirmation_still_names_nobody() -> None:
+    """matchguru's "Conferma candidatura" and allibo's "Candidatura ricevuta"
+    genuinely say nothing. Inventing an employer for them is the failure mode
+    this whole package is built to avoid."""
+    assert subject_facts("Conferma candidatura").company == ""
+    assert subject_facts("Conferma candidatura").role == ""
+    assert subject_facts("Candidatura ricevuta").company == ""
+
+
+def test_an_agency_writing_from_its_own_domain_is_evidence_enough() -> None:
+    """Experis, Randstad, Orienta: the confirmation is real, the subject names
+    the job, and the employer is the sender itself. Requiring membership of the
+    platform list dropped 25 real applications."""
+    header = _header(
+        "Candidatura eseguita con successo per AI Specialist", "noreply@experis.it"
+    )
+    evidence = extract_application(header)
+    assert evidence is not None
+    assert evidence.role == "AI Specialist"
+    assert "experis" in evidence.company.lower()
+
+
+def test_a_generic_mail_host_never_becomes_an_employer() -> None:
+    header = _header("Grazie per la tua candidatura", "someone@gmail.com")
+    assert extract_application(header) is None
+
+
+def test_an_ats_domain_is_not_read_as_the_employer() -> None:
+    """From myworkday.com the employer is the tenant's client, never "Workday"."""
+    header = _header("Grazie per la candidatura", "no-reply@myworkday.com")
+    evidence = extract_application(header)
+    assert evidence is None or "workday" not in evidence.company.lower()
+
+
+# ── what reading the extraction by hand caught, one row at a time ────────────
+
+
+def test_a_subject_that_says_the_word_advert_names_no_job() -> None:
+    """"Conferma di candidatura all'annuncio" — the pattern was capturing
+    "all'annuncio" and offering it as a job title."""
+    assert subject_facts("Conferma di candidatura all'annuncio").role == ""
+    assert subject_facts("Conferma candidatura alla posizione").role == ""
+
+
+def test_a_reference_number_is_not_a_job_title() -> None:
+    """"Candidatura per la posizione JN -062026-740365 completata!" — a filing
+    number with the tail stripped still looks like a title to a regex."""
+    assert subject_facts("Candidatura per la posizione JN -062026-740365 completata!").role == ""
+
+
+def test_an_ats_domain_never_supplies_the_employer() -> None:
+    """Three that slipped through: the sender was an applicant tracking system
+    the list did not have, so its own name was read as the employer.
+
+    ``icims.eu`` is the sibling of ``icims.com`` — the same list bug as
+    Teamtailor, found the same way. Jobgether and adeccoapps are job platforms:
+    the employer is their client, never them.
+    """
+    for addr in (
+        "noreply@talent.icims.eu",
+        "noreply@match.jobgether.com",
+        "noreply@info.adeccoapps.com",
+    ):
+        assert company_from_sender(addr) == "", addr
+
+
+def test_an_employer_writing_from_its_own_domain_still_works() -> None:
+    assert company_from_sender("noreply@experis.it") == "experis"
+    assert company_from_sender("hr@loacker.com") == "loacker"

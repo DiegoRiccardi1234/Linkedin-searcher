@@ -650,6 +650,19 @@
             </select>
           </div>
           <p class="micro" data-i18n="mail.body.hint">Whatever you pick, the body is read in memory only: never saved, never logged, never sent to a model.</p>
+          <!-- When the employer AND the job title both point at one offer and
+               only one, there is nothing left to ask. Whether the app may act on
+               that is a decision about your own record of applications, so it is
+               a setting rather than a behaviour. Narrowing six offers to two is
+               never enough: that stays a question in every mode. -->
+          <div class="mail-row">
+            <label class="micro" for="mailAttachMode" data-i18n="mail.attach.label">When the job title leaves one answer</label>
+            <select id="mailAttachMode">
+              <option value="auto" data-i18n="mail.attach.auto">Record it, I can undo it</option>
+              <option value="known" data-i18n="mail.attach.known">Only for LinkedIn, Indeed and known platforms</option>
+              <option value="ask" data-i18n="mail.attach.ask">Always ask me, with the answer pre-selected</option>
+            </select>
+          </div>
           <div class="mail-row mail-actions">
             <!-- Runs the rules and reports what they WOULD have marked. How well
                  they do is unknown until they meet a real mailbox, and the cost

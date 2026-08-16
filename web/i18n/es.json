@@ -1131,7 +1131,8 @@
       "createEntry": "Registrarla como candidatura propia",
       "messageOf": "mensaje {n} de {total}",
       "dismissOne": "Ignorar este mensaje",
-      "pick": "¿De qué oferta habla?"
+      "pick": "¿De qué oferta habla?",
+      "suggested": "sugerido por el puesto"
     },
     "whereIdFrom": "¿De dónde saco un id de aplicación?",
     "idSource": {
@@ -1148,6 +1149,12 @@
       "hint": "Elijas lo que elijas, el cuerpo se lee solo en memoria: nunca se guarda, nunca se registra, nunca se envía a un modelo.",
       "fetchOne": "Recuperar el puesto",
       "notFound": "Ningún título reconocible en este mensaje."
+    },
+    "attach": {
+      "label": "Cuando el puesto deja una sola respuesta",
+      "auto": "Regístrala, puedo deshacerlo",
+      "known": "Solo para LinkedIn, Indeed y plataformas conocidas",
+      "ask": "Pregúntame siempre, con la respuesta preseleccionada"
     }
   },
   "readiness": {

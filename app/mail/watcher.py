@@ -7,11 +7,17 @@ into a check on the four companies opened this week.
 
 Three behaviours here are decisions, not implementation details:
 
-* **Nothing pending, nothing fetched.** The common state of this feature is
-  "no applications in flight", and in that state it must not touch the network
-  at all. The one exception is a periodic connection kept deliberately: a
-  Microsoft refresh token expires after about 90 days of inactivity, so a
-  feature that works perfectly by doing nothing would eventually lock itself out.
+* **A connected mailbox gets read.** This used to say "nothing pending, nothing
+  fetched": with no offer whose link had been opened from inside the app, the
+  tick returned ``idle`` without opening a connection. The intention was
+  restraint; the effect was an off switch, because that flag is set by a gesture
+  — pressing an offer's link in Job Finder — that someone who applies on
+  LinkedIn never makes. Confirmations then piled up unread until a historic
+  sweep was run by hand. Now a configured, enabled account is looked at, over
+  the pending-days window, and a message that records an application to a
+  company the archive never saw becomes a proposal instead of nothing.
+  A periodic connection is still kept deliberately when there is truly nothing
+  to do: a Microsoft refresh token expires after about 90 days of inactivity.
 * **The last-run stamp is written even when the run failed.** Learned the
   expensive way in ``autoscan``: without it, a mailbox that cannot be reached is
   retried every single tick, forever.
@@ -32,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 from app.log import get_logger
 from app.mail import config as mail_config
 from app.mail.auth import refresh_access_token, scope_for
-from app.mail.body import role_from_body
+from app.mail.body import BodyFacts, facts_from_body
 from app.mail.config import MailAccount
 from app.mail.errors import (
     MailAuthError,
@@ -47,11 +53,12 @@ from app.mail.matcher import (
     CLOCK_SLACK,
     MailHeader,
     PendingJob,
-    _subject_company,
     classify,
     extract_application,
     is_known_sender,
+    rank_candidates,
     sender_domain,
+    subject_facts,
 )
 
 if TYPE_CHECKING:
@@ -74,6 +81,14 @@ MAX_PER_RUN = 300
 MAX_HISTORIC = 6000
 #: Reconnect at least this often so an idle grant does not expire unnoticed.
 KEEP_WARM_DAYS = 30
+
+#: How many message bodies one automatic tick may download, and one user-asked
+#: sweep. Headers come back fifty to a command (1.554 of them in 16 seconds on a
+#: real mailbox); a body is one command each, so the cost here is round trips,
+#: not bytes. A tick has to stay a tick — the sweep has a progress bar and was
+#: asked for. For scale: 110 proposals over 90 days on a real mailbox.
+MAX_BODY_READS_PER_TICK = 20
+MAX_BODY_READS_PER_SWEEP = 200
 
 STATE_OK = "ok"
 STATE_UNCONFIGURED = "unconfigured"
@@ -106,6 +121,82 @@ class ReviewItem:
     received_at: str
     rule: str
     candidates: tuple[int, ...] = ()
+
+
+class _BodyReader:
+    """Reads message bodies during one run: one connection, a budget, no state.
+
+    Before this, every body opened its own connection — ``_fetch_body`` did the
+    whole login/select/logout for a single message. In "always" mode a sweep
+    with sixty imports meant sixty logins, and that was the cost BEFORE this
+    release started reading bodies for the attach branch as well.
+
+    Lazy on purpose: a run where nothing needs a body must not talk to the
+    server at all, which is the promise the tick already makes. Local to the
+    run and never a field on the watcher, because ``run_once`` executes on a
+    background thread.
+    """
+
+    def __init__(self, watcher: MailWatcher, account: MailAccount, budget: int) -> None:
+        self._watcher = watcher
+        self._account = account
+        self._budget = max(0, int(budget))
+        self._box: Any = None
+        self.read = 0
+        self.skipped = 0
+
+    @property
+    def supported(self) -> bool:
+        """Graph cannot fetch a body at all; saying so beats failing quietly."""
+        return self._account.auth != "graph"
+
+    def facts(self, mail_key: str, *, company: str = "", role: str = "") -> BodyFacts:
+        """What the body adds to what is already known. Never raises."""
+        if not self.supported or not mail_key.startswith("imap:"):
+            return BodyFacts(role=role, company=company)
+        if self._budget <= 0:
+            self.skipped += 1
+            return BodyFacts(role=role, company=company)
+        try:
+            uid = int(mail_key.rsplit(":", 1)[-1])
+        except ValueError:
+            return BodyFacts(role=role, company=company)
+        try:
+            if self._box is None:
+                self._box = self._open()
+            raw = bytes(self._box.fetch_body(uid))
+        except (MailError, OSError, ValueError) as exc:
+            # One unreadable message must not cost the rest of the run: the
+            # proposal is still queued, just without what the body would add.
+            log.debug("body unreadable: %s", safe_error(exc))
+            return BodyFacts(role=role, company=company)
+        self._budget -= 1
+        self.read += 1
+        return facts_from_body(raw, company=company, role=role)
+
+    def _open(self) -> Any:
+        account = self._account
+        if account.auth == "imap_oauth":
+            token = self._watcher._oauth_token(account)
+            factory = self._watcher._imap_factory or (
+                lambda acc: ImapMailbox(acc, token_provider=lambda: token)
+            )
+        else:
+            factory = self._watcher._imap_factory or (lambda acc: ImapMailbox(acc))
+        box = factory(account)
+        box.__enter__()
+        box.select_readonly(account.folder or "INBOX")
+        return box
+
+    def close(self) -> None:
+        if self._box is None:
+            return
+        try:
+            self._box.__exit__(None, None, None)
+        except Exception as exc:
+            log.debug("closing the mailbox: %s", safe_error(exc))
+        finally:
+            self._box = None
 
 
 class MailWatcher:
@@ -169,13 +260,65 @@ class MailWatcher:
         raw = str(self._db.get_preference(mail_config.PREF_BODY_MODE, "") or "").strip().lower()
         return raw if raw in mail_config.BODY_MODES else mail_config.DEFAULT_BODY_MODE
 
+    def attach_mode(self) -> str:
+        raw = str(self._db.get_preference(mail_config.PREF_ATTACH_MODE, "") or "").strip().lower()
+        return raw if raw in mail_config.ATTACH_MODES else mail_config.DEFAULT_ATTACH_MODE
+
+    def _may_attach_alone(self, header: MailHeader) -> bool:
+        """Whether this message is allowed to file itself, given the setting."""
+        mode = self.attach_mode()
+        if mode == mail_config.ATTACH_MODE_AUTO:
+            return True
+        if mode == mail_config.ATTACH_MODE_KNOWN:
+            return is_known_sender(header.from_addr, header.list_id)
+        return False
+
+    def _attach_if_certain(
+        self,
+        account: MailAccount,
+        header: MailHeader,
+        role: str,
+        titled: list[tuple[int, str]],
+        rule: str,
+        *,
+        allow_auto: bool,
+    ) -> int | None:
+        """File the application when the title leaves exactly one answer.
+
+        Two facts have to agree — the employer (which is what put these
+        candidates on the list) and the job title — and they have to leave ONE
+        offer standing. Two matches, or a title that only matches in part, stays
+        a question: narrowing is not deciding.
+        """
+        _, only = rank_candidates(role, titled)
+        if only is None or not allow_auto or not self._may_attach_alone(header):
+            return None
+        self._db.confirm_application_from_mail(only, header.message_id, rule)
+        self._db.record_mail_seen(
+            account=account.address,
+            mail_key=header.key,
+            verdict="applied",
+            message_id=header.message_id,
+            received_at=header.date.isoformat() if header.date else "",
+            job_id=only,
+            matched_rule=rule,
+            overwrite=True,
+        )
+        log.info("Mail confirmation filed by title (job %s, rule %s)", only, rule)
+        return only
+
     def fetch_role(self, mail_key: str, company: str) -> str:
         """Read the job title out of one message's body, on request.
 
-        The only place in this package that downloads a body, and it does so for
-        a single message the user pointed at. Refuses outright in ``never`` mode
-        rather than quietly obliging: a setting that can be bypassed by an
-        endpoint is not a setting.
+        Downloads a body for a single message the user pointed at. Refuses
+        outright in ``never`` mode rather than quietly obliging: a setting that
+        can be bypassed by an endpoint is not a setting.
+
+        Uses the same three-shape reader as the automatic path. It used to call
+        ``role_from_body`` alone, which reads one shape — so pressing the button
+        on a Randstad or an Experis confirmation returned an empty string and
+        looked like a message with no title in it, rather than a message written
+        in a form nothing had been taught to read.
         """
         if self.body_mode() == mail_config.BODY_MODE_NEVER:
             raise MailConfigError("body reading is switched off")
@@ -183,7 +326,7 @@ class MailWatcher:
         if not account or not account.configured:
             raise MailConfigError("mailbox not connected")
         raw = self._fetch_body(account, mail_key)
-        return role_from_body(raw, company) if raw else ""
+        return facts_from_body(raw, company=company).role if raw else ""
 
     def _fetch_body(self, account: MailAccount, mail_key: str) -> bytes:
         """One message, whole, in memory. Graph is not wired for this yet."""
@@ -225,6 +368,7 @@ class MailWatcher:
             "pending_count": len(self._db.list_pending_applications(self.pending_days())),
             "review_count": len(self.review_items()),
             "body_mode": self.body_mode(),
+            "attach_mode": self.attach_mode(),
             "recovery_done": str(self._db.get_preference(mail_config.PREF_RECOVERY_DONE, "") or "")
             == "1",
             "running": self._control.running,
@@ -351,43 +495,66 @@ class MailWatcher:
             for job in (_pending(row) for row in self._db.list_pending_applications(ttl))
             if job is not None
         ]
-        if not pending:
+        # The window. With offers waiting it is anchored to the oldest of them,
+        # which is the tightest honest bound. With none, it is the last few days:
+        # the gate used to be "no pending offers, no connection", and that gate
+        # is set by a gesture — opening an offer's link from inside the app —
+        # that someone who applies on LinkedIn never makes. The mailbox then
+        # goes unread for weeks while confirmations arrive, and the only way to
+        # see them is to run the historic sweep by hand.
+        if pending:
+            since = min(job.opened_at for job in pending) - CLOCK_SLACK
+        else:
             if self._keep_warm_due():
                 self.check_connection()
-                return {"status": "keep_warm", "checked": 0}
-            return {"status": "idle", "checked": 0}
-
-        since = min(job.opened_at for job in pending) - CLOCK_SLACK
+            since = _now() - timedelta(days=ttl)
         headers = self._headers_since(account, since, MAX_PER_RUN)
         if account.auth == "graph":
             keys = [h.key for h in headers]
             fresh = set(self._db.filter_unseen_mail(account.address, keys))
             headers = [h for h in headers if h.key in fresh]
 
-        matched = ambiguous = 0
-        for header in headers:
-            result = classify(header, pending, ttl_days=ttl)
-            if result.verdict == "match" and result.job_id is not None:
-                matched += 1
+        matched = ambiguous = imported = 0
+        reader = _BodyReader(self, account, MAX_BODY_READS_PER_TICK)
+        try:
+            for header in headers:
+                result = classify(header, pending, ttl_days=ttl)
+                if result.verdict == "match" and result.job_id is not None:
+                    matched += 1
+                    if not dry_run:
+                        self._db.confirm_application_from_mail(
+                            result.job_id, header.message_id, result.rule
+                        )
+                        pending = [job for job in pending if job.job_id != result.job_id]
+                elif result.verdict == "ambiguous":
+                    ambiguous += 1
+                    if not dry_run:
+                        self._queue_review(
+                            account, header, result, pending, reader, allow_auto=True
+                        )
+                elif (evidence := extract_application(header)) is not None:
+                    # "This records an application, and it is to nobody I am
+                    # waiting on." Until now only the manual historic sweep ever
+                    # asked that question, so an application to a company the
+                    # archive has never seen stayed invisible until someone went
+                    # looking. It costs no extra fetch: the header is in hand.
+                    imported += 1
+                    if not dry_run:
+                        self._queue_import(account, header, evidence, reader, allow_auto=True)
                 if not dry_run:
-                    self._db.confirm_application_from_mail(
-                        result.job_id, header.message_id, result.rule
+                    self._db.record_mail_seen(
+                        account=account.address,
+                        mail_key=header.key,
+                        verdict=result.verdict,
+                        message_id=header.message_id,
+                        received_at=header.date.isoformat() if header.date else "",
+                        job_id=result.job_id,
+                        matched_rule=result.rule,
                     )
-                    pending = [job for job in pending if job.job_id != result.job_id]
-            elif result.verdict == "ambiguous":
-                ambiguous += 1
-                if not dry_run:
-                    self._queue_review(account, header, result, pending)
             if not dry_run:
-                self._db.record_mail_seen(
-                    account=account.address,
-                    mail_key=header.key,
-                    verdict=result.verdict,
-                    message_id=header.message_id,
-                    received_at=header.date.isoformat() if header.date else "",
-                    job_id=result.job_id,
-                    matched_rule=result.rule,
-                )
+                self._backfill_roles(account, reader)
+        finally:
+            reader.close()
         self._set_state(STATE_OK)
         self._db.set_preference(mail_config.PREF_LAST_OK, str(int(self._clock())))
         return {
@@ -395,13 +562,50 @@ class MailWatcher:
             "checked": len(headers),
             "matched": matched,
             "ambiguous": ambiguous,
+            "imported": imported,
+            "bodies_read": reader.read,
+            "bodies_skipped": reader.skipped,
             "dry_run": dry_run,
         }
 
+    def _backfill_roles(self, account: MailAccount, reader: _BodyReader) -> None:
+        """Fill in the title on proposals that were queued before it was read.
+
+        A queue built by an older version, or by a run whose budget ran out, is
+        full of rows whose title was never fetched — and the title is what makes
+        the question answerable. Without this, upgrading changes nothing about
+        the six proposals already on screen: only messages arriving from now on
+        would be legible, which is the wrong half.
+
+        Left alone in ``ask`` and ``never``: there the button on the row is the
+        whole point.
+        """
+        if self.body_mode() != mail_config.BODY_MODE_ALWAYS or not reader.supported:
+            return
+        for row in self._db.list_mail_review(account.address):
+            if str(row.get("role") or "").strip():
+                continue
+            company = str(row.get("company") or "")
+            found = reader.facts(str(row.get("mail_key") or ""), company=company)
+            if found.role:
+                self._db.set_mail_review_role(int(row["id"]), found.role)
+
     def _queue_review(
-        self, account: MailAccount, header: MailHeader, result: Any, pending: list[PendingJob]
+        self,
+        account: MailAccount,
+        header: MailHeader,
+        result: Any,
+        pending: list[PendingJob],
+        reader: _BodyReader | None = None,
+        *,
+        allow_auto: bool = False,
     ) -> None:
-        """Write a proposal to the queue, keeping only facts and never the message."""
+        """Write a proposal to the queue, keeping only facts and never the message.
+
+        ``allow_auto`` is False for the historic sweep and stays that way: over a
+        year a company name and a date are not proof, and that screen exists
+        precisely because the user is the one supplying the missing certainty.
+        """
         by_id = {job.job_id: job for job in pending}
         candidates = [c for c in (result.candidates or ()) if c in by_id]
         # The employer the message names, when it names one. Falls back to the
@@ -413,9 +617,24 @@ class MailWatcher:
         # of somebody's subject line can end up. The part of the subject BEFORE
         # the employer — "Diego, la tua candidatura…", which carries the user's
         # own name — never reaches this at all.
-        company = _subject_company(header.subject)[:80]
+        facts = subject_facts(header.subject)
+        company = facts.company[:80]
         if not company and candidates:
             company = by_id[candidates[0]].company
+        # The title, which is what makes the question answerable. "Teoresi" with
+        # six offers in the archive is six identical radio buttons; "Teoresi ·
+        # AI Engineer" answers itself. Until now this branch never read a body
+        # at all, not even in "always" — only the import branch did — so every
+        # attach proposal in a real queue carried an empty role.
+        role = facts.role[:120]
+        if not role and reader is not None and self.body_mode() == mail_config.BODY_MODE_ALWAYS:
+            role = reader.facts(header.key, company=company).role[:120]
+        if role and candidates:
+            titled = [(job_id, by_id[job_id].title) for job_id in candidates]
+            if self._attach_if_certain(
+                account, header, role, titled, result.rule, allow_auto=allow_auto
+            ):
+                return
         self._db.add_mail_review(
             account=account.address,
             mail_key=header.key,
@@ -425,10 +644,19 @@ class MailWatcher:
             company=company,
             sender=_safe_sender(header),
             rule=result.rule,
+            role=role,
             candidates=candidates,
         )
 
-    def _queue_import(self, account: MailAccount, header: MailHeader, evidence: Any) -> None:
+    def _queue_import(
+        self,
+        account: MailAccount,
+        header: MailHeader,
+        evidence: Any,
+        reader: _BodyReader | None = None,
+        *,
+        allow_auto: bool = False,
+    ) -> None:
         """Queue "you applied to X on that day, and X is not in the archive".
 
         Still a proposal, never an automatic write. The evidence is a company
@@ -439,8 +667,31 @@ class MailWatcher:
         stub can never be improved into one (its description stays empty, so a
         score would be computed on a text it does not contain).
         """
+        company = str(getattr(evidence, "company", "") or "")
+        role = str(getattr(evidence, "role", "") or "")
+        # Indeed names the JOB in its subject and the employer only in the body,
+        # so for those the dedup below has nothing to look up until the body has
+        # been read. Reading it first is therefore not an optimisation, it is
+        # the order the data forces.
+        if not company and reader is not None and self.body_mode() != mail_config.BODY_MODE_NEVER:
+            found = reader.facts(header.key, role=role)
+            company, role = found.company[:80], (found.role or role)[:120]
+        if not company:
+            # Nothing to file it under. A stub with an empty company collides in
+            # ``add_application_from_mail``, whose hash is company + day: two of
+            # them on one day would silently become one.
+            self._db.record_mail_seen(
+                account=account.address,
+                mail_key=header.key,
+                verdict="no_match",
+                message_id=header.message_id,
+                received_at=header.date.isoformat() if header.date else "",
+                matched_rule="employer_unreadable",
+            )
+            return
+
         day = evidence.sent_at.date().isoformat()
-        if self._db.applications_near(evidence.company, day):
+        if self._db.applications_near(company, day):
             # Already recorded, by hand or by an earlier sweep. Nothing to ask.
             self._db.record_mail_seen(
                 account=account.address,
@@ -457,23 +708,27 @@ class MailWatcher:
         # In "always" the title is read here, once, while the sweep is already
         # talking to the server. A failure is not an error: the application is
         # recorded titleless, which is what "never" produces anyway.
-        role = ""
-        if self.body_mode() == mail_config.BODY_MODE_ALWAYS:
-            try:
-                role = self.fetch_role(header.key, evidence.company)
-            except (MailError, OSError) as exc:
-                log.debug("could not read the role: %s", safe_error(exc))
+        if not role and reader is not None and self.body_mode() == mail_config.BODY_MODE_ALWAYS:
+            role = reader.facts(header.key, company=company).role[:120]
+        candidates = self._db.open_offers_from(company)
+        if role and candidates:
+            titles = {row["id"]: str(row["titolo"] or "") for row in self._db.list_jobs(limit=2000)}
+            titled = [(job_id, titles.get(job_id, "")) for job_id in candidates]
+            if self._attach_if_certain(
+                account, header, role, titled, evidence.rule, allow_auto=allow_auto
+            ):
+                return
         self._db.add_mail_review(
             account=account.address,
             mail_key=header.key,
             kind="import",
             message_id=header.message_id,
             received_at=header.date.isoformat() if header.date else "",
-            company=evidence.company,
+            company=company,
             sender=_safe_sender(header),
             rule=evidence.rule,
             role=role,
-            candidates=self._db.open_offers_from(evidence.company),
+            candidates=candidates,
         )
 
     def _keep_warm_due(self) -> bool:
@@ -540,6 +795,7 @@ class MailWatcher:
             truncated = len(headers) >= MAX_HISTORIC
             found = 0
             imports = 0
+            reader = _BodyReader(self, account, MAX_BODY_READS_PER_SWEEP)
             for index, header in enumerate(headers, start=1):
                 # Three questions in this order. Attach before import matters:
                 # a message about a company the archive already knows must offer
@@ -553,11 +809,13 @@ class MailWatcher:
                         # said: over three months a company name is not proof,
                         # and this screen is where the user supplies the missing
                         # certainty.
-                        self._queue_review(account, header, _as_proposal(result), candidates)
+                        self._queue_review(
+                            account, header, _as_proposal(result), candidates, reader
+                        )
                 elif (evidence := extract_application(header)) is not None:
                     imports += 1
                     if not dry_run:
-                        self._queue_import(account, header, evidence)
+                        self._queue_import(account, header, evidence, reader)
                 elif not dry_run:
                     # Only the definite misses are written down. A candidate left
                     # unrecorded is re-found after a restart instead of lost.
@@ -571,6 +829,7 @@ class MailWatcher:
                     )
                 if index % 25 == 0:
                     yield {"status": "progress", "current": index, "total": len(headers)}
+            reader.close()
             if not dry_run:
                 self._db.set_preference(mail_config.PREF_RECOVERY_DONE, "1")
             yield {
@@ -580,6 +839,8 @@ class MailWatcher:
                 "checked": len(headers),
                 "days": window,
                 "dry_run": dry_run,
+                "bodies_read": reader.read,
+                "bodies_skipped": reader.skipped,
                 # Said out loud rather than hidden: a truncated sweep that
                 # reports "done" reads as "there was nothing else".
                 "truncated": truncated,

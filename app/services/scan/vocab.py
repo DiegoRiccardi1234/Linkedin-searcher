@@ -125,7 +125,7 @@ _TITLE_ENTRY_ROUTES = {
 _TITLE_TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+#.\-]+")
 
 
-def _title_tokens(titolo: str) -> set[str]:
+def title_tokens(titolo: str) -> set[str]:
     """Words of a job title, down to two letters."""
     return {token.strip(".-") for token in _TITLE_TOKEN_RE.findall(titolo.lower())}
 
@@ -134,7 +134,7 @@ def _title_tokens(titolo: str) -> set[str]:
 #: titles just as happily as in a technical one. Dropped from the vocabulary
 #: built below, or searching "AI Specialist" would teach the gate that
 #: "PAYROLL SPECIALIST" is on topic.
-_VAGUE_ROLE_WORDS = {
+VAGUE_ROLE_WORDS = {
     "specialist",
     "specialista",
     "consultant",
@@ -188,9 +188,7 @@ def title_vocabulary(
     tokens: set[str] = set()
     for source in (search_terms, skills, roles):
         for item in source or []:
-            tokens |= {
-                token for token in _title_tokens(str(item)) if token not in _VAGUE_ROLE_WORDS
-            }
+            tokens |= {token for token in title_tokens(str(item)) if token not in VAGUE_ROLE_WORDS}
     return (tokens | _TITLE_ENTRY_ROUTES) if tokens else set()
 
 
@@ -207,7 +205,7 @@ def title_off_topic(titolo: str, allowed_tokens: set[str]) -> bool:
     trade. An empty set keeps everything, which is the right answer when we
     know nothing.
     """
-    tokens = _title_tokens(titolo)
+    tokens = title_tokens(titolo)
     if not tokens or not allowed_tokens:
         return False  # nothing to judge: keep it and let the rest decide
     return not (tokens & allowed_tokens)

@@ -1131,7 +1131,8 @@
       "createEntry": "L'enregistrer comme candidature à part",
       "messageOf": "message {n} sur {total}",
       "dismissOne": "Ignorer ce message",
-      "pick": "De quelle offre s'agit-il ?"
+      "pick": "De quelle offre s'agit-il ?",
+      "suggested": "suggéré par l'intitulé du poste"
     },
     "whereIdFrom": "Où trouver un id d'application ?",
     "idSource": {
@@ -1148,6 +1149,12 @@
       "hint": "Quel que soit votre choix, le corps est lu en mémoire uniquement : jamais enregistré, jamais journalisé, jamais envoyé à un modèle.",
       "fetchOne": "Récupérer l'intitulé",
       "notFound": "Aucun intitulé reconnaissable dans ce message."
+    },
+    "attach": {
+      "label": "Quand l'intitulé ne laisse qu'une réponse",
+      "auto": "Enregistre-la, je peux annuler",
+      "known": "Seulement pour LinkedIn, Indeed et les plateformes connues",
+      "ask": "Demande-moi toujours, avec la réponse présélectionnée"
     }
   },
   "readiness": {

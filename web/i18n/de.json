@@ -1131,7 +1131,8 @@
       "createEntry": "Als eigene Bewerbung erfassen",
       "messageOf": "Nachricht {n} von {total}",
       "dismissOne": "Diese Nachricht ignorieren",
-      "pick": "Um welches Angebot geht es?"
+      "pick": "Um welches Angebot geht es?",
+      "suggested": "vom Stellentitel vorgeschlagen"
     },
     "whereIdFrom": "Woher bekomme ich eine App-ID?",
     "idSource": {
@@ -1148,6 +1149,12 @@
       "hint": "Was auch immer du wählst: Der Text wird nur im Speicher gelesen — nie gespeichert, nie protokolliert, nie an ein Modell geschickt.",
       "fetchOne": "Stellenbezeichnung holen",
       "notFound": "Keine erkennbare Stellenbezeichnung in dieser Nachricht."
+    },
+    "attach": {
+      "label": "Wenn der Stellentitel nur eine Antwort lässt",
+      "auto": "Eintragen, ich kann es rückgängig machen",
+      "known": "Nur für LinkedIn, Indeed und bekannte Plattformen",
+      "ask": "Immer nachfragen, mit vorausgewählter Antwort"
     }
   },
   "readiness": {

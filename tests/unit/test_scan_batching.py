@@ -263,3 +263,36 @@ def test_cloned_slots_helper() -> None:
     assert ss._cloned_slots([{"match_axes": axes}, {"match_axes": dict(axes)}]) == {0, 1}
     assert ss._cloned_slots([{"match_axes": axes}, {"match_axes": {"skills_match": 8}}]) == set()
     assert ss._cloned_slots(["garbage", {"punteggio": 1}]) == set()
+
+
+def test_the_batch_reply_stamps_every_verdict_with_the_model_that_wrote_it() -> None:
+    """The stamp arrives on the OUTER dict and the verdicts are in an array.
+
+    ``ProviderManager`` marks the reply it got back with ``answered_by``, once,
+    on the object it returns. Batch scoring then reads ``result["valutazioni"]``
+    and throws the wrapper away — so on a real scan every verdict reached the
+    database with an empty ``analysis_model``, which is precisely the column
+    2.0.0 added to answer "which model gave this a 3?". Measured on a real run:
+    73 offers scored, 73 blank stamps.
+    """
+    from app.scoring_schema import ANSWERED_BY_KEY
+
+    pm = _BatchPM(
+        {
+            "valutazioni": [{"punteggio": 8}, {"punteggio": 3}],
+            ANSWERED_BY_KEY: "google/gemini-flash-lite-latest",
+        }
+    )
+    out = ss.analyze_offers_batch(pm, "CV", [_offer("A"), _offer("B")])
+    assert [o.get(ANSWERED_BY_KEY) for o in out] == [
+        "google/gemini-flash-lite-latest",
+        "google/gemini-flash-lite-latest",
+    ]
+
+
+def test_a_batch_reply_without_a_stamp_invents_none() -> None:
+    from app.scoring_schema import ANSWERED_BY_KEY
+
+    pm = _BatchPM({"valutazioni": [{"punteggio": 8}]})
+    out = ss.analyze_offers_batch(pm, "CV", [_offer("A")])
+    assert not out[0].get(ANSWERED_BY_KEY)

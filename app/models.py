@@ -266,6 +266,7 @@ class MailConfigRequest(BaseModel):
     #: ignored rather than rejected: an unknown value must not be able to turn
     #: body reading on by accident.
     body_mode: str = ""
+    attach_mode: str = ""
 
 
 class MailReviewAttach(BaseModel):

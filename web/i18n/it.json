@@ -1131,7 +1131,8 @@
       "createEntry": "Registrala come candidatura a sé",
       "messageOf": "messaggio {n} di {total}",
       "dismissOne": "Ignora questo messaggio",
-      "pick": "Di quale offerta parla?"
+      "pick": "Di quale offerta parla?",
+      "suggested": "suggerito dal titolo"
     },
     "whereIdFrom": "Dove si prende un id applicazione?",
     "idSource": {
@@ -1148,6 +1149,12 @@
       "hint": "Qualunque cosa scegli, il corpo viene letto solo in memoria: mai salvato, mai nei log, mai spedito a un modello.",
       "fetchOne": "Recupera il ruolo",
       "notFound": "Nessun titolo riconoscibile in questo messaggio."
+    },
+    "attach": {
+      "label": "Quando il titolo lascia una sola risposta",
+      "auto": "Registrala, posso annullare",
+      "known": "Solo per LinkedIn, Indeed e piattaforme note",
+      "ask": "Chiedimelo sempre, con la risposta già selezionata"
     }
   },
   "readiness": {
