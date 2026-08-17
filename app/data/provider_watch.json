@@ -15,7 +15,8 @@
     "nvidia/nemotron-nano-9b-v2:free",
     "openai/gpt-oss-20b:free",
     "poolside/laguna-s-2.1:free",
-    "poolside/laguna-xs-2.1:free"
+    "poolside/laguna-xs-2.1:free",
+    "z-ai/glm-5.2:free"
   ],
   "pages": {
     "cerebras_pricing": "141dd398a4e1bc9a",
