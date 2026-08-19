@@ -305,7 +305,8 @@
     "minScore4": "Note 4+",
     "fromMail": "Aus der Mail",
     "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen",
-    "scoredBy": "Bewertet von {model}"
+    "scoredBy": "Bewertet von {model}",
+    "declaredPay": "Angegebene Vergütung"
   },
   "kanbanCols": {
     "open": "Offen",

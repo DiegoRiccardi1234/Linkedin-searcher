@@ -328,7 +328,10 @@ export async function showJobDetail(jobId) {
   if (container) {
     const sc = scoreCell(job.punteggio_ai);
     let ralSpan = "";
-    if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
+    if (analysis && analysis.ral_dichiarata) {
+      // What the ad itself prints, which is a stronger thing than an estimate.
+      ralSpan = `<div class="info-tag"><strong>${escapeHtml(t("jobs.declaredPay"))}:</strong> ${escapeHtml(analysis.ral_dichiarata)}</div>`;
+    } else if (analysis && analysis.ral_stimata && analysis.ral_stimata !== "Non stimabile") {
       ralSpan = `<div class="info-tag"><strong>RAL:</strong> ${escapeHtml(analysis.ral_stimata)}</div>`;
     }
     // The reasons a score is capped, as badges instead of a sentence glued to

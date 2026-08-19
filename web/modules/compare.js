@@ -91,7 +91,7 @@ function _column(job, analysis) {
       <div class="micro compare-label">${escapeHtml(t("offcanvas.skillsMissing"))}</div>
       ${list(missing, "missing")}
       <div class="micro compare-label">RAL</div>
-      <p class="micro">${escapeHtml(analysis.ral_stimata || "—")}</p>
+      <p class="micro">${escapeHtml(analysis.ral_dichiarata || analysis.ral_stimata || "—")}</p>
       ${job.link ? `<a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" data-job-link="${job.id}" class="micro">${escapeHtml(t("jobs.openPosting"))}</a>` : ""}
     </div>`;
 }

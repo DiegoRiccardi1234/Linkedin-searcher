@@ -78,19 +78,36 @@ _DURATION_LEAD_RE = re.compile(
 # these boasts always take — otherwise "l'azienda cerca almeno 3 anni" would be
 # thrown away too.
 _COMPANY_SUBJECT_RE = re.compile(
-    r"azienda|realt|societ|gruppo|impresa|studio|siamo|fondat|nasce|opera|player|leader",
+    r"azienda|realt|societ|gruppo|impresa|studio|siamo|fondat|nasce|opera|player|leader"
+    # The English half was missing, and English is how the boast reads on an
+    # international posting: "**Who we are:** OPIS is an international CRO with
+    # over 25 years of experience" was read as demanding twenty-five years, on an
+    # ad titled *Junior Programmer* whose real ask is one year, preferred.
+    r"|who we are|about us|chi siamo|company|firm\b|\bcro\b|we are",
     re.IGNORECASE,
 )
 _DEMAND_RE = re.compile(
     r"almeno|minimo|richie|cerchiamo|ricerchiamo|candidat|profilo|risorsa|maturat"
-    r"|possiedi|requisit|must have|we (?:are looking|require)|you have",
+    r"|possiedi|requisit|must have|we (?:are looking|require)|you have"
+    # The English half, added when the company-introduction vocabulary above
+    # learned English: without it, a genuine "at least 1 year of experience"
+    # whose lead still carried the company's own boast was thrown away with it.
+    # Every word here turns a number into a demand, so its presence is what
+    # keeps the guard from firing.
+    r"|at least|minimum|requirements?\b|qualifications?\b|experience:",
     re.IGNORECASE,
 )
 # Matched against the lead INCLUDING the number: _YEARS_RE swallows "oltre" as
 # its own optional prefix, so looking only at what precedes the match never sees
 # the boast that gives the company's age away.
+# ``[\s*_]`` rather than ``\s``: job boards bold the number, and "con oltre
+# **18 anni di esperienza**" puts two asterisks between the lead and the digits,
+# which was all it took for the guard to miss the boast. That posting was titled
+# *Junior Data Analyst* and carried no other number at all, so the company's age
+# became the requirement.
 _BOAST_RE = re.compile(
-    r"(?:oltre|pi[uù] di|over|more than)\s*\d{1,2}\s*(?:[-–—/+]\s*\d{1,2})?\s*(?:ann|year)",  # noqa: RUF001
+    r"(?:oltre|pi[uù] di|over|more than)[\s*_]*\d{1,2}\s*"
+    r"(?:[-–—/+]\s*\d{1,2})?[\s*_]*(?:ann|year)",  # noqa: RUF001
     re.IGNORECASE,
 )
 
@@ -133,8 +150,22 @@ def _year_matches(text: str) -> Iterator[tuple[re.Match[str], int]]:
         yield match, _NUMBER_WORDS[match.group(1).lower()]
 
 
-def _estimate_experience_band(offer_text: str) -> str:
-    """Years of experience the posting demands: ``0|1|2|3+|Non specificato``.
+#: A posting that calls itself junior asks for no years even when it names none.
+#: Matched on whole words, which is not pedantry: the bare substring "intern"
+#: sits inside "international", and "OPIS is an international CRO" was enough to
+#: file a posting as entry level on the strength of the company's address.
+_JUNIOR_HINT_RE = re.compile(
+    r"\bjunior\b|\bentry.level\b|\bneolaureat|\bstage\b|\bintern(?:ship|s)?\b|\btirocin",
+    re.IGNORECASE,
+)
+
+
+def experience_years_required(offer_text: str) -> int | None:
+    """The most years the posting actually demands, or ``None`` when it demands none.
+
+    The number itself, not the band. "3 anni" and "10 anni" land in the same band
+    and sit a very different distance from someone with one year behind them, and
+    only the caller knows whose CV it is measuring that distance against.
 
     Takes the HIGHEST requirement stated, not the first one found: a posting
     asking "1 anno di esperienza in QA, 3 anni in automation" demands three, and
@@ -142,9 +173,9 @@ def _estimate_experience_band(offer_text: str) -> str:
     read at their lower bound, and every number must sit near a word that means
     "experience" or it is not a seniority requirement at all.
 
-    Three shapes name a number of years without demanding it, and each one was
-    hiding real jobs: an escaped range, a time window, and the company boasting
-    about its own age.
+    Four shapes name a number of years without demanding it, and each one was
+    hiding real jobs: an escaped range, a time window, the company boasting about
+    its own age, and a wish (see :func:`_years_are_preferred`).
     """
     offer_text = _MD_ESCAPE_RE.sub(r"\1", offer_text)
     best: int | None = None
@@ -155,17 +186,34 @@ def _estimate_experience_band(offer_text: str) -> str:
         before = offer_text[max(0, match.start() - 80) : match.start()]
         if _TIME_WINDOW_RE.search(before) or _DURATION_LEAD_RE.search(before):
             continue
+        # ``before + match`` on both halves, for the reason the note on
+        # _BOAST_RE already gives: _YEARS_RE swallows the lead as its own
+        # optional prefix, so "at least 1 year" keeps its demand word inside the
+        # match and a guard reading only what precedes it never sees one.
+        lead = before + match.group(0)
         if (
             _COMPANY_SUBJECT_RE.search(before)
-            and not _DEMAND_RE.search(before)
-            and _BOAST_RE.search(before + match.group(0))
+            and not _DEMAND_RE.search(lead)
+            and _BOAST_RE.search(lead)
         ):
+            continue
+        if _years_are_preferred(offer_text, match.start()):
             continue
         # A range is read at its lower bound: that is the bar to clear.
         if low > 40:  # a year like "2026", not a duration
             continue
         best = low if best is None else max(best, low)
+    return best
 
+
+def _estimate_experience_band(offer_text: str) -> str:
+    """Years of experience the posting demands: ``0|1|2|3+|Non specificato``.
+
+    The coarse form, for display and for the analysis schema. Everything above
+    three collapses here, which is why the blocking decision reads the number
+    from :func:`experience_years_required` instead.
+    """
+    best = experience_years_required(offer_text)
     if best is not None:
         if best <= 0:
             return "0"
@@ -175,22 +223,56 @@ def _estimate_experience_band(offer_text: str) -> str:
             return "2"
         return "3+"
 
-    if any(
-        token in offer_text for token in ["junior", "entry level", "neolaureat", "stage", "intern"]
-    ):
-        return "0"
-    return "Non specificato"
+    return "0" if _JUNIOR_HINT_RE.search(offer_text) else "Non specificato"
 
 
-#: Years implied by each band, for comparing a posting against a CV. "Non
-#: specificato" is deliberately absent: an unknown requirement blocks nothing.
-EXPERIENCE_BAND_YEARS: dict[str, int] = {"0": 0, "1": 1, "2": 2, "3+": 3}
+#: An internship, said in a way that means the contract and not the moment.
+#:
+#: The bare substrings "stage" and "intern" put 322 of 469 real ads in this
+#: bucket. English uses "stage" for a phase ("depending on what we agree at the
+#: offer stage" — Bending Spoons), Italian lists it among kinds of experience
+#: ("attività di AMS, stage e percorsi di consulenza" — NTT DATA), and "intern"
+#: sits inside "internazionali", "interni/esterni" and "international". So the
+#: word has to arrive attached to something that makes it a contract.
+_INTERNSHIP_RE = re.compile(
+    r"\btirocin|\bstagist|\binternship\b|\bintern\b"
+    r"|stage\s+(?:curricular|extracurricular|formativ|retribuit|estiv)"
+    r"|(?:programma|percorso|offerta|contratto|inserimento|periodo)\s+(?:di\s+)?stage"
+    r"|\bin\s+stage\b|\bstage\s+(?:di|della\s+durata)",
+    re.IGNORECASE,
+)
+
+#: The same word, about the candidate's PAST instead of the offer. Seven of the
+#: thirteen ads the pattern above found are this: "esperienza, anche tramite
+#: stage o tirocini", "esperienza pregressa di 1 anno, anche sotto forma di
+#: stage", "una prima esperienza (tirocinio o primo impiego)". One of them —
+#: Difa Cooper — offers a permanent role whose holder would *supervise* an
+#: intern. Read as contracts they turn a salaried job into an unpaid one.
+_INTERNSHIP_AS_EXPERIENCE_RE = re.compile(
+    r"esperienz|maturat|pregress|primo\s+impiego|coordinare|affiancand|team\s+universitari",
+    re.IGNORECASE,
+)
+
+
+def _is_internship(offer_text: str) -> bool:
+    """True when the ad OFFERS an internship, not when it asks you to have done one.
+
+    Each mention is judged inside its own clause, because that is the unit the
+    distinction lives in: "l'inserimento avverrà in stage" and "esperienza, anche
+    tramite stage" are the same word in the same ad, and only the first says what
+    the contract is.
+    """
+    for match in _INTERNSHIP_RE.finditer(offer_text):
+        clause = _clause_window(offer_text, match.start(), match.end(), 110)
+        if not _INTERNSHIP_AS_EXPERIENCE_RE.search(clause):
+            return True
+    return False
 
 
 def _estimate_contract_type(offer_text: str) -> str:
     if any(token in offer_text for token in ["apprendistat", "apprenticeship"]):
         return "Apprendistato"
-    if any(token in offer_text for token in ["stage", "intern"]):
+    if _is_internship(offer_text):
         return "Stage"
     if any(token in offer_text for token in ["partita iva", "p.iva", "freelance", "contractor"]):
         return "Partita IVA"
@@ -256,11 +338,44 @@ EDUCATION_LEVELS: tuple[str, ...] = ("Nessuno", "Diploma", "Triennale", "Magistr
 # thing said in the language of public-sector rankings: it earns points, it does
 # not close the door — and reading it as a gate hid an apprenticeship.
 _PREFERRED_RE = re.compile(
-    r"preferib|gradit|costituisce\s+(?:un\s+)?(?:titolo\s+)?preferenziale|plus\b"
+    r"preferib|preferred|gradit|costituisce\s+(?:un\s+)?(?:titolo\s+)?preferenziale|plus\b"
     r"|nice\s+to\s+have|apprezzat|desiderabil|a\s+plus\b"
     r"|attribuzione\s+di\s+punteggio|titolo\s+preferenziale|costituir[àa]\s+titolo",
     re.IGNORECASE,
 )
+
+#: How far back to look for a wish-word governing a number of years.
+_PREFERENCE_LEAD = 120
+
+#: What ends the clause a number lives in, looking BACKWARDS from it: a newline,
+#: a bullet, a semicolon, or a full stop that really closes a sentence.
+_LEAD_BOUNDARY_RE = re.compile(r"[\n\r;•]|(?<=[a-zà-ÿ0-9\)])\.\s|\*\s")
+
+
+def _years_are_preferred(offer_text: str, start: int) -> bool:
+    """True when a wish-word governs this number from inside its own clause.
+
+    The DIRECTION is the whole rule, and it was read off 163 real firings rather
+    than guessed. "preferibile esperienza almeno di 2/3 anni" makes the years a
+    wish; "esperienza di 2-5 anni in software testing, preferibilmente su
+    applicazioni embedded" prefers a SECTOR and demands the years all the same.
+    Looking on both sides of the number cancelled ten requirements and only five
+    deserved it. Clamped to the clause that precedes the number, it cancels four,
+    all four correct, and misses one — a heading ("**preferred qualifications**")
+    ruling the bullet below it, which is the shape :func:`_clause_window` already
+    documents as the reason its own window keeps its head.
+
+    A missed wish costs a posting shown lower than it deserves. A wrongly
+    cancelled requirement costs nothing worse, now that the flag blocks: the
+    offer stays visible and gets judged. Both errors point the same way here, so
+    the tight rule is the one that keeps the four it is sure about.
+    """
+    lead = offer_text[max(0, start - _PREFERENCE_LEAD) : start]
+    cuts = list(_LEAD_BOUNDARY_RE.finditer(lead))
+    if cuts:
+        lead = lead[cuts[-1].end() :]
+    return bool(_PREFERRED_RE.search(lead))
+
 
 # "bachelor's or master's degree" and "laurea triennale o magistrale" are open to
 # BOTH: the master's pattern matched first and the "bachelor's or" in front of it

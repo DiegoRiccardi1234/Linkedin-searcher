@@ -116,6 +116,82 @@ def test_experience_written_out_in_words_still_counts() -> None:
     assert _estimate_experience_band("esperienza di uno o due anni come specialist") == "1"
 
 
+def test_the_company_boasting_about_its_own_age_is_not_a_requirement() -> None:
+    """Two real postings, both titled *Junior*, both read as demanding a career.
+
+    The guard for this existed and missed both, in two different ways. Prime
+    Engineering wrote "un'azienda di riferimento, con oltre **18 anni di
+    esperienza**" — markdown asterisks between the lead and the digits, which is
+    all it took, and no other number appeared in the ad at all. OPIS wrote
+    "**Who we are:** OPIS is an international CRO with over 25 years of
+    experience", where the company-introduction vocabulary was Italian-only.
+
+    Under the old ceiling both landed at 6 and stayed visible. Now the flag
+    blocks, so a miss here hides a junior opening outright — which is the one
+    thing this whole change is meant not to do.
+    """
+    boast_in_bold = "primeit, un'azienda di riferimento, con oltre **18 anni di esperienza**"
+    assert _estimate_experience_band(boast_in_bold) == "Non specificato"
+
+    english = "who we are: opis is an international cro with over 25 years of experience"
+    assert _estimate_experience_band(english) == "Non specificato"
+
+    # The real ask underneath it survives: only the boast is discarded.
+    both = english + ". at least 1 year of experience in a similar role"
+    assert _estimate_experience_band(both) == "1"
+
+    # And a demand phrased through the company is still a demand.
+    assert _estimate_experience_band("l'azienda cerca almeno 3 anni di esperienza") == "3+"
+
+
+def test_years_asked_for_as_a_wish_do_not_count() -> None:
+    """Direction is the whole rule, and it was read off 163 real firings.
+
+    "preferibile esperienza almeno di 2/3 anni" makes the years a wish. But
+    "esperienza di 2-5 anni in software testing, preferibilmente su applicazioni
+    embedded" prefers a SECTOR and demands the years all the same — and there are
+    three of those for every one of the first. Looking on both sides of the
+    number cancelled ten requirements in the archive and only five deserved it;
+    clamped to the clause that precedes the number it cancels four, all correct.
+    """
+    wish = "preferibile esperienza almeno di 2/3 anni nell'implementazione di gestionali"
+    assert _estimate_experience_band(wish) == "Non specificato"
+    assert _estimate_experience_band("preferibile esperienza pregressa di almeno 3 anni") == "Non specificato"
+
+    # The preference is about the sector; the years are still required.
+    sector = "esperienza di 2-5 anni in software testing, preferibilmente su sistemi embedded"
+    assert _estimate_experience_band(sector) == "2"
+    # A wish voiced in the previous bullet is about the previous bullet.
+    previous_bullet = (
+        "laurea in ingegneria o affini (preferibile);\n"
+        "* esperienza di almeno 4 anni in ruoli analoghi"
+    )
+    assert _estimate_experience_band(previous_bullet) == "3+"
+
+
+def test_a_requirement_blocks_on_the_distance_not_on_its_own_size() -> None:
+    """Two years above the CV closes the door. One year is the gap people argue.
+
+    The rule used to be a floor on the REQUIREMENT — "two years or more blocks" —
+    which read the same for everybody: someone with two years behind them was
+    shut out of a three-year posting exactly as hard as a new graduate. And
+    because everything above three collapsed into one band, a posting asking
+    three years and one asking ten were the same distance from anyone.
+    """
+    graduate = _facts(years_experience=0)
+    mid = _facts(years_experience=2)
+    two_years = "esperienza di almeno 2 anni nel ruolo di analista funzionale"
+    three_years = "esperienza di almeno 3 anni nel ruolo di analista funzionale"
+
+    assert cf.experience_status(two_years, graduate)[1], "two above zero is two"
+    assert cf.experience_status(three_years, mid)[1] is None, "one year of gap is arguable"
+    assert cf.experience_status("almeno 5 anni di esperienza", mid)[1], "three is not"
+
+    # The reason now names the real number, which the band could not.
+    reason = cf.experience_status("minimum 8 years of experience required", graduate)[1]
+    assert reason is not None and "8 anni" in reason
+
+
 def test_experience_ignores_how_long_the_programme_lasts() -> None:
     """"Al termine dei due anni otterrai il diploma" is a duration, not a demand.
 
@@ -315,14 +391,15 @@ def test_enforce_caps_and_hides_a_constraint_that_cannot_be_argued_with() -> Non
     assert FLAG_LOCATION in BLOCKING_FLAGS, "must be hidden by the 'applicable only' filter"
 
 
-def test_enforce_weighs_a_negotiable_constraint_instead_of_hiding_it() -> None:
-    """Years and degree lower the ceiling; they no longer make the offer vanish.
+def test_a_requirement_the_candidate_does_not_meet_closes_the_door() -> None:
+    """Years and degree used to lower a ceiling of 6. Now they cap at 3, like the rest.
 
-    An on-site role in another city is not reachable without a car. A posting
-    asking for a master's is one you can still apply to and sometimes get — so
-    capping it to 3 and hiding it behind "applicable only" threw away real
-    chances, while leaving it at the model's 9 (EY, "Laurea magistrale STEM")
-    put a requirement the candidate does not meet at the top of the shortlist.
+    The ceiling was the right idea with the wrong number. Six is exactly where a
+    person sets their own filter — "I only look from 6 up" — so a posting asking
+    for three years more than the CV holds landed in the same place as one that
+    was merely unremarkable, and on a real archive fifteen of the twenty-seven
+    offers sitting at 6 were put there by the ceiling rather than by their own
+    merits. Whatever else that is, it is not a shortlist.
     """
     for descrizione, flag in (
         (_JD + " Richiesti almeno 2 anni di esperienza maturata.", FLAG_EXPERIENCE),
@@ -330,21 +407,22 @@ def test_enforce_weighs_a_negotiable_constraint_instead_of_hiding_it() -> None:
     ):
         out = _enforced(descrizione)
         assert flag in out["blocchi"], flag  # type: ignore[operator]
-        assert out["punteggio"] == 6, flag
-        assert out["consiglio"] != "Salta", flag
-        assert flag in WEIGHTED_FLAGS and flag not in BLOCKING_FLAGS, flag
+        assert out["punteggio"] == 3, flag
+        assert out["consiglio"] == "Salta", flag
+        assert flag in BLOCKING_FLAGS and flag not in WEIGHTED_FLAGS, flag
 
 
-def test_each_further_unmet_requirement_lowers_the_ceiling_by_one() -> None:
+def test_two_unmet_requirements_are_not_worse_than_one() -> None:
+    """The ceiling counted them; the cap does not. Closed is closed."""
     out = _enforced(_JD + " Richiesta laurea magistrale e almeno 2 anni di esperienza maturata.")
     assert {FLAG_EDUCATION, FLAG_EXPERIENCE} <= set(out["blocchi"])  # type: ignore[arg-type]
-    assert out["punteggio"] == 5
+    assert out["punteggio"] == 3
 
 
-def test_a_weighted_constraint_never_raises_a_score() -> None:
-    """A ceiling is a ceiling: an offer already below it keeps its own number."""
-    out = _enforced(_JD + " Richiesta laurea magistrale.", punteggio=4)
-    assert out["punteggio"] == 4
+def test_a_cap_never_raises_a_score() -> None:
+    """A cap is a ceiling too: an offer already below it keeps its own number."""
+    out = _enforced(_JD + " Richiesta laurea magistrale.", punteggio=2)
+    assert out["punteggio"] == 2
 
 
 def test_a_hard_block_still_wins_over_a_weighted_one() -> None:
@@ -353,18 +431,21 @@ def test_a_hard_block_still_wins_over_a_weighted_one() -> None:
     assert out["consiglio"] == "Salta"
 
 
-def test_the_model_is_still_asked_about_a_weighted_constraint() -> None:
-    """Wiring, not logic: a ceiling needs a score to lower.
+def test_the_model_is_not_asked_about_a_requirement_the_candidate_does_not_meet() -> None:
+    """The saving that comes free with the decision: no call to reach a 3.
 
-    ``hard_block_reason`` runs BEFORE the model and skips the call entirely.
-    Leaving the weighted constraints in it would mean no offer asking for a
-    master's ever reaches a model, and its 6 would be the ceiling itself rather
-    than a judgement — the invented number this app stopped producing in 1.7.9.
+    ``hard_block_reason`` runs BEFORE the model. Every requirement it reads is
+    decided from the posting's own words, so an offer demanding a master's the
+    candidate does not have never costs a request — it used to spend one and then
+    have its answer capped. On a real scan, 27 of 30 new offers were decided this
+    way and the whole run cost three calls.
     """
     facts = _facts()
-    weighted = _JD + " Richiesta laurea magistrale e almeno 2 anni di esperienza maturata."
-    assert hard_block_reason(_CV, weighted, "Turin", facts=facts, modalita="In sede") is None
+    unmet = _JD + " Richiesta laurea magistrale e almeno 2 anni di esperienza maturata."
+    assert hard_block_reason(_CV, unmet, "Turin", facts=facts, modalita="In sede")
     assert hard_block_reason(_CV, _JD, "Rome, Latium, Italy", facts=facts, modalita="In sede")
+    # A clean offer in a reachable city still reaches the model.
+    assert hard_block_reason(_CV, _JD, "Turin", facts=facts, modalita="In sede") is None
 
 
 def test_enforce_leaves_a_clean_offer_alone() -> None:
@@ -587,6 +668,124 @@ def test_missing_facts_are_reported_not_guessed(tmp_path) -> None:
         db.close()
 
 
+# ── what the ad says it pays ─────────────────────────────────────────────────
+
+#: Verbatim shapes from the 469-ad archive. Every honest figure sits after a
+#: label; none of the noise does.
+_PAY_CASES = (
+    # (text, the figures the reader must return as (amount, ad said yearly))
+    ("salary range min. RAL 35.000 € – max RAL 38.000 €", [35000, 38000]),  # noqa: RUF001
+    ("proposta retributiva compresa tra 27.000€ e 30.000€", [27000, 30000]),
+    ("RAL di partenza per figure junior: da 23.300€ a 26.000€", [23300, 26000]),
+    ("range di RAL compreso tra 25K e 28K + ticket restaurant", [25000, 28000]),
+    ("RAL: Salario mensile: EUR 1600 - EUR 2000", [1600, 2000]),
+    (
+        "Rimborso spese (curriculare - rimborso spese a partire da 600€; "
+        "extracurriculare - rimborso spese a partire da 800€)",
+        [600, 800],
+    ),
+    ("è prevista un'indennità di tirocinio pari a 1000 euro lordi al mese", [1000]),
+)
+
+#: The noise, each one measured sitting next to a real salary in the archive.
+_NOT_PAY = (
+    # The anti-discrimination statutes, in the footer of a third of the ads.
+    "ai sensi delle leggi 903/77 e 125/91, e dei DLgs 215/03 e 216/03",
+    # The decree the pay-transparency footers cite, whose number reads as money.
+    "Stiamo aggiornando i nostri annunci ai sensi del Dlgs del 7 maggio 2026, n.ro 96",
+    # 267 hits under a hundred euros, against 632 real annual figures.
+    "Retribuzione: buoni pasto 8 euro al giorno",
+    "Meal Vouchers € 8 e Welfare Band € 1.000",
+    # Pay that is not the pay.
+    "Compenso: Variable Pay Band € 1.000-3000",
+    # A currency this app does not convert.
+    "Typically, we offer an annual salary of £85,797 in London",
+    "Nessuna cifra qui dentro, solo requisiti e benefit generici.",
+)
+
+
+def test_the_pay_is_read_from_the_ad_and_not_from_the_model() -> None:
+    """186 ads print a figure; the model returned one for 19 of them.
+
+    It answered "Non stimabile" to "salary range min. RAL 35.000 € - max RAL
+    38.000 €". Worse than the coverage, the answer moved: the same unchanged ad
+    was capped one day and not the next, because the only thing that had changed
+    was what the model felt like estimating.
+    """
+    for text, expected in _PAY_CASES:
+        found = sorted({value for value, _yearly in cf._pay_figures(text)})
+        assert found == sorted(expected), text
+
+
+def test_a_number_near_a_money_word_is_not_a_salary() -> None:
+    """Why the reader anchors on the label instead of hunting for numbers."""
+    for text in _NOT_PAY:
+        assert cf._pay_figures(text) == [], text
+
+
+def test_the_period_is_never_guessed() -> None:
+    """The rule that lets this work in a country whose pay scales we never encode.
+
+    An ad writing "rimborso spese a partire da 600€" does not say per what.
+    Deciding it means per month would be an assumption about one market, in an
+    app other people install with their own CV — so each figure is annualised the
+    most GENEROUS way its text allows and the door shuts only when even that
+    falls short. 600 cannot reach a 20.000 floor whatever it meant; 25.000 clears
+    it on any reading; the ambiguous middle stays open.
+    """
+    floor = _facts(ral_min=20000)
+    _label, reason = cf.salary_status("Rimborso spese a partire da 600€", floor)
+    assert reason is not None, "800x12 is still under 20.000"
+
+    _label, reason = cf.salary_status("RAL 25.000€", floor)
+    assert reason is None, "already over the floor, whatever the period meant"
+
+    # 1.850 with no period stated: monthly it is 22.200, and that clears.
+    _label, reason = cf.salary_status("Retribuzione: 1.850€", floor)
+    assert reason is None
+
+    # No floor declared, nothing to be under — like every other check here.
+    _label, reason = cf.salary_status("Rimborso spese a partire da 600€", _facts())
+    assert reason is None
+
+
+def test_a_range_is_read_at_its_top() -> None:
+    """An ad offering 18.000 to 24.000 may pay 24.000, and you are the one who asks."""
+    floor = _facts(ral_min=20000)
+    assert cf.salary_status("RAL da 18.000€ a 24.000€", floor)[1] is None
+    assert cf.salary_status("RAL da 12.000€ a 15.000€", floor)[1] is not None
+
+
+def test_an_internship_you_are_offered_is_not_one_you_are_asked_to_have_done() -> None:
+    """The bare substrings put 322 of 469 real ads in the internship bucket.
+
+    English uses "stage" for a phase ("depending on what we agree at the offer
+    stage"), Italian lists it among kinds of experience ("esperienza, anche
+    tramite stage o tirocini"), and "intern" sits inside "internazionali" and
+    "stakeholder interni/esterni". One ad offered a permanent role whose holder
+    would *supervise* an intern.
+    """
+    from app.services.scan.heuristics import _estimate_contract_type
+
+    for text in (
+        "depending on what we agree at the offer stage",
+        "esperienza, anche tramite stage o tirocini, in società di consulenza",
+        "esperienza pregressa di 1 anno, anche sotto forma di stage o tirocinio",
+        "collaborazione con stakeholder interni/esterni",
+        "contesti nazionali e internazionali",
+        "potrà coordinare una risorsa junior in stage, affiancandola",
+    ):
+        assert _estimate_contract_type(text) != "Stage", text
+
+    for text in (
+        "cerchiamo neolaureate per il nostro programma di stage 2026",
+        "l'inserimento avverrà in stage (curriculare o extra curriculare)",
+        "la posizione prevede un inserimento in tirocinio",
+        "è previsto un inserimento in stage con indennità di tirocinio",
+    ):
+        assert _estimate_contract_type(text) == "Stage", text
+
+
 # ── reserved to the protected-categories register ────────────────────────────
 
 #: Verbatim from the 238-offer archive (06/08/2026). Twenty-nine postings cite
@@ -599,7 +798,23 @@ _RESERVED = (
     "Technologies di Adecco sta cercando una figura di uno Junior Data Engineer "
     "appartenente alle categorie protette (L.68/99) sul territorio di Torino."
 )
+#: The second one, found on 2026-08-19 sitting at 8/10 at the top of the
+#: shortlist. It addresses several people at once, so the participle is plural —
+#: and the detector only knew the singular, which is the whole of the bug.
+_RESERVED_PLURAL = (
+    "Per ampliamento del nostro organico, ricerchiamo giovani neolaureati / laureandi, "
+    "diplomati appartenenti alle categorie protette legge 68/99 da inserire in uno dei "
+    "nostri centri di competenza."
+)
 _BOILERPLATE = (
+    # Capgemini Engineering, twice in the archive: the footer that let the
+    # detector through when the subject list was widened to plurals to catch
+    # _RESERVED_PLURAL. "Attention and sensitivity towards future resources" is
+    # a promise, not a requirement.
+    "L'offerta di lavoro si intende rivolta all'uno e all'altro sesso in ottemperanza al "
+    "D.Lgs. 198/2006. Inoltre, prestiamo attenzione e sensibilità alle future risorse "
+    "appartenenti alle categorie protette, ai sensi degli articoli 1 e 18 della legge 68 "
+    "del '99.",
     # Teoresi
     "L'offerta è rivolta ad entrambi i sessi in ottemperanza al D.Lgs. 198/2006 ed è aperta "
     "anche a candidati appartenenti alle categorie protette e iscritti al collocamento "
@@ -642,6 +857,12 @@ _BOILERPLATE = (
 def test_a_reserved_posting_is_blocked_only_when_the_user_said_they_are_not_on_the_register() -> None:
     not_registered = _facts(protected_category=False)
     _label, reason = cf.protected_category_status(_RESERVED, not_registered)
+    assert reason is not None
+
+    # Plural: "diplomati appartenenti", because the sentence addresses several
+    # people. Missing it put NTT DATA's reserved opening at 8/10, first in a
+    # shortlist built for someone who is not on the register.
+    _label, reason = cf.protected_category_status(_RESERVED_PLURAL, not_registered)
     assert reason is not None
 
     # Registered: the posting is an advantage, not an obstacle.

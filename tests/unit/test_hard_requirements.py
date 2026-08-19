@@ -203,15 +203,20 @@ def test_parse_ral_reads_the_common_formats() -> None:
     assert ss._parse_ral("") == (None, None)
 
 
-def test_salary_below_minimum_lowers_the_ceiling_without_hiding_the_offer() -> None:
-    """A stated figure under a stated floor is a fact, so it moves the number.
+def test_salary_below_minimum_caps_the_offer() -> None:
+    """A stated figure under a stated floor is a fact, so it settles the number.
 
-    It used to flag and nothing else, on the grounds that capping would punish
-    the rare posting honest enough to publish a figure. What that produced on the
-    real archive: a TIM internship declaring up to 9.600 EUR against a declared
-    floor of 20.000 held the model's 8/10 and led the "best for you" panel. So it
-    is weighted, not blocking — the offer keeps its place and its badge, it just
-    cannot outrank one that pays enough. An internship can still be worth taking.
+    It used to flag and nothing else, which on the real archive let a TIM
+    internship declaring up to 9.600 EUR against a declared floor of 20.000 hold
+    the model's 8/10 and lead the "best for you" panel. Then it lowered a ceiling
+    to 6. Now it caps, with the other declared constraints.
+
+    The cap lives inside ``_apply_salary_expectation`` and not in a shared
+    ceiling, which is the one thing to keep straight here: this is the only
+    blocking constraint that cannot be decided before the model answers, because
+    the figure is read out of ``ral_stimata``. When the weighted tier was
+    emptied, a flag that relied on that ceiling would have gone on being drawn
+    over a score nothing held down.
     """
     out = ss.enforce_hard_requirements(
         _analysis(ral_stimata="22.000€-25.000€"),
@@ -220,12 +225,11 @@ def test_salary_below_minimum_lowers_the_ceiling_without_hiding_the_offer() -> N
         sede="Milan, Italy",
         extra_context=_RAL_CTX,
     )
-    assert out["punteggio"] == 6, "held under the recommend band, not written off"
-    assert out["punteggio"] > 3, "and above the hard-block cap, which means something else"
+    assert out["punteggio"] == 3
     assert ss.FLAG_SALARY_BELOW in out["blocchi"]
     assert any("sotto la tua minima" in m for m in out["skills_match"]["mancano"])
     assert out["match_axes"]["salary_match"] == 1
-    assert "Salta" not in str(out.get("consiglio") or ""), "still worth reading"
+    assert out["consiglio"] == "Salta"
 
 
 def test_a_posting_that_declares_no_salary_is_untouched() -> None:

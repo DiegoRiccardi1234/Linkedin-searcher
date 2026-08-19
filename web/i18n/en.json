@@ -305,7 +305,8 @@
     "minScore4": "Score 4+",
     "fromMail": "From mail",
     "fromMailHint": "Only the applications rebuilt from your inbox",
-    "scoredBy": "Scored by {model}"
+    "scoredBy": "Scored by {model}",
+    "declaredPay": "Stated pay"
   },
   "kanbanCols": {
     "open": "Open",

@@ -147,6 +147,9 @@ class CandidateFacts:
     #: from ``education_level``: one answers "how high", this one "in what".
     degree_fields: frozenset[str] = frozenset()
     work_rule: WorkRule = field(default_factory=WorkRule)
+    #: Yearly gross the user will not go below. None = never said, and never
+    #: said blocks nothing — the rule every other fact here follows.
+    ral_min: int | None = None
     #: fact name -> "cv" | "manuale" | "mancante", for the profile panel.
     sources: dict[str, str] = field(default_factory=dict)
 
@@ -303,6 +306,9 @@ def candidate_facts(db: Database) -> CandidateFacts:
     else:
         licence, sources["driving_licence"] = None, "mancante"
 
+    ral_min = _as_int(db.get_preference("onboarding_ral_min", ""))
+    sources["ral_min"] = "manuale" if ral_min else "mancante"
+
     rule = _work_rule_for(db, sources)
     return CandidateFacts(
         years_experience=years,
@@ -312,6 +318,7 @@ def candidate_facts(db: Database) -> CandidateFacts:
         driving_licence=licence,
         degree_fields=fields,
         work_rule=rule,
+        ral_min=ral_min,
         sources=sources,
     )
 
@@ -350,24 +357,36 @@ def _work_rule_for(db: Database, sources: dict[str, str]) -> WorkRule:
 # checks need the facts, so putting them here is what keeps the imports acyclic.
 
 
-#: Years below which a stated requirement is treated as a wish, not a gate.
-#: Italian postings routinely ask for "1 anno" and hire graduates anyway; asking
-#: for two or more is where the door actually closes.
-BLOCKING_EXPERIENCE_YEARS = 2
+#: How far below a stated requirement a CV has to sit before the door is really
+#: shut. The DISTANCE, not the requirement: Italian postings routinely ask for
+#: "1 anno" and hire graduates anyway, and one year of gap is the one people
+#: argue across and win. Two is where the filter and the recruiter agree.
+#:
+#: This replaced a fixed floor on the requirement itself ("two years or more
+#: closes the door"), which read the same for everyone — a candidate with two
+#: years behind them was shut out of a three-year posting exactly as hard as a
+#: new graduate, and that is the difference that gets argued in an interview.
+BLOCKING_EXPERIENCE_GAP = 2
 
 
 def experience_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
-    """``(years the posting asks for, blocking reason or None)``."""
-    from app.services.scan.heuristics import EXPERIENCE_BAND_YEARS, _estimate_experience_band
+    """``(years the posting asks for, blocking reason or None)``.
 
-    band = _estimate_experience_band(str(descrizione or "").lower())
-    required = EXPERIENCE_BAND_YEARS.get(band)
-    if required is None:  # "Non specificato": asks nothing we can measure
+    The band is what the schema shows; the DECISION is taken on the real number,
+    because "3+" is where a posting asking three years and one asking ten stop
+    being distinguishable and they are not the same distance from anybody.
+    """
+    from app.services.scan.heuristics import _estimate_experience_band, experience_years_required
+
+    text = str(descrizione or "").lower()
+    band = _estimate_experience_band(text)
+    required = experience_years_required(text)
+    if required is None:  # asks nothing we can measure
         return band, None
     have = facts.years_experience
-    if have is None or have >= required or required < BLOCKING_EXPERIENCE_YEARS:
+    if have is None or required - have < BLOCKING_EXPERIENCE_GAP:
         return band, None
-    return band, f"Richiede {band} anni di esperienza (il profilo ne dichiara {have})"
+    return band, f"Richiede {required} anni di esperienza (il profilo ne dichiara {have})"
 
 
 def education_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
@@ -474,7 +493,12 @@ _FIELD_UMBRELLAS = (
 #: A subject named as a wish is not a gate — the same rule ``education_status``
 #: already applies to the level.
 _FIELD_PREFERENCE_RE = re.compile(
-    r"preferib|preferen|gradit|desirable|preferably|nice to have|costituisce titolo|plus",
+    # "preferred" bare and post-positioned is how English asks for it, and it was
+    # the one shape missing: Rotork's "Bachelor's in Electrical or Mechanical
+    # Engineering preferred (other engineering fields or equivalent experience
+    # will also be considered)" was read as a closed door.
+    r"preferib|preferen|preferred|gradit|desirable|preferably|nice to have"
+    r"|costituisce titolo|plus",
     re.IGNORECASE,
 )
 
@@ -652,13 +676,22 @@ _PROTECTED_MENTION_RE = re.compile(
 _PROTECTED_INCLUSIVE_RE = re.compile(
     r"anche\s+a|rivolta\s+anche|aperta\s+anche|indipendentemente|preferenzial|promuoviamo"
     r"|valutiamo|pari\s+opportunit|do\s+not\s+hesitate|committed|inserimento\s+e\s+l|"
-    r"attenzione\s+alle\s+risorse|ambosessi|entrambi\s+i\s+sessi|valorizzazione",
+    # "prestiamo attenzione E SENSIBILITA' alle FUTURE risorse appartenenti alle
+    # categorie protette" — Capgemini's footer, twice in the archive. The phrase
+    # already listed here wanted "attenzione alle risorse" adjacent, and three
+    # words in between were enough to lose it.
+    r"attenzione\s+alle\s+risorse|sensibilit|ambosessi|entrambi\s+i\s+sessi|valorizzazione",
     re.IGNORECASE,
 )
 _PROTECTED_REQUIRED_RE = re.compile(
     r"riservat\w*\s+(?:a|ai|alle)|esclusivamente\s+(?:a|ai|alle)"
     r"|(?:cerc\w+|ricerc\w+|selezion\w+|figura\s+di|profilo|risorsa|candidat[oa])"
-    r"[^.;!?]{0,80}appartenente\s+alle\s+categori",
+    # ``appartenent[ei]``: the singular alone missed the one posting in the whole
+    # archive that really is reserved. NTT DATA wrote "ricerchiamo giovani
+    # neolaureati, diplomati **appartenenti** alle categorie protette legge
+    # 68/99" — plural, because it is addressing several people — and it scored
+    # 8/10 at the top of a shortlist built for someone not on the register.
+    r"[^.;!?]{0,80}appartenent[ei]\s+alle\s+categori",
     re.IGNORECASE,
 )
 
@@ -686,6 +719,161 @@ def protected_category_status(descrizione: str, facts: CandidateFacts) -> tuple[
     )
 
 
+#: What an ad calls the pay when it is stating the pay. Anchoring on the LABEL is
+#: the whole design, and it comes from the census rather than from taste: in 469
+#: real ads every honest figure sits after one of these words and none of the
+#: noise does. "A number near a money word" instead returns the anti-
+#: discrimination statutes ("leggi 903/77 e 125/91"), the decree in the pay
+#: transparency footer ("DLgs 215/03"), and the meal vouchers — 267 hits under a
+#: hundred euros against 632 real annual figures. Same shape as the body reader
+#: in ``app.mail``, anchored for the same reason and measured at 29 out of 30.
+_PAY_LABEL_RE = re.compile(
+    r"\bral\b|retribu|salari[oe]|stipendi|\bsalary\b|compensation|remunerazion"
+    r"|indennit[aà]|rimborso\s+spese|offerta\s+economica|pacchetto\s+retributiv"
+    r"|trattamento\s+economico|\bpaga\b|\bcompenso\b",
+    re.IGNORECASE,
+)
+
+#: Money the job pays that is not the pay. Every one of these sits beside a real
+#: salary somewhere in the archive and would be read as one.
+_NOT_THE_PAY_RE = re.compile(
+    r"buoni\s+pasto|ticket|meal\s+voucher|welfare|variabil|variable\s+pay|bonus|fringe"
+    r"|premio|stock\s+option|una\s+tantum|rimborso\s+km|formazione",
+    re.IGNORECASE,
+)
+
+#: A statute, a decree or a date is not an amount: "leggi 903/77 e 125/91",
+#: "DLgs 215/03 e 216/03", "Dlgs del 7 maggio 2026, n.ro 96".
+_NOT_AN_AMOUNT_RE = re.compile(r"\d/\d|\bn\.?ro\b|\bd\.?lgs\b|\blegg[ei]\b|\bart\b", re.IGNORECASE)
+
+#: A number that could be money, with the thousands separator written either way
+#: and the "25K" shorthand the ads use as often as the digits.
+_PAY_AMOUNT_RE = re.compile(r"\d{1,3}(?:[.,\s]\d{3})+|\d{3,6}|\d{1,3}\s*k\b", re.IGNORECASE)
+
+#: Currencies that are not the euro. Their figures are skipped rather than
+#: converted: an exchange rate belongs in a table somebody maintains.
+_FOREIGN_CURRENCY_RE = re.compile(r"£|\$|\bgbp\b|\busd\b|\bchf\b|\bsek\b", re.IGNORECASE)
+
+#: Said out loud, the period settles it. Unsaid, see :func:`salary_status`.
+_MONTHLY_RE = re.compile(r"mensil|al\s+mese|/\s*mese|per\s+month|monthly", re.IGNORECASE)
+_YEARLY_RE = re.compile(r"annu|per\s+year|yearly|/\s*anno|\bl\.?a\.?\b", re.IGNORECASE)
+
+#: Labels that carry the period inside them. "RAL" is not jargon to be guessed
+#: at: it spells out Retribuzione Annua Lorda, so an ad writing "RAL da 12.000 a
+#: 15.000" has stated the period as plainly as one writing "annui". Reading it as
+#: possibly-monthly was costing exactly the ads that state their pay properly.
+_YEARLY_LABEL_RE = re.compile(r"\bral\b|retribuzione\s+annu", re.IGNORECASE)
+
+#: Where the pay sentence ends. A bullet or a new sentence is the next subject.
+_PAY_CLAUSE_END_RE = re.compile(r"[;•]|\.\s+[A-Z]|\*\s")
+
+
+def _pay_figures(descrizione: str) -> list[tuple[int, bool]]:
+    """``(amount, the ad said it is yearly)`` for every euro figure stated as pay.
+
+    The period is reported, never inferred. A figure of 26.000 is almost
+    certainly yearly and a figure of 600 almost certainly is not, but "almost
+    certainly" is an assumption about one country's pay scales, and
+    :func:`salary_status` is built so it never has to make one.
+    """
+    # Markdown emphasis, flattened before anything reads the text: job boards
+    # write "**Retribuzione** Da € 23.000", and an asterisk looked exactly like
+    # the bullet that ends the pay clause — so the figure was cut off from its
+    # own label. Same class of bug as the escaped hyphen in the years detector.
+    text = " ".join(str(descrizione or "").replace("\\", "").replace("*", " ").split())
+    out: list[tuple[int, bool]] = []
+    for label in _PAY_LABEL_RE.finditer(text):
+        window = text[label.end() : label.end() + 120]
+        for end in (_PAY_CLAUSE_END_RE, _NOT_THE_PAY_RE):
+            # The benefit ENDS the pay clause instead of voiding it: "Ral
+            # compresa tra 26k e 29k, buoni pasto 8 euro" states a real salary
+            # and then a meal voucher, and discarding the window over the second
+            # threw away the first.
+            cut = end.search(window)
+            if cut:
+                window = window[: cut.start()]
+        if _FOREIGN_CURRENCY_RE.search(window):
+            continue
+        around_label = text[max(0, label.start() - 40) : label.end() + 120]
+        said_yearly = _YEARLY_RE.search(around_label) or _YEARLY_LABEL_RE.search(label.group(0))
+        yearly = bool(said_yearly) and not _MONTHLY_RE.search(around_label)
+        for amount in _PAY_AMOUNT_RE.finditer(window):
+            around = window[max(0, amount.start() - 12) : amount.end() + 12]
+            if _NOT_AN_AMOUNT_RE.search(around):
+                continue
+            digits = re.sub(r"[^\d]", "", amount.group(0))
+            if not digits:
+                continue
+            value = int(digits)
+            if re.search(r"\d\s*k\b", amount.group(0), re.IGNORECASE) and value < 1000:
+                value *= 1000
+            if value < 100:
+                continue
+            if 1900 <= value <= 2100 and not re.search(r"€|\beur", around, re.IGNORECASE):
+                continue  # a year, not an amount
+            out.append((value, yearly))
+    return out
+
+
+def declared_pay(descrizione: str) -> str:
+    """What the ad says it pays, in its own terms, or "" when it says nothing.
+
+    Deliberately not a number: the period is only known when the ad gave it, and
+    a range is a range. "800€ (periodo non dichiarato)" is the honest rendering
+    of an internship reimbursement, and the reader is not going to pretend it
+    knows the twelve.
+    """
+    figures = _pay_figures(descrizione)
+    if not figures:
+        return ""
+    amounts = sorted({value for value, _yearly in figures})
+    yearly = any(is_yearly for _value, is_yearly in figures)
+    shown = f"{amounts[0]:,}".replace(",", ".")
+    if len(amounts) > 1:
+        shown += f"-{amounts[-1]:,}".replace(",", ".")
+    return f"{shown} EUR" + ("/anno" if yearly else " (periodo non dichiarato)")
+
+
+def salary_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:
+    """``(what the ad pays, blocking reason or None)``, read from the ad itself.
+
+    This used to read the model's ``ral_stimata`` and nothing else, which made it
+    the one check in this file whose answer could change between two runs over
+    the same unchanged text. Measured on 469 real ads: 186 print a figure and the
+    model returned one for 19 of them — it answered "Non stimabile" to "salary
+    range min. RAL 35.000 EUR - max RAL 38.000 EUR".
+
+    **The period is never guessed.** An ad writing "rimborso spese a partire da
+    600€" does not say per what, and deciding that it means per month would bake
+    an assumption about one country's internship market into an app other people
+    install with their own CV. So each figure is annualised the most GENEROUS way
+    its own text allows, and the door closes only when even that reading falls
+    short: 600 cannot reach a 20.000 floor whatever it meant, 25.000 clears it on
+    any reading, and the ambiguous middle stays open. That is the side to be
+    wrong on — an offer wrongly kept costs a line to read, an offer wrongly hidden
+    costs the job.
+
+    Ranges are read at their TOP for the same reason: an ad offering 18.000 to
+    24.000 may pay 24.000, and the user is the one who will negotiate it.
+    """
+    floor = facts.ral_min
+    if not floor:
+        return "Non dichiarata", None  # no floor stated: nothing to be under
+    figures = _pay_figures(descrizione)
+    if not figures:
+        return "Non dichiarata", None
+    # The most an ad could possibly mean: a figure it called yearly is worth
+    # itself, one whose period it never gave is worth twelve of itself.
+    ceiling = max(value if yearly else value * 12 for value, yearly in figures)
+    stated = max(value for value, _yearly in figures)
+    if ceiling >= floor:
+        return f"Dichiarata: {stated}", None
+    return (
+        f"Dichiarata: {stated}",
+        f"Dichiara al massimo {stated} ({ceiling} EUR/anno), sotto la tua minima ({floor})",
+    )
+
+
 def blocking_reasons(
     descrizione: str, sede: str, modalita: str, facts: CandidateFacts | None
 ) -> list[tuple[str, str]]:
@@ -703,6 +891,7 @@ def blocking_reasons(
         FLAG_EXPERIENCE,
         FLAG_LOCATION,
         FLAG_PROTECTED_CATEGORY,
+        FLAG_SALARY_BELOW,
     )
 
     out: list[tuple[str, str]] = []
@@ -713,6 +902,10 @@ def blocking_reasons(
         (FLAG_LOCATION, location_status(sede, modalita, facts)),
         (FLAG_DRIVING_LICENCE, driving_licence_status(descrizione, facts)),
         (FLAG_PROTECTED_CATEGORY, protected_category_status(descrizione, facts)),
+        # Joined the deterministic checks once it stopped depending on the
+        # model: the pay is in the ad's own words, so the offer no longer has to
+        # be sent away and judged before anyone can notice it pays too little.
+        (FLAG_SALARY_BELOW, salary_status(descrizione, facts)),
     ):
         if reason:
             out.append((code, reason))
