@@ -32,7 +32,13 @@ from __future__ import annotations
 #: 1 = pre-versioning analyses (marker-key era, v1.7.6 and earlier).
 #: 2 = v1.7.7: slimmed/reordered schema, explicit scoring rubric, salary axis
 #:     that is honestly null when nothing is known about pay.
-CURRENT_ANALYSIS_VERSION = 2
+#: 3 = v2.1.0: a requirement the candidate does not meet — years, degree level,
+#:     degree subject, declared pay under the floor — closes the door instead of
+#:     lowering a ceiling to 6. Every stored 6 is now ambiguous: it may be a real
+#:     six or a ceiling talking, and nothing in the row says which. This is the
+#:     mechanism that re-files them, in place of a migration that would have had
+#:     to guess the number the cap overwrote.
+CURRENT_ANALYSIS_VERSION = 3
 
 #: Key holding :data:`CURRENT_ANALYSIS_VERSION` inside a stored analysis dict.
 ANALYSIS_VERSION_KEY = "scoring_v"

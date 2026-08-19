@@ -305,7 +305,8 @@
     "minScore4": "Voto 4+",
     "fromMail": "Dalla posta",
     "fromMailHint": "Solo le candidature ricostruite dalla tua casella",
-    "scoredBy": "Valutata da {model}"
+    "scoredBy": "Valutata da {model}",
+    "declaredPay": "Retribuzione dichiarata"
   },
   "kanbanCols": {
     "open": "Aperto",

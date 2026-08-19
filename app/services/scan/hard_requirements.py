@@ -136,10 +136,11 @@ def hard_block_reason(
     where they can work). It is optional and defaults to "unknown", which blocks
     nothing: a CV the parser misread must never hide jobs.
 
-    Only the non-arguable constraints are read here. A weighted one lowers a
-    ceiling, and a ceiling needs a score to lower: skipping the model for those
-    would make the ceiling itself the verdict — a number nobody judged, which is
-    what this app stopped producing in 1.7.9.
+    Reads every constraint in :data:`BLOCKING_FLAGS` that ``blocking_reasons``
+    can decide from the text: years, degree level, degree subject, city, licence,
+    register. The one blocking constraint missing here is the salary, and it is
+    missing for a reason — the figure comes out of the model's own
+    ``ral_stimata``, so there is nothing to read before asking.
     """
     reason = _geo_status(sede, descrizione)[1] or _grade_status(profile_markdown, descrizione)[1]
     if reason:
@@ -207,16 +208,48 @@ def _ral_min_from_context(extra_context: str) -> int | None:
     return int(digits) if digits else None
 
 
+def _record_declared_pay(analysis: dict[str, Any], descrizione: str) -> None:
+    """Put what the AD states into its own field, beside what the model guessed.
+
+    Two provenances, two fields, on purpose. ``ral_stimata`` is the model's
+    reading and is empty four times out of five; this one is the ad's own words.
+    Merging them would leave the interface unable to say which it was showing,
+    and on this data that difference is the whole point — the model returned a
+    figure for 19 ads out of the 186 that print one.
+    """
+    from app.services.candidate_facts import declared_pay
+
+    stated = declared_pay(descrizione)
+    if stated:
+        analysis["ral_dichiarata"] = stated
+
+
 def _apply_salary_expectation(analysis: dict[str, Any], ral_min: int | None) -> None:
-    """Flag (not cap) an offer whose declared salary is under the user's floor."""
+    """Cap an offer whose declared salary is under the user's floor.
+
+    Caps here rather than leaving it to a ceiling, and that is not a style
+    choice: this is the one blocking constraint that cannot be decided before
+    the model answers, because the figure is read out of ``ral_stimata``. It used
+    to rely on :func:`_apply_weighted_ceiling`, and when the weighted tier was
+    emptied the flag would have gone on being drawn while the score it was
+    supposed to hold down floated free — a badge that means nothing is worse than
+    no badge, because it reads as a check that ran.
+    """
+    if FLAG_SALARY_BELOW in (analysis.get("blocchi") or []):
+        # ``salary_status`` already read the figure out of the ad and capped the
+        # offer. Running again would prepend a second sentence to the weakness
+        # line and cap an already-capped score: ``_cap_score`` is not idempotent,
+        # which is a trap this project has paid for once already in a migration.
+        return
     low, high = _parse_ral(analysis.get("ral_stimata"))
     if ral_min and high and high < ral_min:
         detail = f"RAL dichiarata fino a {high} EUR, sotto la tua minima ({ral_min})"
         _add_flag(analysis, FLAG_SALARY_BELOW, detail)
         _add_missing(analysis, detail)
-        previous = str(analysis.get("punti_deboli") or "").strip()
-        analysis["punti_deboli"] = (
-            f"Retribuzione sotto la RAL minima dichiarata ({ral_min} EUR). {previous}".strip()
+        _cap_score(
+            analysis,
+            _DECLARED_CONSTRAINT_CAP,
+            f"Retribuzione sotto la RAL minima dichiarata ({ral_min} EUR).",
         )
         axes = analysis.get("match_axes")
         if isinstance(axes, dict):
@@ -394,28 +427,34 @@ BLOCKING_FLAGS = frozenset(
         FLAG_LOCATION,
         FLAG_PROTECTED_CATEGORY,
         FLAG_DRIVING_LICENCE,
+        # The four below used to lower a ceiling instead of closing the door. The
+        # ceiling was 6, which is precisely where people set their own filter, so
+        # a posting demanding three years more than the CV holds and a posting
+        # that simply was not very interesting arrived at the same place and
+        # could not be told apart. Blocking them costs nothing to look at either:
+        # all four are decided from the posting's own text before any model is
+        # asked, so the offer never spends a call to come back with a 3.
+        FLAG_EXPERIENCE,
+        FLAG_EDUCATION,
+        FLAG_DEGREE_FIELD,
+        FLAG_SALARY_BELOW,
     }
 )
 
-#: Requirements the candidate does not meet but could still argue with. A degree
-#: and a couple of years are the two every junior is told to apply for anyway,
-#: and hiding those postings threw away real chances — while leaving them at the
-#: model's number put a requirement the candidate does not hold at the top of the
-#: shortlist (EY, "Laurea magistrale STEM", 9/10 against a three-year degree).
-#: They lower a CEILING instead: still visible, still badged, never recommended.
-#: The other four are not arguable — no driving licence, no visa, a grade
-#: threshold an ATS filters on, a register you are not enrolled in.
+#: Requirements that used to lower a CEILING of 6 instead of closing the door,
+#: on the reasoning that a degree and a couple of years are what every junior is
+#: told to apply for anyway. The reasoning held; the number did not. Six is
+#: exactly where a person sets their own filter ("I only look from 6 up"), so an
+#: offer demanding three years more than the CV holds and an offer that was
+#: simply mediocre arrived at the same place with nothing to tell them apart —
+#: and on a real archive fifteen of the twenty-seven offers sitting at 6 were
+#: there because the ceiling put them there, not because they earned it.
 #:
-#: ``FLAG_DEGREE_FIELD`` joined them once the archive was read properly: 245 of
-#: 423 real descriptions name the SUBJECT of the degree they want, which makes it
-#: the most-stated requirement in the whole archive and the only one nothing
-#: checked — a computer-science CV sat at 8/10 under "hai una laurea in Economia".
-#: ``FLAG_SALARY_BELOW`` joined them for the opposite reason: it was flagged and
-#: nothing else, so a TIM internship declaring 9.600 EUR against a 20.000 floor
-#: kept an 8/10 and led the "best for you" panel. Both are arguable — people do
-#: get hired across a subject line, and an internship can still be worth taking —
-#: so neither hides the offer; they just stop it outranking one that fits.
-WEIGHTED_FLAGS = frozenset({FLAG_EXPERIENCE, FLAG_EDUCATION, FLAG_DEGREE_FIELD, FLAG_SALARY_BELOW})
+#: Empty since all four moved to :data:`BLOCKING_FLAGS`. Kept as a name rather
+#: than deleted because ``reapply_weighted_constraints`` and the migrations that
+#: call it still read it, and because an empty set says "nothing is merely
+#: discouraged any more" without rewriting what those migrations did.
+WEIGHTED_FLAGS: frozenset[str] = frozenset()
 
 
 def is_unevaluated(analysis: Mapping[str, Any]) -> bool:
@@ -534,13 +573,11 @@ def _apply_declared_constraints(
     scored 8 against a bachelor. Reading the same fields deterministically is the
     only thing that made those stop being recommended.
 
-    The two kinds part ways here. A constraint in :data:`BLOCKING_FLAGS` is not
-    arguable — no licence, no visa, a grade an ATS filters on — and keeps the cap
-    at 3 plus "Salta". A constraint in :data:`WEIGHTED_FLAGS` lowers a ceiling,
-    but that is applied once at the end by :func:`_apply_weighted_ceiling`: the
-    salary check runs after this function and produces a weighted flag too, and
-    counting them in two places let the second one land on a ceiling the first
-    had already used up.
+    Every constraint the user declared now caps at 3 plus "Salta".
+    :data:`WEIGHTED_FLAGS` is empty, so the second branch below never runs; it is
+    left standing because the set is still read by the migrations, and because a
+    requirement the user does not meet turning out to be arguable after all is a
+    change of policy, not of plumbing.
     """
     for code, reason in _declared_constraint_breaks(descrizione, sede, modalita, facts):
         _add_flag(analysis, code, reason)
@@ -736,6 +773,10 @@ def enforce_hard_requirements(
     the posting is worked. Both default to "unknown", which blocks nothing.
     """
     out = _normalize_analysis(analysis)
+    # Recorded before anything can cap or skip: a figure the ad prints is a fact
+    # about the ad, true whether or not a model ever looked at it, and the offers
+    # most worth showing it on are exactly the ones no model was asked about.
+    _record_declared_pay(out, descrizione)
     _apply_grade_requirement(out, profile_markdown, descrizione)
     _apply_geo_eligibility(out, sede, descrizione)
     _apply_declared_constraints(out, descrizione, sede, modalita, facts)

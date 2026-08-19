@@ -305,7 +305,8 @@
     "minScore4": "Nota 4+",
     "fromMail": "Del correo",
     "fromMailHint": "Solo las candidaturas reconstruidas desde tu buzón",
-    "scoredBy": "Evaluada por {model}"
+    "scoredBy": "Evaluada por {model}",
+    "declaredPay": "Retribución declarada"
   },
   "kanbanCols": {
     "open": "Abierto",
