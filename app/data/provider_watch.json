@@ -13,16 +13,17 @@
     "nvidia/nemotron-3.5-lightning:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
     "nvidia/nemotron-nano-9b-v2:free",
-    "openai/gpt-oss-20b:free",
     "poolside/laguna-s-2.1:free",
     "poolside/laguna-xs-2.1:free",
+    "thinkingmachines/inkling-small:free",
+    "thinkingmachines/inkling:free",
     "z-ai/glm-5.2:free"
   ],
   "pages": {
-    "cerebras_pricing": "141dd398a4e1bc9a",
+    "cerebras_pricing": "f513528f230b61c9",
     "google_pricing": "562fe793f13f33ca",
-    "google_rate_limits": "1ef2f1931b169fcd",
-    "groq_limits": "30cf9514b0f2eb4c",
-    "openrouter_limits": "fd728c2ab37037b1"
+    "google_rate_limits": "da54b13601c1d599",
+    "groq_limits": "ab9a996ab0cdf61d",
+    "openrouter_limits": "8136b983da62ed1e"
   }
 }
