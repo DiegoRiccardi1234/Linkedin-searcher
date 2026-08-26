@@ -206,9 +206,26 @@ def facts_from_connection(conn: sqlite3.Connection) -> Any:
         except (TypeError, ValueError):
             return None
 
-    years = _int(prefs.get("profile_fact_years_experience"))
+    def _years(raw: Any) -> float | None:
+        """The fraction survives, and an unreadable value is still unknown.
+
+        This read ``int(str(raw))`` with no ``float`` in the way, so the ``0.5``
+        a CV extractor produces for a first internship raised, came back as
+        ``None``, and every caller below treats an unknown year count as "know
+        nothing" — the guard at the top of :func:`reapply_weighted_constraints`
+        then returned before touching a single row. Mirrors
+        :func:`app.services.candidate_facts._as_years` on purpose: two parsers
+        for one fact is how they drift.
+        """
+        try:
+            value = float(str(raw).strip())
+        except (TypeError, ValueError):
+            return None
+        return value if value >= 0 else None
+
+    years = _years(prefs.get("profile_fact_years_experience"))
     if years is None:
-        years = _int(summary.get("years_experience"))
+        years = _years(summary.get("years_experience"))
 
     def _tri(raw: Any) -> bool | None:
         value = (raw or "").strip().lower()

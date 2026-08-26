@@ -31,8 +31,10 @@ from app.services.scan.heuristics import education_requirement
 if TYPE_CHECKING:
     from app.db import Database
 
-#: Preference keys holding the user's manual corrections. The ``profile_fact_``
-#: prefix is what makes them writable through ``POST /api/preferences``.
+#: Preference keys holding the user's manual corrections. Written ONLY through
+#: ``PATCH /api/profile`` — the ``profile_fact_`` prefix is not on the allowlist
+#: in ``app.routers.preferences``, so ``POST /api/preferences`` refuses it with
+#: ``unknown_preference``. This note used to claim the opposite.
 FACT_PREFIX = "profile_fact_"
 FACT_YEARS = f"{FACT_PREFIX}years_experience"
 FACT_EDUCATION = f"{FACT_PREFIX}education_level"
@@ -135,7 +137,10 @@ class WorkRule:
 class CandidateFacts:
     """What we know, and where each piece came from."""
 
-    years_experience: int | None = None
+    #: Fractional on purpose: five months of internship is ``0.5``, and rounding
+    #: it down to zero moved the blocking boundary by a whole year. See
+    #: :func:`_as_years`.
+    years_experience: float | None = None
     education_level: str | None = None
     grade: int | None = None
     #: On the protected-categories register (L. 68/99). None = not stated.
@@ -158,19 +163,67 @@ class CandidateFacts:
 
 
 def _as_int(raw: Any) -> int | None:
-    """A whole number of years, from whatever the CV extractor produced.
+    """A whole number, from whatever the CV extractor or a preference produced.
 
-    It parsed through ``int(str(...))``, so ``0.5`` — six months, which is what
-    a first job looks like — raised and became "unknown". The difference
-    matters: an unknown year count disables the experience check entirely, so a
-    CV that says half a year silently stopped flagging the offers asking for
-    three. Fractions floor, because half a year of experience is not one.
+    Used for the facts that ARE whole by nature — a degree mark and a yearly
+    gross. It parses through ``float`` first because a preference round-trips as
+    text and "95.0" must not read as unknown; the floor that follows is correct
+    for both, and an unknown is worse than a rounded one because an unknown
+    switches the corresponding check off entirely.
+
+    Years of experience are NOT parsed here — see :func:`_as_years`.
     """
     try:
         value = int(float(str(raw).strip()))
     except (TypeError, ValueError):
         return None
     return value if value >= 0 else None
+
+
+def _as_years(raw: Any) -> float | None:
+    """Years of experience, fraction intact.
+
+    This used to go through :func:`_as_int`, whose docstring argued that "half a
+    year of experience is not one" and floored it. That was written to fix a
+    different bug — ``0.5`` raised on the old ``int(str(...))`` path, became
+    ``None``, and an unknown year count disables the experience check entirely —
+    and it landed BEFORE the rule that reads a DISTANCE
+    (:data:`BLOCKING_EXPERIENCE_GAP`) rather than the requirement's own size.
+    Measured together, the two cost exactly one boundary: floored to ``0``, a CV
+    with five months of internship is two years away from a posting asking for
+    two and gets the door shut; at its real ``0.5`` it is one and a half away and
+    passes. On a real 466-posting archive that hid 19 offers, and it hides them
+    from every new graduate — which is most of the people this app is for.
+
+    Still floors nothing and invents nothing: an unreadable value stays ``None``,
+    which leaves the check off, and a negative one is not a year count.
+    """
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 0 else None
+
+
+def format_years(value: float | None) -> str:
+    """Years of experience as a person would say them, in Italian.
+
+    Not translated, and deliberately consistent with the other facts this module
+    hands to the UI — ``education_level`` is already "Triennale" and the blocking
+    reasons are already Italian sentences. Under a year reads in months, because
+    "0,5 anni" is how a number looks, not how a CV reads.
+    """
+    if value is None:
+        return ""
+    if value < 1:
+        months = round(value * 12)
+        if months <= 0:
+            return "meno di un mese"
+        return f"{months} mes{'e' if months == 1 else 'i'}"
+    if float(value).is_integer():
+        whole = int(value)
+        return f"{whole} ann{'o' if whole == 1 else 'i'}"
+    return f"{value:.1f}".replace(".", ",") + " anni"
 
 
 def candidate_education_level(profile_markdown: str, summary: dict[str, Any] | None) -> str | None:
@@ -254,15 +307,15 @@ def candidate_facts(db: Database) -> CandidateFacts:
         summary = {}
 
     sources: dict[str, str] = {}
-    years: int | None
+    years: float | None
     education: str | None
     grade: int | None
 
-    manual_years = _as_int(db.get_preference(FACT_YEARS, ""))
+    manual_years = _as_years(db.get_preference(FACT_YEARS, ""))
     if manual_years is not None:
         years, sources["years_experience"] = manual_years, "manuale"
     else:
-        years = _as_int(summary.get("years_experience"))
+        years = _as_years(summary.get("years_experience"))
         sources["years_experience"] = "cv" if years is not None else "mancante"
 
     manual_edu = (db.get_preference(FACT_EDUCATION, "") or "").strip()
@@ -386,7 +439,10 @@ def experience_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str
     have = facts.years_experience
     if have is None or required - have < BLOCKING_EXPERIENCE_GAP:
         return band, None
-    return band, f"Richiede {required} anni di esperienza (il profilo ne dichiara {have})"
+    return (
+        band,
+        f"Richiede {required} anni di esperienza (il profilo ne dichiara {format_years(have)})",
+    )
 
 
 def education_status(descrizione: str, facts: CandidateFacts) -> tuple[str, str | None]:

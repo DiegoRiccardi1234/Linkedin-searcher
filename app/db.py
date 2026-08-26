@@ -1273,7 +1273,20 @@ class Database:
             query += " AND punteggio_ai IS NOT NULL AND punteggio_ai >= ?"
             params.append(min_score)
         if max_age_days is not None:
-            query += " AND julianday('now') - julianday(last_seen_at) <= ?"
+            # Counted from the LAST SCAN, not from now. `last_seen_at` only moves
+            # when a scan re-sees the posting, so measuring it against the clock
+            # measures how long it has been since you scanned — not whether the
+            # ad is still up. Measured on a real archive: with the newest run
+            # seven days old, "max 7 days" returned 0 rows out of 394, because
+            # every row was older than the window by exactly the gap in the
+            # scanning, and the filter switched itself off in silence. Anchored,
+            # the same threshold returns 194. COALESCE keeps a fresh install
+            # (no runs yet) on the clock instead of returning nothing.
+            query += (
+                " AND julianday(COALESCE("
+                "(SELECT MAX(started_at) FROM scan_runs), 'now'"
+                ")) - julianday(last_seen_at) <= ?"
+            )
             params.append(max_age_days)
         return query, params
 

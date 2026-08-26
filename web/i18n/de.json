@@ -127,7 +127,9 @@
       "target": "Was ich suche",
       "constraints": "Einschränkungen",
       "tools": "KI-Werkzeuge"
-    }
+    },
+    "month": "Monat",
+    "months": "Monate"
   },
   "jobSearch": {
     "title": "Job",
@@ -306,7 +308,11 @@
     "fromMail": "Aus der Mail",
     "fromMailHint": "Nur die aus deinem Postfach rekonstruierten Bewerbungen",
     "scoredBy": "Bewertet von {model}",
-    "declaredPay": "Angegebene Vergütung"
+    "declaredPay": "Angegebene Vergütung",
+    "archiveAction": "Archivieren",
+    "maxAgeHint": "Tage ab dem letzten Scan, nicht ab heute: eine Anzeige, die der letzte Scan wiedergefunden hat, gilt als aktuell",
+    "onlyFresh": "Nur aktuelle",
+    "onlyFreshHint": "Nur Angebote zeigen, die der letzte Scan innerhalb von 7 Tagen wiedergefunden hat"
   },
   "kanbanCols": {
     "open": "Offen",

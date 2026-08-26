@@ -127,7 +127,9 @@
       "target": "What I'm looking for",
       "constraints": "Constraints",
       "tools": "AI tools"
-    }
+    },
+    "month": "month",
+    "months": "months"
   },
   "jobSearch": {
     "title": "Job",
@@ -195,7 +197,7 @@
     "kanban": "Kanban",
     "searchPlaceholder": "Search title or company...",
     "minScore": "Min score",
-    "maxAge": "Max age (days)",
+    "maxAge": "Max days",
     "favorites": "Favorites",
     "new": "New",
     "remote": "Remote",
@@ -306,7 +308,11 @@
     "fromMail": "From mail",
     "fromMailHint": "Only the applications rebuilt from your inbox",
     "scoredBy": "Scored by {model}",
-    "declaredPay": "Stated pay"
+    "declaredPay": "Stated pay",
+    "archiveAction": "Archive",
+    "maxAgeHint": "Days counted from the last scan, not from today: a posting the last scan found again counts as recent",
+    "onlyFresh": "Recent only",
+    "onlyFreshHint": "Show only offers the last scan found again within 7 days"
   },
   "kanbanCols": {
     "open": "Open",

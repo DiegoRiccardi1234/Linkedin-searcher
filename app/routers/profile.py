@@ -107,6 +107,18 @@ def _parse_ral_line(content: str) -> tuple[int | None, int | None]:
     return (_amount(match.group(1)), _amount(match.group(2)))
 
 
+def _years_preference(value: float) -> str:
+    """Years of experience as a preference string, fraction kept.
+
+    Preferences are text, so the round-trip has to survive one: ``0.5`` must come
+    back out of :func:`app.services.candidate_facts._as_years` as ``0.5`` and not
+    as a zero. Whole values are written without the ``.0`` so a preference dump
+    stays readable.
+    """
+    years = max(0.0, float(value))
+    return str(int(years)) if years.is_integer() else f"{years:g}"
+
+
 def build_router(container: AppContainer) -> APIRouter:
     router = APIRouter()
     _cached_suggestion = _cached_suggestion_factory(container)
@@ -453,15 +465,30 @@ def build_router(container: AppContainer) -> APIRouter:
 
         Written as preferences rather than into ``summary_json`` on purpose: a
         re-uploaded CV rewrites the summary, and a correction the user made by
-        hand must outlive that. An empty string clears the override and hands the
+        hand must outlive that. An empty value clears the override and hands the
         fact back to the CV.
+
+        Clearing is why the numbers read ``model_fields_set`` instead of just
+        testing for ``None``: the two facts below are the only ones that could
+        not be cleared through any API. ``None`` meant "not sent", so emptying
+        the box in the profile editor was a silent no-op and a wrong override
+        stayed wrong forever — which is how an override of "0 years" outlived
+        the CV that said half a year. A field PRESENT and null now clears; a
+        field absent from the payload is still left alone, so the chat coach can
+        keep sending one key at a time.
         """
-        for value, key in (
-            (payload.years_experience, cf.FACT_YEARS),
-            (payload.grade, cf.FACT_GRADE),
-        ):
-            if value is not None:
-                container.db.set_preference(key, str(max(0, int(value))))
+        given = payload.model_fields_set
+        if "years_experience" in given:
+            years = payload.years_experience
+            container.db.set_preference(
+                cf.FACT_YEARS, "" if years is None else _years_preference(years)
+            )
+        if "grade" in given:
+            grade = payload.grade
+            # Stays whole: a degree mark has no fraction.
+            container.db.set_preference(
+                cf.FACT_GRADE, "" if grade is None else str(max(0, int(grade)))
+            )
         if payload.education_level is not None:
             level = payload.education_level.strip()
             container.db.set_preference(

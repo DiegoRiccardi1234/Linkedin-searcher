@@ -127,7 +127,9 @@
       "target": "Ce que je cherche",
       "constraints": "Contraintes",
       "tools": "Outils IA"
-    }
+    },
+    "month": "mois",
+    "months": "mois"
   },
   "jobSearch": {
     "title": "Recherche",
@@ -306,7 +308,11 @@
     "fromMail": "Depuis le courrier",
     "fromMailHint": "Seulement les candidatures reconstruites depuis votre boîte mail",
     "scoredBy": "Évaluée par {model}",
-    "declaredPay": "Rémunération indiquée"
+    "declaredPay": "Rémunération indiquée",
+    "archiveAction": "Archiver",
+    "maxAgeHint": "Jours comptés depuis le dernier scan, pas depuis aujourd'hui : une annonce retrouvée par le dernier scan compte comme récente",
+    "onlyFresh": "Récentes seulement",
+    "onlyFreshHint": "N'afficher que les offres retrouvées par le dernier scan dans les 7 jours"
   },
   "kanbanCols": {
     "open": "Ouvert",

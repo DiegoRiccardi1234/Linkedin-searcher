@@ -188,6 +188,12 @@ export function initJobSorting() {
 
 //: The five slices of the archive, mirroring JOB_BUCKETS in app/db.py.
 const BUCKETS = ["to_review", "applied", "rejected", "archived", "all"];
+//: What the "recent only" switch means, in days since the LAST SCAN (the
+//: anchoring lives in `_jobs_where`, app/db.py). Seven covers two or three runs
+//: at Diego's cadence without reaching back to the postings a scan stopped
+//: returning weeks ago.
+const FRESH_DAYS = 7;
+
 const BUCKET_KEY = "jobsBucket";
 const PAGE_LIMIT = 250;
 
@@ -241,6 +247,17 @@ export function initJobBuckets() {
     const minScore = document.getElementById("minScore");
     if (event.currentTarget.checked) minScore.value = "4";
     else if (minScore.value.trim() === "4") minScore.value = "";
+    loadJobs();
+  });
+  // Same shape as the checkbox above, and for the same reason: it writes into
+  // the number field rather than sending a filter of its own, so the two can
+  // never disagree and the query, the bucket counts and the empty-state test
+  // keep reading one value. Off by default on purpose — on a real archive it
+  // hid ten of the sixteen best offers, the top one included.
+  document.getElementById("onlyFresh")?.addEventListener("change", (event) => {
+    const maxAge = document.getElementById("maxAgeDays");
+    if (event.currentTarget.checked) maxAge.value = String(FRESH_DAYS);
+    else if (maxAge.value.trim() === String(FRESH_DAYS)) maxAge.value = "";
     loadJobs();
   });
 }
@@ -386,6 +403,7 @@ export async function loadJobs(opts) {
           <button data-action="rejected" data-id="${job.id}" class="danger">${t("jobs.skip")}</button>
           <button data-action="reopened" data-id="${job.id}" class="secondary icon-btn" title="${t("jobs.reopen")}" aria-label="${t("jobs.reopen")}"><span class="material-symbols-outlined">restart_alt</span></button>
           <button data-favorite="${job.is_favorite ? "0" : "1"}" data-id="${job.id}" class="secondary icon-btn${job.is_favorite ? " is-active" : ""}" title="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}" aria-label="${job.is_favorite ? t("jobs.unfavorite") : t("jobs.favorite")}"><span class="material-symbols-outlined">${job.is_favorite ? "star" : "star_border"}</span></button>
+          <button data-action="archived" data-id="${job.id}" class="secondary icon-btn" title="${t("jobs.archiveAction")}" aria-label="${t("jobs.archiveAction")}"><span class="material-symbols-outlined">archive</span></button>
           <button data-delete-id="${job.id}" class="danger icon-btn" title="${t("jobs.delete")}" aria-label="${t("jobs.delete")}"><span class="material-symbols-outlined">delete</span></button>
         </div>
       </td>

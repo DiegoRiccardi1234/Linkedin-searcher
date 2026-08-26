@@ -127,7 +127,9 @@
       "target": "Cosa cerco",
       "constraints": "Vincoli",
       "tools": "Strumenti IA"
-    }
+    },
+    "month": "mese",
+    "months": "mesi"
   },
   "jobSearch": {
     "title": "Cerca",
@@ -306,7 +308,11 @@
     "fromMail": "Dalla posta",
     "fromMailHint": "Solo le candidature ricostruite dalla tua casella",
     "scoredBy": "Valutata da {model}",
-    "declaredPay": "Retribuzione dichiarata"
+    "declaredPay": "Retribuzione dichiarata",
+    "archiveAction": "Archivia",
+    "maxAgeHint": "Giorni trascorsi dall'ultimo scan, non da oggi: un annuncio che l'ultimo scan ha ritrovato conta come recente",
+    "onlyFresh": "Solo recenti",
+    "onlyFreshHint": "Mostra solo le offerte che l'ultimo scan ha ritrovato negli ultimi 7 giorni"
   },
   "kanbanCols": {
     "open": "Aperto",

@@ -412,3 +412,93 @@ def test_set_job_action_archived_updates_status(tmp_path: Path) -> None:
         assert db.get_job(jid)["status"] == "open"
     finally:
         db.close()
+
+
+# ── the age filter, and the clock it is measured against ─────────────────────
+# `max_age_days` shipped without a test, which is how it kept being measured
+# against `now`: on a real archive whose newest scan was seven days old, "max 7
+# days" returned 0 rows out of 394 and looked like a filter that simply hid
+# everything.
+
+
+def _seed_job_last_seen(db: Database, titolo: str, last_seen: str) -> int:
+    job_id, _, _ = db.upsert_job(
+        {
+            "titolo": titolo,
+            "azienda": "Acme",
+            "descrizione": "x" * 400,
+            "sede": "Torino",
+            "fonte": "linkedin",
+            "link": f"https://example.com/{titolo}",
+            "ricerca_usata": titolo,
+            "modalita": "In sede",
+        }
+    )
+    db.conn.execute("UPDATE jobs SET last_seen_at = ? WHERE id = ?", (last_seen, job_id))
+    db.conn.commit()
+    return job_id
+
+
+def test_max_age_is_counted_from_the_last_scan_not_from_today(tmp_path: Path) -> None:
+    """A posting the newest scan re-saw is recent, however long ago that scan was.
+
+    ``last_seen_at`` only moves when a scan re-sees the posting, so measuring it
+    against the wall clock measures how long it has been since you scanned. Left
+    that way the filter switches itself off in silence: stop scanning for a week
+    and every offer looks expired, including the ones that are still up.
+    """
+    db = Database(tmp_path / "s.db")
+    try:
+        db.conn.execute(
+            "INSERT INTO scan_runs(started_at, location, is_remote, terms_json) "
+            "VALUES ('2026-08-19T09:00:00+00:00', 'Torino', 1, '[]')"
+        )
+        db.conn.commit()
+        # Seen the day of that scan, which is far more than 7 days before today.
+        _seed_job_last_seen(db, "seen-by-the-last-scan", "2026-08-19T09:00:00+00:00")
+        # Seen two runs earlier: outside the window even measured from the scan.
+        _seed_job_last_seen(db, "missed-by-two-runs", "2026-08-04T09:00:00+00:00")
+
+        kept = [j["titolo"] for j in db.list_jobs(max_age_days=7, limit=100)]
+        assert kept == ["seen-by-the-last-scan"], kept
+        assert db.count_jobs(max_age_days=7) == 1, "count and list must agree"
+    finally:
+        db.close()
+
+
+def test_max_age_falls_back_to_the_clock_before_the_first_scan(tmp_path: Path) -> None:
+    """A fresh install has no runs to anchor to: filter on the clock, not on nothing."""
+    db = Database(tmp_path / "s.db")
+    try:
+        _seed_job_last_seen(db, "ancient", "2020-01-01T00:00:00+00:00")
+        assert db.list_jobs(max_age_days=7, limit=100) == []
+        assert len(db.list_jobs(limit=100)) == 1, "unfiltered still sees it"
+    finally:
+        db.close()
+
+
+def test_the_age_filter_off_changes_nothing(tmp_path: Path) -> None:
+    db = Database(tmp_path / "s.db")
+    try:
+        _seed_job_last_seen(db, "old", "2020-01-01T00:00:00+00:00")
+        _seed_job_last_seen(db, "new", "2026-08-26T00:00:00+00:00")
+        assert len(db.list_jobs(limit=100)) == 2
+        assert db.count_jobs() == 2
+    finally:
+        db.close()
+
+
+def test_archiving_from_the_list_is_reversible(tmp_path: Path) -> None:
+    """The row button archives; the reopen button next to it must bring it back."""
+    db = Database(tmp_path / "s.db")
+    try:
+        job_id = _seed_job_last_seen(db, "regrettable", "2026-08-26T00:00:00+00:00")
+        db.set_job_action(job_id=job_id, action="archived", notes="")
+        assert db.get_job(job_id)["status"] == "archived"
+        assert [j["id"] for j in db.list_jobs(status="open", limit=100)] == []
+
+        db.set_job_action(job_id=job_id, action="reopened", notes="")
+        assert db.get_job(job_id)["status"] == "open"
+        assert [j["id"] for j in db.list_jobs(status="open", limit=100)] == [job_id]
+    finally:
+        db.close()

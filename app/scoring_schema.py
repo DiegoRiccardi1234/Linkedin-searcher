@@ -38,7 +38,15 @@ from __future__ import annotations
 #:     six or a ceiling talking, and nothing in the row says which. This is the
 #:     mechanism that re-files them, in place of a migration that would have had
 #:     to guess the number the cap overwrote.
-CURRENT_ANALYSIS_VERSION = 3
+#: 4 = v2.2.0: years of experience keep their fraction all the way into the
+#:     blocking decision. Floored to a whole number, a CV with five months of
+#:     internship read as zero and sat a full two years from a posting asking for
+#:     two, so the door shut on it — on a real archive that was 19 offers hidden
+#:     from the graduates this app is mostly for. Same release stops reading a
+#:     company's own age ("Con oltre 40 anni di esperienza, X affianca…") as a
+#:     seniority demand. Both change which offers carry a blocking flag, so every
+#:     analysis stored under 3 has to be asked again.
+CURRENT_ANALYSIS_VERSION = 4
 
 #: Key holding :data:`CURRENT_ANALYSIS_VERSION` inside a stored analysis dict.
 ANALYSIS_VERSION_KEY = "scoring_v"

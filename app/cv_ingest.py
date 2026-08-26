@@ -831,7 +831,13 @@ def summarize_profile_with_llm(
         "- years_experience: total years of PROFESSIONAL WORK experience only (jobs and "
         "internships). Do NOT count education, degree/coursework years, certifications, or "
         "high-school years, and never treat a law/regulation number (e.g. '2016/679') as a year. "
-        "If under a year, use 0.\n"
+        # This used to say "If under a year, use 0", and a graduate with two
+        # internships is the commonest CV this app sees: zero is the one answer
+        # that makes every posting asking for two years unreachable. A decimal
+        # costs nothing downstream — the fraction is carried all the way into the
+        # blocking decision.
+        "Use a DECIMAL when it is under a year or falls between years: 0.5 means six months, "
+        "1.5 means eighteen months. Use 0 only when there is no work experience at all.\n"
         "- strengths: list of 3 key strengths\n"
         "- industries: list of industries the candidate has experience in\n"
         "- education: highest education level and field\n"
