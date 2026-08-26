@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from app.db import Database
-from app.services.candidate_facts import candidate_facts
+from app.services.candidate_facts import candidate_facts, format_years
 from app.services.search_intent import search_intent
 
 BLOCKING = "blocking"
@@ -134,7 +134,9 @@ def profile_readiness(db: Database) -> dict[str, Any]:
     # tracks. A fact nobody stated is a warning: it cannot block an offer, so
     # it cannot block a scan either.
     readable = {
-        "years_experience": "" if facts.years_experience is None else str(facts.years_experience),
+        # Not str(): a float renders "2.0" for two years and "0.5" for six
+        # months, and neither is how the panel should read.
+        "years_experience": format_years(facts.years_experience),
         "education_level": facts.education_level or "",
         "grade": "" if facts.grade is None else str(facts.grade),
         "degree_fields": ", ".join(sorted(facts.degree_fields)),

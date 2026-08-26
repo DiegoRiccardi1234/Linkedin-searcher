@@ -127,7 +127,9 @@
       "target": "Cosa cerco",
       "constraints": "Vincoli",
       "tools": "Strumenti IA"
-    }
+    },
+    "month": "mese",
+    "months": "mesi"
   },
   "jobSearch": {
     "title": "Cerca",

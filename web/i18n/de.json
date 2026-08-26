@@ -127,7 +127,9 @@
       "target": "Was ich suche",
       "constraints": "Einschränkungen",
       "tools": "KI-Werkzeuge"
-    }
+    },
+    "month": "Monat",
+    "months": "Monate"
   },
   "jobSearch": {
     "title": "Job",

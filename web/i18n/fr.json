@@ -127,7 +127,9 @@
       "target": "Ce que je cherche",
       "constraints": "Contraintes",
       "tools": "Outils IA"
-    }
+    },
+    "month": "mois",
+    "months": "mois"
   },
   "jobSearch": {
     "title": "Recherche",

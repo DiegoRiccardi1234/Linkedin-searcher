@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-26
+
+### Fixed
+- **Half a year of experience was being read as none, and it closed doors that should have stayed open.** The CV parser gets this right — a graduate with five months of internship and two of research comes out as 0.5 years — and the number was then rounded down to zero before anything used it. That rounding looks harmless and costs exactly one boundary: the door closes at two years of gap, so a real 0.5 sits one and a half years from an ad asking for two and gets through, while a floored 0 sits a full two and does not. Measured on a real 466-posting archive, that was **20 offers hidden**, sixteen of them still open, and among them a Junior Data Analyst, an application-consultant role on an ERP suite and a public-body IT position — all in the user's own city. It hits every new graduate who uploads a CV, which is most of the people this app is for. The fraction now survives all the way into the decision, and it reads as months where months are what it is: "6 mesi", not "0,5".
+- **A manual correction to one of these facts could never be undone.** Years of experience and degree grade were the only two facts with no way back: emptying the box in the profile editor sent nothing, the server read nothing as "not sent", and the old value stayed. So a correction typed once outlived every CV uploaded afterwards, silently — which is how an override reading "0 years" kept beating a CV that said half a year. Clearing one now hands the fact back to the CV, the same way the degree, the subjects and the cities already did.
+- **A company bragging about its own age is not the job's requirement.** "Con oltre 40 anni di esperienza, X affianca i propri clienti" and "With 40 years of experience in monetization, we are…" were both read as demanding forty years. A guard for this already existed and wanted the company to be introduced *before* the number; in these the subject comes after it. Widening that search forwards was measured first and thrown away: on 466 real postings it fires 29 times and only twice is it the boast — the rest are genuine requirements whose sentence happens to name a company next. Size is the honest test instead. Every one of these brags says forty; the largest real requirement in the same archive is eight.
+
+### Notes
+- Stored analyses are re-scored once, the next time their job comes up, because both fixes change which offers carry a blocking flag. Press "Re-score" over the whole archive to do it in one pass. Verified before release: 20 offers stop being blocked and **not one gains a block**.
+
 ## [2.1.0] — 2026-08-19
 
 ### Changed

@@ -155,3 +155,49 @@ def test_delete_active_profile_promotes_latest_remaining(
     res = client.delete(f"/api/profiles/{pid2}")
     assert res.status_code == 200
     assert res.json()["active_profile_id"] == str(pid1)
+
+
+# ── the matching facts: writing one, and getting rid of it ───────────────────
+# None of this was covered before, which is how an override of "0 years" outlived
+# the CV that said half a year: emptying the box in the UI was a silent no-op.
+
+
+def test_a_fractional_year_survives_the_round_trip(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """An int field answered 422 to "0.5", then floored it on the way in."""
+    _seed_profile(tmp_path, {"years_experience": 3})
+    res = client.patch("/api/profile", json={"years_experience": 0.5})
+    assert res.status_code == 200, res.text
+    facts = client.get("/api/profile/matching-facts").json()
+    assert facts["years_experience"] == 0.5
+    assert facts["sources"]["years_experience"] == "manuale"
+
+
+def test_an_override_can_be_cleared_and_the_cv_takes_over(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Present-and-null clears; the fact goes back to whatever the CV says."""
+    _seed_profile(tmp_path, {"years_experience": 0.5})
+    client.patch("/api/profile", json={"years_experience": 4})
+    assert client.get("/api/profile/matching-facts").json()["sources"][
+        "years_experience"
+    ] == "manuale"
+
+    res = client.patch("/api/profile", json={"years_experience": None})
+    assert res.status_code == 200, res.text
+    facts = client.get("/api/profile/matching-facts").json()
+    assert facts["years_experience"] == 0.5, "the CV is back in charge"
+    assert facts["sources"]["years_experience"] == "cv"
+
+
+def test_a_payload_that_omits_a_fact_leaves_it_alone(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Absent is not the same as null — the chat coach sends one key at a time."""
+    _seed_profile(tmp_path, {"years_experience": 0.5})
+    client.patch("/api/profile", json={"years_experience": 4})
+    client.patch("/api/profile", json={"grade": 95})
+    facts = client.get("/api/profile/matching-facts").json()
+    assert facts["years_experience"] == 4, "untouched by a payload that never named it"
+    assert facts["grade"] == 95

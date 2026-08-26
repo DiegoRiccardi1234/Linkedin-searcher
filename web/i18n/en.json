@@ -127,7 +127,9 @@
       "target": "What I'm looking for",
       "constraints": "Constraints",
       "tools": "AI tools"
-    }
+    },
+    "month": "month",
+    "months": "months"
   },
   "jobSearch": {
     "title": "Job",

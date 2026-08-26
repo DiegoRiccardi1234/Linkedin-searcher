@@ -159,7 +159,11 @@ class ProfileUpdate(BaseModel):
     # date, a degree it never found — and until now the only way to correct one
     # was to rewrite the whole CV text by hand. They are stored as preferences,
     # not in summary_json, so a correction survives re-uploading the CV.
-    years_experience: int | None = None
+    #: Fractional: a CV with five months of internship is ``0.5``, and an ``int``
+    #: here answered 422 to it — then floored it out of existence on the way in.
+    #: A field PRESENT and null clears the override and hands the fact back to
+    #: the CV; a field left out of the payload leaves the override alone.
+    years_experience: float | None = None
     education_level: str | None = None
     grade: int | None = None
     base_cities: list[str] | None = None

@@ -861,7 +861,11 @@
           <div id="matchingFactsView" class="profile-experience"></div>
           <div id="matchingFactsEdit" class="cv-edit-wrap hidden">
             <label class="micro" data-i18n="profile.matching.years">Years of professional experience</label>
-            <input type="number" min="0" max="50" id="factYears" class="profile-add-input" />
+            <!-- step="any", not "0.5": without a step the implicit one is 1 and
+                 half a year is :invalid, but a fixed 0.5 would reject the 0.3 a
+                 CV extractor can legitimately produce and that the editor
+                 prefills — the box must never refuse what the server accepts. -->
+            <input type="number" min="0" max="50" step="any" id="factYears" class="profile-add-input" />
             <label class="micro" data-i18n="profile.matching.education">Highest degree</label>
             <select id="factEducation" class="settings-select"></select>
             <label class="micro" data-i18n="profile.matching.grade">Degree grade (out of 110)</label>

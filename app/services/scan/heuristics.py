@@ -111,6 +111,27 @@ _BOAST_RE = re.compile(
     re.IGNORECASE,
 )
 
+#: Above this, a number of years is not a job requirement — it is a calendar year
+#: ("dal 2026") or, far more often, the company's own age. The guards above catch
+#: an age only when the sentence introduces the company BEFORE the number, and
+#: four real postings put the subject after it: "Con oltre 40 anni di esperienza,
+#: eGlue affianca…", "With 40 years of experience in monetization…, we are…",
+#: "Da oltre 40 anni supportiamo…", "…da 40 anni è a fianco delle aziende".
+#:
+#: Widening the subject search forwards is the fix that does NOT work, and it was
+#: measured before being discarded: on 466 real postings it fires on 29 — 27 of
+#: them still open — and only 2 are the boast. The rest are genuine requirements
+#: whose sentence happens to name a company next ("almeno 2 anni di esperienza
+#: presso un'azienda del settore automotive"). A detector that fires on 29 to
+#: catch 2 is the detector, not the data.
+#:
+#: Size is the honest discriminator instead. Every one of those boasts says 40;
+#: the largest genuine requirement in the same archive is 8, and the whole
+#: distribution is 0-8, 10, 12, then the two anomalies at 25 and 40. Fifteen
+#: clears both and leaves 12 alone. Dropping a number never blocks anything, so
+#: the failure mode here is an offer staying visible — the side to be wrong on.
+_IMPLAUSIBLE_YEARS = 15
+
 # The same requirement, written out. "Almeno quattro anni di esperienza nel ruolo
 # di Project Manager" is not a rarer way of saying it than "almeno 4": measured
 # on 348 real postings, 15 spell the number out, SIX of them state a genuine
@@ -200,7 +221,7 @@ def experience_years_required(offer_text: str) -> int | None:
         if _years_are_preferred(offer_text, match.start()):
             continue
         # A range is read at its lower bound: that is the bar to clear.
-        if low > 40:  # a year like "2026", not a duration
+        if low > _IMPLAUSIBLE_YEARS:
             continue
         best = low if best is None else max(best, low)
     return best

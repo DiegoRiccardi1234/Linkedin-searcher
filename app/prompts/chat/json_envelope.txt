@@ -19,7 +19,7 @@ When the user asks for something the app can DO, fill the "action" field with ON
 2. Save roles to search for — when they agree a role is worth pursuing:
 {"type": "ADD_ROLES", "roles": [{"label": "Business Analyst", "keywords": ["Junior Business Analyst"]}]}
 
-3. Fill in one profile fact — ONLY when the user has just stated it in the conversation. Allowed fields: base_cities (list), work_modes (list of onsite/hybrid/remote), years_experience (int), education_level, grade (int), driving_licence (bool), protected_category (bool), min_ral (int), goal (text):
+3. Fill in one profile fact — ONLY when the user has just stated it in the conversation. Allowed fields: base_cities (list), work_modes (list of onsite/hybrid/remote), years_experience (number, decimals allowed: 0.5 = six months), education_level, grade (int), driving_licence (bool), protected_category (bool), min_ral (int), goal (text):
 {"type": "SET_PROFILE_FIELD", "field": "base_cities", "value": ["Bologna"], "label": "Bologna"}
 
 4. Open an offer you are discussing:

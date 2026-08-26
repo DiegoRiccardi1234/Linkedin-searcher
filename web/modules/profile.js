@@ -39,6 +39,19 @@ function _activeList(field) {
   return Array.isArray(summary[field]) ? [...summary[field]] : [];
 }
 
+/** A year count as a person would say it: months under a year, years above. */
+function _formatYears(years) {
+  if (years < 1) {
+    const months = Math.round(years * 12) || 1;
+    const word = months === 1 ? t("profile.month") || "month" : t("profile.months") || "months";
+    return `${months} ${word}`;
+  }
+  // Integers stay integers: toLocaleString drops the ".0" that String() keeps.
+  const shown = years.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const word = years === 1 ? t("profile.year") || "year" : t("profile.years") || "years";
+  return `${shown} ${word}`;
+}
+
 function _renderExperience(summary) {
   const el = document.getElementById("profileExperience");
   if (!el) return;
@@ -52,12 +65,11 @@ function _renderExperience(summary) {
   const parts = [];
   const headline = [];
   if (level) headline.push(`<span class="exp-level">${escapeHtml(String(level))}</span>`);
-  // Show a year count only when it's meaningful (>= 1). A recent grad with a few
-  // months reads as just "Junior", not "Junior · 0 years".
-  if (years !== undefined && years !== null && years !== "" && Number(years) >= 1) {
-    const yearWord =
-      Number(years) === 1 ? t("profile.year") || "year" : t("profile.years") || "years";
-    headline.push(`<span class="exp-years">${escapeHtml(String(years))} ${yearWord}</span>`);
+  // Under a year reads in months. The old floor was ">= 1", which hid every
+  // graduate's first internship behind a bare "Junior" — the same half year the
+  // scoring path used to round away.
+  if (years !== undefined && years !== null && years !== "" && Number(years) > 0) {
+    headline.push(`<span class="exp-years">${escapeHtml(_formatYears(Number(years)))}</span>`);
   }
   if (headline.length) {
     parts.push(`<p class="exp-headline">${headline.join(" · ")}</p>`);
@@ -778,9 +790,18 @@ function _closeFactsEditor() {
 }
 
 async function _saveFacts() {
+  // Three answers, not two. An emptied box means "clear this override" and the
+  // server now acts on it; a control that isn't there, or a value that won't
+  // parse, must mean "leave it alone" instead — JSON.stringify drops undefined
+  // keys, and an absent key is what the server reads as untouched. Collapsing
+  // the last two onto null would let one bad keystroke wipe a saved fact with a
+  // success message on top.
   const num = (id) => {
     const raw = document.getElementById(id)?.value.trim();
-    return raw === "" || raw === undefined ? null : Number(raw);
+    if (raw === undefined) return undefined;
+    if (raw === "") return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
   };
   const body = {
     years_experience: num("factYears"),

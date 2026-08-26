@@ -187,6 +187,13 @@ def test_a_requirement_blocks_on_the_distance_not_on_its_own_size() -> None:
     assert cf.experience_status(three_years, mid)[1] is None, "one year of gap is arguable"
     assert cf.experience_status("almeno 5 anni di esperienza", mid)[1], "three is not"
 
+    # The same distance at half-year resolution. Rounded down to a whole zero
+    # this persona was two years from the two-year posting and lost it; the
+    # fraction is what puts them one and a half away instead.
+    fresh = _facts(years_experience=0.5)
+    assert cf.experience_status(two_years, fresh)[1] is None, "1.5 of gap is arguable too"
+    assert cf.experience_status(three_years, fresh)[1], "2.5 is not"
+
     # The reason now names the real number, which the band could not.
     reason = cf.experience_status("minimum 8 years of experience required", graduate)[1]
     assert reason is not None and "8 anni" in reason
@@ -245,6 +252,54 @@ def test_experience_never_blocks_when_the_cv_is_unreadable() -> None:
     facts = _facts(years_experience=None)
     _band, reason = cf.experience_status("almeno 3 anni di esperienza maturata", facts)
     assert reason is None, "an unparsed CV must not hide real jobs"
+
+
+def test_a_company_bragging_about_forty_years_is_not_a_requirement() -> None:
+    """Four real postings, and the guard that already exists misses all four.
+
+    It wants something introducing the company in the 80 characters BEFORE the
+    number, and in these the subject comes after it. Widening that search
+    forwards was measured on 466 real postings first: it fires on 29 and only 2
+    are the boast, so it was discarded. Size is the discriminator instead — the
+    largest genuine requirement in the same archive is eight years.
+    """
+    graduate = _facts(years_experience=0)
+    for text in (
+        "Con oltre 40 anni di esperienza, eGlue affianca i propri clienti nella "
+        "trasformazione digitale. Cerchiamo un AI Engineer.",
+        "With 40 years of experience in monetization topics of all kinds, we are "
+        "regarded as the world's leading advisors.",
+        "Da oltre 40 anni supportiamo le aziende nella gestione dei rischi ambientali.",
+        "Il gruppo, con quasi 400 collaboratori, da 40 anni è a fianco delle aziende "
+        "nell'offrire servizi in ambito sicurezza e formazione.",
+    ):
+        _band, reason = cf.experience_status(text, graduate)
+        assert reason is None, text[:48]
+
+
+def test_a_real_senior_requirement_still_blocks() -> None:
+    """The other side of the same threshold, so it cannot be widened by accident.
+
+    Eight years is the largest genuine requirement measured on the real archive;
+    twelve and ten are in there too and must keep their meaning.
+    """
+    graduate = _facts(years_experience=0)
+    for text in (
+        "Almeno 8 anni di esperienza nel ruolo di Business Analyst.",
+        "Richiesti 12 anni di esperienza maturata in ambito regolatorio.",
+    ):
+        _band, reason = cf.experience_status(text, graduate)
+        assert reason is not None, text[:48]
+
+
+def test_format_years_reads_like_a_person_wrote_it() -> None:
+    """"2.0" and "0,5 anni" are how a number looks, not how a CV reads."""
+    assert cf.format_years(0.5) == "6 mesi"
+    assert cf.format_years(1 / 12) == "1 mese"
+    assert cf.format_years(1) == "1 anno"
+    assert cf.format_years(2.0) == "2 anni", "a whole number keeps no decimal"
+    assert cf.format_years(1.5) == "1,5 anni"
+    assert cf.format_years(None) == ""
 
 
 # ── degree level ─────────────────────────────────────────────────────────────
@@ -630,14 +685,21 @@ def test_a_posting_that_needs_a_car_is_blocked_only_when_you_said_you_have_none(
     assert cf.driving_licence_status("Sviluppatore backend a Torino, ibrido.", none)[1] is None
 
 
-def test_half_a_year_of_experience_is_zero_years_not_unknown(tmp_path) -> None:
-    """The regression a rewritten CV shipped, silently.
+def test_half_a_year_of_experience_is_half_a_year(tmp_path) -> None:
+    """Six months is neither a mystery nor a zero.
 
-    The extractor reports a first job as ``0.5`` years, which parsed through
-    ``int(str(...))`` and became "unknown" — and unknown switches the whole
-    experience check off, so an archive full of "3+ anni" offers stopped being
-    flagged at all. Measured on the real profile: ``missing`` listed
-    ``years_experience`` on a CV that plainly describes six months of work.
+    Two regressions meet in this one CV. The first: ``0.5`` parsed through
+    ``int(str(...))`` and became "unknown", and an unknown year count switches
+    the experience check off entirely, so an archive full of "3+ anni" offers
+    stopped being flagged. That half is unchanged and still asserted below.
+
+    The second is why this test was renamed. The fix for the first floored the
+    fraction, on the argument that "half a year of experience is not one" — and
+    it landed before the rule that reads a DISTANCE rather than the requirement's
+    own size. Floored to zero, this CV sits two years from a posting asking for
+    two and the door shuts; at its real 0.5 it sits one and a half away and
+    passes. On a real 466-posting archive that was 19 offers hidden from exactly
+    the people this app is for.
     """
     db = Database(tmp_path / "half.db")
     try:
@@ -647,12 +709,15 @@ def test_half_a_year_of_experience_is_zero_years_not_unknown(tmp_path) -> None:
             summary={"years_experience": 0.5},
         )
         facts = cf.candidate_facts(db)
-        assert facts.years_experience == 0, "six months is zero whole years, not a mystery"
+        assert facts.years_experience == 0.5, "the fraction is the whole point"
         assert facts.sources["years_experience"] == "cv"
         assert "years_experience" not in facts.missing()
-        # And the check it gates works again.
+        # Unknown would switch the check off; half a year does not.
         _band, reason = cf.experience_status("richiesti almeno 3 anni di esperienza", facts)
         assert reason is not None
+        # ...and the boundary the floor used to move.
+        _band, reason = cf.experience_status("richiesti almeno 2 anni di esperienza", facts)
+        assert reason is None, "1.5 years of gap is arguable, and 0.5 is not 0"
     finally:
         db.close()
 
