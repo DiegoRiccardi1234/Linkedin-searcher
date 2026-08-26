@@ -52,6 +52,10 @@ def make_job_hash(titolo: str, azienda: str, link: str) -> str:
 
 DEDUP_MODES = ("exact", "city", "title_company")
 
+#: An offer scoring this high is never auto-archived on age alone. Six is the
+#: number people filter on, so it is the line the rest of the UI already draws.
+AUTO_ARCHIVE_SCORE_FLOOR = 6
+
 
 def _normalize_city(sede: str) -> str:
     """Canonical city token from a free-text location.
@@ -257,6 +261,50 @@ class Database:
             ),
         )
         self.conn.commit()
+
+    @_synchronized
+    def rebuild_dedup_keys(self, mode: str | None = None) -> int:
+        """Recompute every row's ``dedup_key`` under one mode. Returns rows changed.
+
+        ``upsert_job`` reads the mode from a preference and stores the resulting
+        hash in a column, so the two can fall out of step: change the preference
+        and every key already on disk was computed under the old rule, which
+        means a re-scraped posting can never match the row it belongs to. It is
+        silent — nothing errors, the archive just starts growing a second copy of
+        things it already had. Found on a real archive, where the same Bending
+        Spoons role sat twice: one row keyed under ``title_company``, one under
+        ``city``, with title, company and location identical byte for byte.
+
+        Recomputes and nothing else. Rows that now share a key are LEFT ALONE:
+        merging them would mean choosing which score, which status and which
+        application date survives, and there is no honest way to choose. Future
+        sightings will merge into the first of them, which is the behaviour that
+        was intended all along.
+
+        Rows with no title are skipped and keep whatever key they have: the key
+        is built from title+company+location, and one made from an empty title
+        identifies nothing — on a real archive it collapsed five separate
+        applications to the same agency into a single identity. Those rows come
+        from the mailbox importer, which deliberately does not go through
+        ``upsert_job``, so they have no dedup to take part in.
+        """
+        mode = mode or self.get_preference("dedup_mode", "city")
+        if mode not in DEDUP_MODES:
+            mode = "city"
+        changed = 0
+        cur = self.conn.cursor()
+        rows = cur.execute("SELECT id, titolo, azienda, sede, dedup_key FROM jobs").fetchall()
+        for row in rows:
+            if not (row["titolo"] or "").strip():
+                continue
+            fresh = make_dedup_key(
+                row["titolo"] or "", row["azienda"] or "", row["sede"] or "", mode
+            )
+            if fresh != row["dedup_key"]:
+                cur.execute("UPDATE jobs SET dedup_key = ? WHERE id = ?", (fresh, row["id"]))
+                changed += 1
+        self.conn.commit()
+        return changed
 
     @_synchronized
     def upsert_job(self, payload: dict[str, Any]) -> tuple[int, bool, str]:
@@ -2044,7 +2092,25 @@ class Database:
 
     @_synchronized
     def cleanup_stale_jobs(self, retention_days: int) -> int:
-        # Always keep favorites; archive only non-favorite open jobs past retention.
+        """Archive open offers nobody has re-seen in a while.
+
+        Favourites are exempt, and so is anything scoring
+        :data:`AUTO_ARCHIVE_SCORE_FLOOR` or better. The score exemption is the
+        newer half and it exists because this rule read nothing except the date:
+        retention is there to stop the list silting up with the mediocre, and it
+        was filing away the best just as readily. Two things make that worse than
+        it sounds. The threshold sits one day from the scraping window
+        (``hours_old``, 14 days), so an offer is archived almost exactly when it
+        becomes impossible to re-find — which is not the same fact as being
+        closed. And the score is the only reason the user would ever have looked.
+
+        Measured on a real archive: of six high scorers it had filed away, the
+        user opened each one and four were still live, two of them applications
+        he had already sent. The floor would have protected 11 of 208.
+
+        The cost, stated rather than hidden: an expired offer scoring at or above
+        the floor now stays in the list until someone archives it by hand.
+        """
         cur = self.conn.cursor()
         cur.execute(
             """
@@ -2052,9 +2118,10 @@ class Database:
             SET status = 'archived', updated_at = ?
             WHERE status = 'open'
               AND is_favorite = 0
+              AND (punteggio_ai IS NULL OR punteggio_ai < ?)
               AND julianday('now') - julianday(last_seen_at) > ?
             """,
-            (now_iso(), retention_days),
+            (now_iso(), AUTO_ARCHIVE_SCORE_FLOOR, retention_days),
         )
         self.conn.commit()
         return cur.rowcount

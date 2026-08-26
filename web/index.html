@@ -97,6 +97,62 @@
     <button type="button" id="compareClearBtn" class="ghost-btn" data-i18n="compare.clear">Clear</button>
   </div>
 
+  <!-- Shown once, right after a CV upload. These seven facts are the ones that
+       hide offers, and until now they were deduced in silence: the upload
+       reported skills and roles, never the things that actually gate a job.
+       Three of them had no control anywhere in the app at all. -->
+  <div id="cvReviewModal" class="mini-modal hidden" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="mini-modal-card">
+      <div class="mini-modal-head">
+        <h3 data-i18n="cvReview.title">What I read from your CV</h3>
+        <button type="button" class="icon-btn" data-close-cvreview aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <p class="micro" data-i18n="cvReview.hint">These decide which offers get hidden. Correct anything I got wrong — what you leave alone stays sourced to your CV.</p>
+      <div class="mini-modal-form">
+        <label class="micro" data-i18n="readiness.item.years_experience">Years of experience</label>
+        <span class="cvr-origin" data-cvr-origin="years_experience"></span>
+        <input type="number" min="0" max="50" step="any" id="cvrYears" class="profile-add-input" />
+
+        <label class="micro" data-i18n="readiness.item.education_level">Highest degree</label>
+        <span class="cvr-origin" data-cvr-origin="education_level"></span>
+        <select id="cvrEducation" class="settings-select"></select>
+
+        <label class="micro" data-i18n="readiness.item.degree_fields">Degree subject</label>
+        <span class="cvr-origin" data-cvr-origin="degree_fields"></span>
+        <input type="text" id="cvrFields" class="profile-add-input" data-i18n-placeholder="cvReview.fieldsPlaceholder" placeholder="informatica, ingegneria" />
+
+        <label class="micro" data-i18n="readiness.item.grade">Degree grade</label>
+        <span class="cvr-origin" data-cvr-origin="grade"></span>
+        <input type="number" min="60" max="110" id="cvrGrade" class="profile-add-input" />
+
+        <label class="micro" data-i18n="readiness.item.work_rule">Where you can work</label>
+        <span class="cvr-origin" data-cvr-origin="work_rule"></span>
+        <input type="text" id="cvrCities" class="profile-add-input" data-i18n-placeholder="profile.matching.citiesPlaceholder" placeholder="City, city" />
+
+        <label class="micro" data-i18n="readiness.item.driving_licence">Category B licence</label>
+        <span class="cvr-origin" data-cvr-origin="driving_licence"></span>
+        <select id="cvrLicence" class="settings-select">
+          <option value="" data-i18n="cvReview.notSaid">Not said</option>
+          <option value="1" data-i18n="common.yes">Yes</option>
+          <option value="0" data-i18n="common.no">No</option>
+        </select>
+
+        <label class="micro" data-i18n="readiness.item.protected_category">Protected categories register</label>
+        <span class="cvr-origin" data-cvr-origin="protected_category"></span>
+        <select id="cvrProtected" class="settings-select">
+          <option value="" data-i18n="cvReview.notSaid">Not said</option>
+          <option value="1" data-i18n="common.yes">Yes</option>
+          <option value="0" data-i18n="common.no">No</option>
+        </select>
+
+        <div class="mini-modal-actions">
+          <button type="button" class="ghost-btn" data-close-cvreview data-i18n="cvReview.later">I'll do this later</button>
+          <button type="button" class="action-main" id="cvrConfirmBtn" data-i18n="cvReview.confirm">Looks right</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="manualJobModal" class="mini-modal hidden" role="dialog" aria-modal="true">
     <div class="mini-modal-card">
       <div class="mini-modal-head">
@@ -873,6 +929,25 @@
             <input type="number" min="60" max="110" id="factGrade" class="profile-add-input" />
             <label class="micro" data-i18n="profile.matching.cities">Cities you can commute to (comma separated)</label>
             <input type="text" id="factCities" class="profile-add-input" data-i18n-placeholder="profile.matching.citiesPlaceholder" placeholder="City, city" />
+            <!-- These three had a field in ProfileUpdate, a writer in
+                 _save_matching_facts, a readiness item and a label in five
+                 languages — and no control anywhere. The chip that said "degree
+                 subject is missing" opened this panel, which had nothing to fix
+                 it with. -->
+            <label class="micro" data-i18n="readiness.item.degree_fields">Degree subject</label>
+            <input type="text" id="factFields" class="profile-add-input" data-i18n-placeholder="cvReview.fieldsPlaceholder" placeholder="computer science, engineering" />
+            <label class="micro" data-i18n="readiness.item.driving_licence">Category B licence</label>
+            <select id="factLicence" class="settings-select">
+              <option value="" data-i18n="cvReview.notSaid">Not said</option>
+              <option value="1" data-i18n="common.yes">Yes</option>
+              <option value="0" data-i18n="common.no">No</option>
+            </select>
+            <label class="micro" data-i18n="readiness.item.protected_category">Protected categories register</label>
+            <select id="factProtected" class="settings-select">
+              <option value="" data-i18n="cvReview.notSaid">Not said</option>
+              <option value="1" data-i18n="common.yes">Yes</option>
+              <option value="0" data-i18n="common.no">No</option>
+            </select>
             <label class="micro" data-i18n="profile.matching.modes">Work modes you accept</label>
             <div class="filter-pills" id="factModes">
               <label class="filter-check"><input type="checkbox" value="onsite" /> <span data-i18n="profile.matching.onsite">On-site</span></label>

@@ -34,6 +34,18 @@ async function uploadCv(page, filePath) {
   const summary = page.locator("#cvSummary");
   await expect(summary).not.toHaveClass(/hidden/, { timeout: 120000 });
   await expect(summary).not.toBeEmpty();
+
+  // An upload now ends by asking the user to confirm the facts it deduced —
+  // years, degree, subject, mark, where you can work, licence, register — and
+  // that card is a modal, so it holds the page until it is answered. This test
+  // is the reason to say so out loud: it sat clicking at the nav for four
+  // minutes with the dialog quietly intercepting every one. Dismissing it is
+  // what a user who wants to get on does, and it is the third of three ways out
+  // (Escape, the X, and this button).
+  const review = page.locator("#cvReviewModal");
+  await expect(review).not.toHaveClass(/hidden/, { timeout: 30000 });
+  await review.locator("[data-close-cvreview]").last().click();
+  await expect(review).toHaveClass(/hidden/);
 }
 
 async function addManualJobs(page) {

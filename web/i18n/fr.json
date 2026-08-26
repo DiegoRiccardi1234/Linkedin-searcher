@@ -1206,5 +1206,14 @@
     "addRoles": "J'enregistre ces métiers à chercher : {roles} ?",
     "setField": "Je mets {field} à {value} ?",
     "openJob": "J'ouvre cette offre ?"
+  },
+  "cvReview": {
+    "title": "Voici ce que j'ai lu dans ton CV",
+    "hint": "Ces données décident quelles offres sont masquées. Corrige ce qui est faux : ce que tu laisses tel quel reste attribué à ton CV.",
+    "confirm": "C'est correct",
+    "later": "Je le ferai plus tard",
+    "saved": "Merci — tes données de matching sont à jour",
+    "notSaid": "Non précisé",
+    "fieldsPlaceholder": "informatique, ingénierie"
   }
 }

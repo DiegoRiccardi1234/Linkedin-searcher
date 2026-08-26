@@ -201,3 +201,49 @@ def test_a_payload_that_omits_a_fact_leaves_it_alone(
     facts = client.get("/api/profile/matching-facts").json()
     assert facts["years_experience"] == 4, "untouched by a payload that never named it"
     assert facts["grade"] == 95
+
+
+def test_agreeing_with_the_cv_does_not_turn_it_into_an_override(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The rule the post-upload review card exists to honour.
+
+    Confirming a value the CV supplied must leave it sourced to the CV. Writing
+    it back as a manual correction would make it immune to the next upload —
+    which is the defect this release fixed for years of experience, and
+    re-creating it deliberately for another field would be worse.
+    """
+    _seed_profile(tmp_path, {"years_experience": 0.5, "education_level": "Triennale"})
+    before = client.get("/api/profile/matching-facts").json()
+    assert before["sources"]["years_experience"] == "cv"
+
+    # The card sends only what the user actually changed. Agreeing with
+    # everything therefore sends nothing at all.
+    assert client.patch("/api/profile", json={}).status_code == 200
+
+    after = client.get("/api/profile/matching-facts").json()
+    assert after["years_experience"] == 0.5
+    assert after["sources"]["years_experience"] == "cv", "confirming is not overriding"
+
+
+def test_the_three_facts_with_no_ui_can_now_be_answered(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Degree subject, licence and register had an API and no field anywhere."""
+    _seed_profile(tmp_path, {"years_experience": 1})
+    res = client.patch(
+        "/api/profile",
+        json={
+            "degree_fields": ["informatica"],
+            "driving_licence": False,
+            "protected_category": False,
+        },
+    )
+    assert res.status_code == 200, res.text
+    facts = client.get("/api/profile/matching-facts").json()
+    assert facts["degree_fields"] == ["informatica"]
+    assert facts["driving_licence"] is False
+    assert facts["protected_category"] is False
+    for key in ("degree_fields", "driving_licence", "protected_category"):
+        assert facts["sources"][key] == "manuale"
+        assert key not in facts["missing"]

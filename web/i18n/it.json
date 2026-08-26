@@ -1206,5 +1206,14 @@
     "addRoles": "Salvo questi ruoli fra quelli da cercare: {roles}?",
     "setField": "Imposto {field} a {value}?",
     "openJob": "Apro questa offerta?"
+  },
+  "cvReview": {
+    "title": "Cosa ho letto dal tuo CV",
+    "hint": "Sono i dati che decidono quali offerte vengono nascoste. Correggi quello che ho sbagliato: ciò che lasci com'è resta attribuito al CV.",
+    "confirm": "Va bene così",
+    "later": "Lo faccio dopo",
+    "saved": "Grazie: i dati per il matching sono aggiornati",
+    "notSaid": "Non detto",
+    "fieldsPlaceholder": "informatica, ingegneria"
   }
 }
