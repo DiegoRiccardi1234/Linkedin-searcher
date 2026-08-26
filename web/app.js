@@ -73,6 +73,7 @@ import {
   invalidateReadiness,
   renderReadinessStrips,
 } from "./modules/readiness.js";
+import { initCvReview, showCvReview } from "./modules/cv_review.js";
 import { initCompare, isSelected, toggleCompare } from "./modules/compare.js";
 import {
   initJobDetail,
@@ -610,6 +611,11 @@ document.getElementById("cvForm").addEventListener("submit", async (event) => {
     await loadProfiles();
     await loadProfileView();
     await loadRecommendations();
+    // The facts are not in the upload response - they are derived afterwards by
+    // candidate_facts - so the card asks the server for them rather than reading
+    // the payload. Only after an upload: a panel that reappears on every visit
+    // stops being a question and becomes furniture.
+    showCvReview().catch(() => {});
     if (typeof refreshOnboardingPlaceholder === "function") {
       refreshOnboardingPlaceholder().catch(() => {});
     }
@@ -1091,6 +1097,7 @@ initJobBuckets();
 // what is on screen, so there is nothing to re-fetch on a switch.
 initSubtabs("settings", { defaultTab: "ai" });
 initReadiness({ revealElement });
+initCvReview({ enableModalDismiss });
 initSubtabs("profile", {
   defaultTab: "about",
   // The matching facts and the goals were fetched once at boot and never

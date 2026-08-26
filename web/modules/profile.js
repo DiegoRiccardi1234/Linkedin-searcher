@@ -723,6 +723,13 @@ const _FACT_ROWS = [
   { key: "years_experience", i18n: "profile.matching.years" },
   { key: "education_level", i18n: "profile.matching.education" },
   { key: "grade", i18n: "profile.matching.grade" },
+  // Shown as well as editable now. They gate offers exactly like the three
+  // above — a missing degree subject or an unanswered licence question is the
+  // difference between a field role being takeable or not — and the panel used
+  // to report neither.
+  { key: "degree_fields", i18n: "readiness.item.degree_fields" },
+  { key: "driving_licence", i18n: "readiness.item.driving_licence" },
+  { key: "protected_category", i18n: "readiness.item.protected_category" },
 ];
 
 function _sourceTag(origin) {
@@ -736,6 +743,18 @@ function _sourceTag(origin) {
   return `<span class="job-flag ${cls}">${escapeHtml(t(key))}</span>`;
 }
 
+/** A fact as a person reads it: a list joins, a yes/no is a word, unset is a dash.
+ *
+ * `String(false)` renders "false", and false is a real answer here — "I do not
+ * hold a licence" is the whole reason the licence check can block anything.
+ */
+function _readableFact(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
+  if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
+  return String(value);
+}
+
 export async function loadMatchingFacts() {
   const view = document.getElementById("matchingFactsView");
   if (!view) return;
@@ -746,7 +765,7 @@ export async function loadMatchingFacts() {
   }
   const rows = _FACT_ROWS.map((row) => {
     const value = _facts[row.key];
-    const shown = value === null || value === undefined || value === "" ? "—" : value;
+    const shown = _readableFact(value);
     return (
       `<div class="profile-experience-row"><span>${escapeHtml(t(row.i18n))}</span>` +
       `<strong>${escapeHtml(String(shown))}</strong> ${_sourceTag(_facts.sources?.[row.key])}</div>`
@@ -772,6 +791,14 @@ function _openFactsEditor() {
   }
   const years = document.getElementById("factYears");
   if (years) years.value = _facts.years_experience ?? "";
+  const fields = document.getElementById("factFields");
+  if (fields) fields.value = (_facts.degree_fields || []).join(", ");
+  const tri = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value === null || value === undefined ? "" : value ? "1" : "0";
+  };
+  tri("factLicence", _facts.driving_licence);
+  tri("factProtected", _facts.protected_category);
   const grade = document.getElementById("factGrade");
   if (grade) grade.value = _facts.grade ?? "";
   const cities = document.getElementById("factCities");
@@ -803,6 +830,11 @@ async function _saveFacts() {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : undefined;
   };
+  const tri = (id, key) => {
+    const raw = document.getElementById(id)?.value;
+    if (raw === undefined || raw === "") return {};
+    return { [key]: raw === "1" };
+  };
   const body = {
     years_experience: num("factYears"),
     grade: num("factGrade"),
@@ -812,6 +844,14 @@ async function _saveFacts() {
       .map((c) => c.trim())
       .filter(Boolean),
     work_modes: [...document.querySelectorAll("#factModes input:checked")].map((el) => el.value),
+    degree_fields: (document.getElementById("factFields")?.value || "")
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean),
+    // Three states, and the empty one is an answer: nobody said, and nobody has
+    // to — an unknown fact blocks nothing.
+    ...tri("factLicence", "driving_licence"),
+    ...tri("factProtected", "protected_category"),
   };
   try {
     await api("/api/profile", { method: "PATCH", body: JSON.stringify(body) });

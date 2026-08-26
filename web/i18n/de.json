@@ -1206,5 +1206,14 @@
     "addRoles": "Diese Rollen zum Suchen merken: {roles}?",
     "setField": "{field} auf {value} setzen?",
     "openJob": "Dieses Angebot öffnen?"
+  },
+  "cvReview": {
+    "title": "Das habe ich aus deinem Lebenslauf gelesen",
+    "hint": "Diese Angaben entscheiden, welche Stellen ausgeblendet werden. Korrigiere, was falsch ist — was du unverändert lässt, bleibt dem Lebenslauf zugeordnet.",
+    "confirm": "Passt so",
+    "later": "Mache ich später",
+    "saved": "Danke — deine Matching-Daten sind aktuell",
+    "notSaid": "Nicht angegeben",
+    "fieldsPlaceholder": "Informatik, Ingenieurwesen"
   }
 }

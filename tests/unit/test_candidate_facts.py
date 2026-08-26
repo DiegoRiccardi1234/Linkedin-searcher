@@ -54,6 +54,31 @@ def test_work_mode_reads_the_real_postings() -> None:
     assert _detect_work_mode({}, "Sede di lavoro: da remoto", "In sede") == "Full Remote"
 
 
+def test_lavoro_agile_is_hybrid_and_in_ufficio_is_a_desk() -> None:
+    """The Italian half of two vocabularies that only knew English.
+
+    Verbatim from a real posting stored as Full Remote with a Milan address, so
+    the location check never ran on it — the user found it by reading the ad
+    himself. Two independent gaps, and either one alone would have caught it:
+    "lavoro agile" is what Italian law (L. 81/2017) calls the arrangement the
+    detector already knew as "smart working", and "in ufficio" was missing from
+    a list that contained the English "in office".
+    """
+    bip = (
+        "Flessibilita e Work-Life Integration. Lavoro agile con possibilita di "
+        "programmare le giornate da remoto e in ufficio con il proprio responsabile "
+        "e in base alle esigenze di progetto."
+    )
+    assert _detect_work_mode({"is_remote": True}, bip, "Full Remote") == "Ibrido"
+
+    # Each half on its own, so a future edit cannot quietly drop one of them.
+    assert _detect_work_mode({"is_remote": True}, "Modello di lavoro agile.", "Full Remote") == "Ibrido"
+    assert _detect_work_mode({"is_remote": True}, "Due giornate in ufficio.", "Full Remote") == "In sede"
+
+    # And the thing this must not break: a declared full remote is still one.
+    assert _detect_work_mode({}, "Posizione 100% remota.", "In sede") == "Full Remote"
+
+
 def test_work_mode_text_outranks_the_board_flag() -> None:
     onsite = "Il ruolo prevede lavoro in sede presso lo stabilimento."
     assert _detect_work_mode({"is_remote": True}, onsite, "Full Remote") == "In sede"

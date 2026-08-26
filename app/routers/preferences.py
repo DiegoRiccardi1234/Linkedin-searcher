@@ -61,7 +61,15 @@ def build_router(container: AppContainer) -> APIRouter:
             raise HTTPException(status_code=400, detail="unknown_preference")
         if len(payload.value) > _MAX_PREFERENCE_LEN:
             raise HTTPException(status_code=413, detail="preference_too_large")
+        previous = container.db.get_preference(payload.key, "")
         container.db.set_preference(payload.key, payload.value)
+        # Changing how a role is identified invalidates every key already on
+        # disk: they were hashed under the old rule and a re-scraped posting can
+        # never match the row it belongs to again. Nothing errors — the archive
+        # just quietly starts keeping two copies of the same job. Rehash here so
+        # the preference and the column can never disagree.
+        if payload.key == "dedup_mode" and payload.value != previous:
+            container.db.rebuild_dedup_keys(payload.value)
         return {"ok": True, "preferences": container.db.list_preferences()}
 
     @router.get("/api/preferences")

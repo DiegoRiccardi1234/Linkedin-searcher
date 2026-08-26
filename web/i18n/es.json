@@ -1206,5 +1206,14 @@
     "addRoles": "¿Guardo estos roles para buscar: {roles}?",
     "setField": "¿Pongo {field} en {value}?",
     "openJob": "¿Abro esta oferta?"
+  },
+  "cvReview": {
+    "title": "Esto he leído de tu CV",
+    "hint": "Estos datos deciden qué ofertas se ocultan. Corrige lo que esté mal: lo que dejes igual seguirá atribuido a tu CV.",
+    "confirm": "Está bien así",
+    "later": "Lo hago más tarde",
+    "saved": "Gracias: tus datos de matching están al día",
+    "notSaid": "No indicado",
+    "fieldsPlaceholder": "informática, ingeniería"
   }
 }

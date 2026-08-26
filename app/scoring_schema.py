@@ -46,7 +46,12 @@ from __future__ import annotations
 #:     company's own age ("Con oltre 40 anni di esperienza, X affianca…") as a
 #:     seniority demand. Both change which offers carry a blocking flag, so every
 #:     analysis stored under 3 has to be asked again.
-CURRENT_ANALYSIS_VERSION = 4
+#: 5 = v2.3.0: "lavoro agile" and "in ufficio" are read as what they mean, so a
+#:     posting that says you will spend days in a Milan office is hybrid rather
+#:     than full remote — and the location check, which full remote skips
+#:     entirely, now runs on it. Four postings in a real archive changed hands
+#:     that way. Every verdict stored under 4 was reached with the old reading.
+CURRENT_ANALYSIS_VERSION = 5
 
 #: Key holding :data:`CURRENT_ANALYSIS_VERSION` inside a stored analysis dict.
 ANALYSIS_VERSION_KEY = "scoring_v"

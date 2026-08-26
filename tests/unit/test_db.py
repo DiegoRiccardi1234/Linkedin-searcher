@@ -502,3 +502,105 @@ def test_archiving_from_the_list_is_reversible(tmp_path: Path) -> None:
         assert [j["id"] for j in db.list_jobs(status="open", limit=100)] == [job_id]
     finally:
         db.close()
+
+
+# ── the auto-archive stopped eating the good ones ────────────────────────────
+# It read nothing but the date, and its threshold sits one day from the scraping
+# window, so an offer was filed almost exactly when it became impossible to
+# re-find — whether or not it was still open. On a real archive it had put away
+# two 8/10s and two applications the user had already sent.
+
+
+def _seed_scored(db: Database, titolo: str, score, last_seen: str, favorite: int = 0) -> int:
+    job_id = _seed_job_last_seen(db, titolo, last_seen)
+    db.conn.execute(
+        "UPDATE jobs SET punteggio_ai = ?, is_favorite = ? WHERE id = ?",
+        (score, favorite, job_id),
+    )
+    db.conn.commit()
+    return job_id
+
+
+def test_a_good_offer_is_not_archived_just_for_being_old(tmp_path: Path) -> None:
+    from app.db import AUTO_ARCHIVE_SCORE_FLOOR
+
+    db = Database(tmp_path / "s.db")
+    try:
+        good = _seed_scored(db, "worth-keeping", AUTO_ARCHIVE_SCORE_FLOOR, "2020-01-01T00:00:00+00:00")
+        meh = _seed_scored(db, "silt", AUTO_ARCHIVE_SCORE_FLOOR - 1, "2020-01-01T00:00:00+00:00")
+        unscored = _seed_scored(db, "never-judged", None, "2020-01-01T00:00:00+00:00")
+
+        assert db.cleanup_stale_jobs(retention_days=15) == 2
+        assert db.get_job(good)["status"] == "open", "the score is the reason to look"
+        assert db.get_job(meh)["status"] == "archived"
+        assert db.get_job(unscored)["status"] == "archived", "no score is not a good score"
+    finally:
+        db.close()
+
+
+def test_a_favourite_is_still_exempt_whatever_it_scores(tmp_path: Path) -> None:
+    db = Database(tmp_path / "s.db")
+    try:
+        pinned = _seed_scored(db, "pinned", 2, "2020-01-01T00:00:00+00:00", favorite=1)
+        assert db.cleanup_stale_jobs(retention_days=15) == 0
+        assert db.get_job(pinned)["status"] == "open"
+    finally:
+        db.close()
+
+
+# ── changing dedup_mode must not orphan the keys already written ─────────────
+
+
+def test_changing_the_dedup_mode_rehashes_what_is_already_stored(tmp_path: Path) -> None:
+    """Otherwise a re-scraped posting can never match its own row again.
+
+    Found on a real archive: the same role present twice, one row keyed under
+    `title_company` and one under `city`, with title, company and location
+    identical byte for byte.
+    """
+    from app.db import make_dedup_key
+
+    db = Database(tmp_path / "s.db")
+    try:
+        db.set_preference("dedup_mode", "city")
+        job_id = _seed_job_last_seen(db, "Data Analyst", "2026-08-26T00:00:00+00:00")
+        before = db.get_job(job_id)["dedup_key"]
+        assert before == make_dedup_key("Data Analyst", "Acme", "Torino", "city")
+
+        changed = db.rebuild_dedup_keys("title_company")
+        assert changed == 1
+        after = db.get_job(job_id)["dedup_key"]
+        assert after == make_dedup_key("Data Analyst", "Acme", "Torino", "title_company")
+        assert after != before
+
+        assert db.rebuild_dedup_keys("title_company") == 0, "second pass rewrites nothing"
+    finally:
+        db.close()
+
+
+def test_a_row_with_no_title_is_left_out_of_the_rehash(tmp_path: Path) -> None:
+    """A key built from an empty title identifies nothing.
+
+    Found on the trial run against a copy of the real archive: five separate
+    applications to the same agency, all imported from the mailbox with no job
+    title, collapsed onto one identity. The mailbox importer deliberately does
+    not go through ``upsert_job``, so those rows have no dedup to take part in.
+    """
+    db = Database(tmp_path / "s.db")
+    try:
+        db.set_preference("dedup_mode", "city")
+        real = _seed_job_last_seen(db, "Data Analyst", "2026-08-26T00:00:00+00:00")
+        db.conn.execute(
+            "INSERT INTO jobs (titolo, azienda, sede, job_hash, dedup_key, status, "
+            "first_seen_at, last_seen_at, updated_at) "
+            "VALUES ('', 'Gi Group', '', 'h1', 'untouched', 'applied', ?, ?, ?)",
+            ("2026-08-26T00:00:00+00:00",) * 3,
+        )
+        db.conn.commit()
+
+        assert db.rebuild_dedup_keys("title_company") == 1, "only the titled row"
+        row = db.conn.execute("SELECT dedup_key FROM jobs WHERE titolo = ''").fetchone()
+        assert row["dedup_key"] == "untouched"
+        assert db.get_job(real)["dedup_key"] != "untouched"
+    finally:
+        db.close()

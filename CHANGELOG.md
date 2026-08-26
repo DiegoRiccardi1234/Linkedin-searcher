@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-08-26
+
+### Added
+- **After a CV upload the app now shows what it read, and asks.** Seven facts decide whether an offer is applicable at all — years of experience, degree level and subject, mark, where you can work, a category B licence, the protected-categories register — and every one of them used to be deduced in silence. The upload reported skills and job titles; the things that actually hide offers were filled in behind your back. They are now laid out with where each one came from, editable on the spot, and the card is dismissible because an unanswered fact blocks nothing. Agreeing with a value read from your CV leaves it attributed to your CV: it does not quietly become a manual override that the next upload can no longer correct.
+- **Three of those facts had no field anywhere in the app.** Degree subject, driving licence and the protected-categories register each had an API, a writer, a checklist entry and a label in five languages — and no control. The checklist chip that said "degree subject is missing" opened a panel with nothing in it to fix. All three are now editable, in the review card and in the profile's matching-data panel, which also stops rendering "false" where it means "no".
+
+### Fixed
+- **Retention was filing away the best offers, not the forgettable ones.** It read nothing but the date, and its threshold sits one day from the scraping window — so an offer was archived almost exactly when it became impossible to find again, whether or not it was still open. Checked by hand against a real archive: of six high scorers it had put away, four were live and two of those were applications already sent. Anything scoring six or more is now left alone, like favourites always were. The cost is stated rather than hidden: an expired offer with a high score stays in the list until you archive it, which is what the row's archive button is for.
+- **"Lavoro agile" and "in ufficio" were read as nothing at all.** A posting saying "Lavoro agile con possibilità di programmare le giornate da remoto e in ufficio", on-site in Milan, was stored as full remote — so the location check, which full remote skips, never ran on it. Two gaps, both on the Italian half of vocabularies that knew the English: "lavoro agile" is what Italian law calls the arrangement already recognised as "smart working", and "in ufficio" was missing from a list containing "in office". Measured over 573 real postings: sixteen change mode and only four change any decision, all four the same employer writing that same sentence.
+- **Changing how duplicates are recognised orphaned every offer already stored.** The identity of a role is hashed under a setting and kept in a column, so changing the setting left every existing key computed under the old rule — a re-scraped posting could never match its own row again, silently, with the archive growing a second copy instead of updating. Found on a real archive: the same role present twice, one row keyed one way and one the other, with title, company and location identical. Keys are now rebuilt when the setting changes, and once on upgrade. Rows that turn out to be the same offer are left as they are: merging them would mean choosing which score and which application date survives.
+
 ## [2.2.0] — 2026-08-26
 
 ### Added

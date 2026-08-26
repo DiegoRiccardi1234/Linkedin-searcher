@@ -63,13 +63,31 @@ _HYBRID_RE = re.compile(
     # In Italy "smart working" means a couple of days from home, not full remote.
     # It used to live in _REMOTE_RE, which is how a hybrid role became remote.
     r"|smart working"
+    # "lavoro agile" is the same arrangement under the name Italian law gives it
+    # (L. 81/2017), and employers use the two interchangeably. Without it, "Lavoro
+    # agile con possibilita' di programmare le giornate da remoto e in ufficio"
+    # — a real posting, on-site in Milan — was stored as Full Remote and the
+    # location check never ran on it. Measured over 573 real postings: 16 change
+    # mode, and only the 4 that go Full Remote -> Ibrido change any decision
+    # (hybrid and on-site are judged identically by ``location_status``), all
+    # four the same employer writing "da remoto e in ufficio".
+    # Known limit, one posting in 573: "policy che supporta il lavoro AGILE fino
+    # al 100% del proprio tempo" is nearer full remote than hybrid and is read as
+    # hybrid here. It costs nothing today — that ad lands on a mode change that
+    # decides nothing — and narrowing the word to exclude it would be a rule
+    # written for a single row.
+    r"|lavoro agile"
     # "possibilità di lavorare da remoto (fino a 2 giornate su 5 settimanali)":
     # a countable number of remote days is the definition of hybrid.
     r"|\d+\s*(?:giorn[ie]|giornate|days?)[^.\n]{0,40}(?:settiman|su\s*\d|a\s*week|week)",
     re.IGNORECASE,
 )
 _ONSITE_RE = re.compile(
-    r"\bin sede\b|\bon[- ]site\b|\bonsite\b|\bin presenza\b|presenza in sede|\bin office\b",
+    r"\bin sede\b|\bon[- ]site\b|\bonsite\b|\bin presenza\b|presenza in sede|\bin office\b"
+    # The English half was here and the Italian one was not, on an app whose
+    # postings are mostly Italian: "giornate da remoto e in ufficio" says you
+    # will be at a desk, and it was reading as nothing at all.
+    r"|\bin ufficio\b",
     re.IGNORECASE,
 )
 # Only phrasings that claim the WHOLE job is remote. A bare "da remoto" is not

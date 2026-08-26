@@ -1206,5 +1206,14 @@
     "addRoles": "Save these roles to search for: {roles}?",
     "setField": "Set {field} to {value}?",
     "openJob": "Open this offer?"
+  },
+  "cvReview": {
+    "title": "What I read from your CV",
+    "hint": "These decide which offers get hidden. Correct anything I got wrong — what you leave alone stays sourced to your CV.",
+    "confirm": "Looks right",
+    "later": "I'll do this later",
+    "saved": "Thanks — your matching data is up to date",
+    "notSaid": "Not said",
+    "fieldsPlaceholder": "computer science, engineering"
   }
 }
