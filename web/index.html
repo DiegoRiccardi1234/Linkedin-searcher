@@ -362,13 +362,14 @@
         <div class="filters-row">
           <input id="searchText" type="text" data-i18n-placeholder="jobs.searchPlaceholder" placeholder="Search title or company..." />
           <input id="minScore" type="number" min="0" max="10" data-i18n-placeholder="jobs.minScore" placeholder="Min score" />
-          <input id="maxAgeDays" type="number" min="1" data-i18n-placeholder="jobs.maxAge" placeholder="Max age (days)" />
+          <input id="maxAgeDays" type="number" min="1" data-i18n-placeholder="jobs.maxAge" placeholder="Max days" data-i18n-title="jobs.maxAgeHint" title="Days counted from the last scan, not from today" />
           <label class="filter-check"><input id="onlyFavorites" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">favorite</span> <span data-i18n="jobs.favorites">Favorites</span></label>
           <label class="filter-check"><input id="onlyNew" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">fiber_new</span> <span data-i18n="jobs.new">New</span></label>
           <label class="filter-check"><input id="remoteOnly" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">home_work</span> <span data-i18n="jobs.remote">Remote</span></label>
           <label class="filter-check" data-i18n-title="jobs.applicableOnlyHint" title="Hide jobs you can't legally take"><input id="applicableOnly" type="checkbox" checked /> <span class="material-symbols-outlined" style="font-size:1rem">how_to_reg</span> <span data-i18n="jobs.applicableOnly">Applicable</span></label>
           <label class="filter-check" data-i18n-title="jobs.fromMailHint" title="Only applications rebuilt from your inbox"><input id="fromMail" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">mark_email_read</span> <span data-i18n="jobs.fromMail">From mail</span></label>
           <label class="filter-check"><input id="minScore4" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">grade</span> <span data-i18n="jobs.minScore4">Score 4+</span></label>
+          <label class="filter-check" data-i18n-title="jobs.onlyFreshHint" title="Show only offers the last scan found again within 7 days"><input id="onlyFresh" type="checkbox" /> <span class="material-symbols-outlined" style="font-size:1rem">schedule</span> <span data-i18n="jobs.onlyFresh">Recent only</span></label>
           <button id="refreshJobsBtn" type="button" class="ghost-btn" aria-label="Refresh jobs"><span class="material-symbols-outlined">refresh</span></button>
           <button id="exportCsvBtn" type="button" class="ghost-btn"><span class="material-symbols-outlined">download</span> <span data-i18n="jobs.csv">CSV</span></button>
           <!-- The applications, not the archive: status, which CV went with
