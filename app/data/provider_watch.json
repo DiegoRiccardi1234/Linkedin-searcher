@@ -5,6 +5,7 @@
     "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
     "inclusionai/ling-3.0-flash-fin:free",
+    "inclusionai/ling-3.0-flash-sante:free",
     "liquid/lfm-2.5-2.6b:free",
     "minimax/minimax-m2.7:free",
     "minimax/minimax-m3:free",
@@ -16,14 +17,13 @@
     "poolside/laguna-s-2.1:free",
     "poolside/laguna-xs-2.1:free",
     "thinkingmachines/inkling-small:free",
-    "thinkingmachines/inkling:free",
-    "z-ai/glm-5.2:free"
+    "thinkingmachines/inkling:free"
   ],
   "pages": {
-    "cerebras_pricing": "f513528f230b61c9",
-    "google_pricing": "9b4e4fdea0ff6649",
-    "google_rate_limits": "8f11494f64bac1cc",
+    "cerebras_pricing": "ec161eb0228305fe",
+    "google_pricing": "90d6e6d65028b26a",
+    "google_rate_limits": "c5f7eccefb49e2dc",
     "groq_limits": "261170b346ff2287",
-    "openrouter_limits": "a911ad9304454e56"
+    "openrouter_limits": "55f8bbb100911e8c"
   }
 }
